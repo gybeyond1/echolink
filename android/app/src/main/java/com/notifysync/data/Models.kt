@@ -126,13 +126,13 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
         topic = json.getString("topic"),
         title = json.optString("title", ""),
         text = json.optString("text", ""),
-        senderName = obj.optString("sender_name", ""),
+        senderName = json.optString("sender_name", ""),
         timestamp = json.getLong("timestamp"),
-        deviceId = obj.optLong("device_id", -1),
-        mediaType = obj.optString("media_type", "text"),
-        mediaUrl = obj.optString("media_url", null),
-        mediaName = obj.optString("media_name", null),
-        mediaSize = obj.optLong("media_size", 0)
+        deviceId = json.optLong("device_id", -1),
+        mediaType = json.optString("media_type", "text"),
+        mediaUrl = json.optString("media_url", null),
+        mediaName = json.optString("media_name", null),
+        mediaSize = json.optLong("media_size", 0)
     )
 }
 
