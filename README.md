@@ -41,12 +41,6 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
     volumes:
       - ./data:/app/data
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 ```
 
 启动：
