@@ -6,7 +6,7 @@ const http = require("http");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
-const { initDB, seedAdmin } = require("./db");
+const { initDB, seedAdmin, getSettings } = require("./db");
 const { setupWebSocket } = require("./websocket");
 
 const app = express();
@@ -79,6 +79,10 @@ app.use("/api/admin", require("./routes/admin"));
 const publicDir = path.join(__dirname, "..", "public");
 if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir));
+  // 上传的媒体文件（图片/语音/附件）静态可访问
+  const uploadsDir = path.join(getDataDir(), "uploads");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  app.use("/uploads", express.static(uploadsDir));
   // 未匹配的非 API 路径都回退到 index.html（单页应用）
   app.get(/^(?!\/api\/).*/, (req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
@@ -98,6 +102,13 @@ app.use((req, res) => {
 
 // 初始化数据库
 initDB();
+// 加载服务器设置缓存（大小上限等）
+try {
+  getSettings();
+  console.log("[Settings] loaded");
+} catch (e) {
+  console.error("[Settings] load error:", e);
+}
 // 根据环境变量初始化/维护管理员账号
 try {
   seedAdmin();

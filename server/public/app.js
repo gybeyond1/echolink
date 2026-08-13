@@ -40,6 +40,21 @@
     setTimeout(() => el.remove(), 3200);
   }
 
+  function fmtSize(bytes) {
+    bytes = Number(bytes) || 0;
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / 1024 / 1024).toFixed(1) + " MB";
+  }
+  function mediaHtml(m) {
+    if (!m.media_type || m.media_type === "text" || !m.media_url) return "";
+    const url = m.media_url;
+    if (m.media_type === "image") return `<div style="margin-top:4px"><a href="${esc(url)}" target="_blank"><img src="${esc(url)}" style="max-width:240px;max-height:240px;border-radius:8px" /></a></div>`;
+    if (m.media_type === "voice") return `<div style="margin-top:4px"><audio controls src="${esc(url)}"></audio></div>`;
+    if (m.media_type === "file") return `<div style="margin-top:4px"><a class="btn ghost sm" href="${esc(url)}" target="_blank" download>${esc(m.media_name || "文件")}（${fmtSize(m.media_size)}）</a></div>`;
+    return "";
+  }
+
   async function api(path, opts) {
     opts = opts || {};
     const headers = { "Content-Type": "application/json" };
@@ -136,6 +151,7 @@
     { id: "admin_users", ic: "🛡️", label: "用户管理" },
     { id: "admin_topics", ic: "📚", label: "全部话题" },
     { id: "admin_notifs", ic: "📥", label: "全部通知" },
+    { id: "admin_settings", ic: "⚙️", label: "服务器设置" },
   ];
 
   function navItems() {
@@ -172,6 +188,7 @@
       if (state.tab === "admin_users") return renderAdminUsers(main);
       if (state.tab === "admin_topics") return renderAdminTopics(main);
       if (state.tab === "admin_notifs") return renderAdminNotifs(main);
+      if (state.tab === "admin_settings") return renderAdminSettings(main);
     } catch (e) {
       main.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
     }
@@ -424,6 +441,10 @@
         <button class="btn" id="t-send" style="flex:0 0 auto">发送</button>
       </div>
       <div class="row" style="margin-top:10px">
+        <input id="t-file" type="file" style="flex:1;min-width:0" />
+        <button class="btn ghost sm" id="t-upimg">发送图片/文件</button>
+      </div>
+      <div class="row" style="margin-top:10px">
         <button class="btn ghost sm" id="t-leave">退出话题</button>
         <button class="btn danger sm" id="t-del">删除话题</button>
       </div>
@@ -448,6 +469,32 @@
       if (!confirm("确定删除该话题？所有消息将被清除，且不可恢复。")) return;
       try { await api("/api/topics/" + topic, { method: "DELETE" }); toast("已删除", "ok"); state.topic = null; renderTopics(main); }
       catch (e) { toast(e.message, "err"); }
+    };
+    document.getElementById("t-upimg").onclick = async () => {
+      const f = document.getElementById("t-file").files[0];
+      if (!f) return toast("请先选择一个文件（图片或任意文件）", "err");
+      const kind = f.type.startsWith("image/") ? "image" : "file";
+      const fd = new FormData();
+      fd.append("file", f);
+      const btn = document.getElementById("t-upimg");
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/topics/${encodeURIComponent(topic)}/media?kind=${kind}`, {
+          method: "POST",
+          headers: { Authorization: "Bearer " + state.token },
+          body: fd,
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || "上传失败");
+        await api("/api/topics/" + topic + "/publish", {
+          method: "POST",
+          body: { media_type: kind, media_url: j.url, media_name: j.name, media_size: j.size, sender_name: state.username },
+        });
+        document.getElementById("t-file").value = "";
+        toast("已发送", "ok");
+        renderTopicView(main, topic);
+      } catch (e) { toast(e.message, "err"); }
+      finally { btn.disabled = false; }
     };
     document.getElementById("t-members").onclick = async () => {
       try {
@@ -484,6 +531,7 @@
       <div style="font-size:13px"><b>${esc(m.sender_name || "未知")}</b> <span style="color:var(--muted);font-size:11px">${fmtTime(m.timestamp)}</span></div>
       ${m.title ? `<div style="font-weight:600">${esc(m.title)}</div>` : ""}
       <div>${esc(m.text)}</div>
+      ${mediaHtml(m)}
     </div>`).join("");
     msg.scrollTop = msg.scrollHeight;
   }
@@ -639,6 +687,51 @@
     };
     document.getElementById("an-go").onclick = load;
     await load();
+  }
+
+  // ---------- Admin: Server Settings ----------
+  async function renderAdminSettings(main) {
+    main.innerHTML = `<h2 class="page-title">服务器设置</h2>
+      <p class="page-sub">配置话题中可发送的 图片 / 语音 / 文件 大小上限，以及每个话题保留的消息历史条数。设置即时生效。</p>
+      <div class="card" style="max-width:560px">
+        <div class="row">
+          <div><label>图片大小上限（MB）</label><input id="s-img" type="number" min="0" step="0.5" /></div>
+          <div><label>语音大小上限（MB）</label><input id="s-voice" type="number" min="0" step="0.5" /></div>
+        </div>
+        <div class="row">
+          <div><label>文件大小上限（MB）</label><input id="s-file" type="number" min="0" step="0.5" /></div>
+          <div><label>话题历史保留（条）</label><input id="s-hist" type="number" min="0" step="10" /></div>
+        </div>
+        <div class="hint" style="margin-top:8px">数值 0 表示不限制（但服务端硬性上限为 100MB/单个文件）。超出上限的文件会被拒绝上传。</div>
+        <button class="btn" id="s-save" style="margin-top:14px">保存设置</button>
+      </div>
+      <div id="s-status" style="margin-top:12px"></div>`;
+    const status = document.getElementById("s-status");
+    try {
+      const r = await api("/api/admin/settings");
+      const s = r.settings || {};
+      document.getElementById("s-img").value = s.max_image_size ?? 10;
+      document.getElementById("s-voice").value = s.max_voice_size ?? 5;
+      document.getElementById("s-file").value = s.max_file_size ?? 20;
+      document.getElementById("s-hist").value = s.max_topic_history ?? 200;
+    } catch (e) { status.innerHTML = `<div class="empty">读取设置失败：${esc(e.message)}</div>`; }
+    document.getElementById("s-save").onclick = async () => {
+      const patch = {
+        max_image_size: document.getElementById("s-img").value,
+        max_voice_size: document.getElementById("s-voice").value,
+        max_file_size: document.getElementById("s-file").value,
+        max_topic_history: document.getElementById("s-hist").value,
+      };
+      const btn = document.getElementById("s-save");
+      btn.disabled = true;
+      try {
+        const r = await api("/api/admin/settings", { method: "PUT", body: { settings: patch } });
+        const s = r.settings || patch;
+        status.innerHTML = `<div class="label" style="color:#1a7f37;font-weight:600">已保存。当前上限：图片 ${esc(s.max_image_size)}MB · 语音 ${esc(s.max_voice_size)}MB · 文件 ${esc(s.max_file_size)}MB · 历史 ${esc(s.max_topic_history)} 条。</div>`;
+        toast("设置已保存", "ok");
+      } catch (e) { status.innerHTML = `<div class="empty">保存失败：${esc(e.message)}</div>`; }
+      finally { btn.disabled = false; }
+    };
   }
 
   // ---------- boot ----------

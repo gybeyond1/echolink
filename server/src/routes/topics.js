@@ -1,9 +1,30 @@
 const express = require("express");
-const { getDB } = require("../db");
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
+const { getDB, getMediaLimitBytes } = require("../db");
 const { authMiddleware } = require("../middleware/auth");
 const { publishToTopic, normalizeTopic } = require("../websocket");
 
 const router = express.Router();
+
+// 媒体上传（图片/语音/文件）落地目录：与数据库同级的 uploads/
+const UPLOAD_ROOT = path.join(process.env.DB_PATH ? path.dirname(process.env.DB_PATH) : "./data", "uploads");
+if (!fs.existsSync(UPLOAD_ROOT)) fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_ROOT),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || "").slice(0, 12);
+    cb(null, Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ext);
+  },
+});
+const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
+
+// 安全删除：某些环境（如受限沙箱）会在 unlink 时抛错，这里吞掉异常，
+// 避免"拒绝超大文件"等正常分支意外把整个服务进程搞崩。
+function safeUnlink(p) {
+  try { if (p) fs.unlinkSync(p); } catch (_) { /* 忽略：文件可能已不存在 */ }
+}
 
 function getTopic(name) {
   return getDB().prepare("SELECT * FROM topics WHERE name = ?").get(name);
@@ -22,6 +43,7 @@ router.get("/", authMiddleware, (req, res) => {
               m.role as my_role,
               (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name) as message_count,
               (SELECT MAX(timestamp) FROM topic_messages tm WHERE tm.topic = t.name) as last_message_at,
+              (SELECT text FROM topic_messages tm WHERE tm.topic = t.name ORDER BY id DESC LIMIT 1) as last_message,
               (SELECT COUNT(*) FROM topic_join_requests jr WHERE jr.topic_id = t.id AND jr.status='pending') as pending_requests
        FROM topics t
        JOIN topic_members m ON m.topic_id = t.id
@@ -86,6 +108,22 @@ router.post("/:topic/join", authMiddleware, (req, res) => {
   db.prepare(
     "INSERT OR REPLACE INTO topic_join_requests (topic_id, user_id, status, message, requested_at, handled_at) VALUES (?, ?, 'pending', ?, datetime('now'), NULL)"
   ).run(topic.id, req.userId, String(req.body.message || "").slice(0, 300));
+
+  // 通知话题创建者有人申请加入（写入其通知列表，创建者顶部会看到「待审批」提示）
+  try {
+    db.prepare(
+      `INSERT INTO notifications (user_id, device_id, package_name, app_name, title, text, timestamp)
+       VALUES (?, NULL, 'topic', '话题', ?, ?, ?)`
+    ).run(
+      topic.owner_id,
+      `申请加入话题「${name}」`,
+      `${req.username || "某用户"} 申请加入你创建的话题「${name}」`,
+      Date.now()
+    );
+  } catch (e) {
+    console.error("[topics] notify owner failed:", e);
+  }
+
   res.status(201).json({ message: "Join request sent, awaiting owner approval", status: "pending" });
 });
 
@@ -171,6 +209,45 @@ router.post("/:topic/leave", authMiddleware, (req, res) => {
   res.json({ message: "Left topic" });
 });
 
+// 上传话题媒体（图片/语音/文件）。需为该话题成员/管理员。
+// POST /api/topics/:topic/media?kind=image|voice|file   (multipart, field "file")
+router.post("/:topic/media", authMiddleware, (req, res) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: "上传失败: " + (err.message || err.code || "未知错误") });
+    const name = normalizeTopic(req.params.topic);
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "未收到文件" });
+    const kind = String(req.query.kind || req.body.kind || "file");
+    const allowed = { image: true, voice: true, file: true };
+    if (!allowed[kind]) {
+      safeUnlink(file.path);
+      return res.status(400).json({ error: "无效的媒体类型" });
+    }
+    const limit = getMediaLimitBytes(kind);
+    if (file.size > limit) {
+      safeUnlink(file.path);
+      return res.status(413).json({ error: `文件大小超过上限（${Math.round(limit / 1024 / 1024)}MB）` });
+    }
+    const db = getDB();
+    const topic = getTopic(name);
+    if (!topic) {
+      safeUnlink(file.path);
+      return res.status(404).json({ error: "Topic not found" });
+    }
+    if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
+      safeUnlink(file.path);
+      return res.status(403).json({ error: "Not a member of this topic" });
+    }
+    const url = "/uploads/" + encodeURIComponent(path.basename(file.path));
+    res.status(201).json({
+      url,
+      name: file.originalname || path.basename(file.path),
+      size: file.size,
+      type: kind,
+    });
+  });
+});
+
 // 发布消息到话题（成员/管理员可发）
 // POST /api/topics/:topic/publish  body: { title, text, sender_name?, device_id? }
 router.post("/:topic/publish", authMiddleware, (req, res) => {
@@ -179,9 +256,11 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
     return res.status(400).json({ error: "Invalid topic name (1-64 chars of a-z0-9_-)" });
   }
 
-  const { title, text } = req.body;
-  if ((!title || !String(title).trim()) && (!text || !String(text).trim())) {
-    return res.status(400).json({ error: "title or text is required" });
+  const { title, text, media_type, media_url, media_name, media_size } = req.body;
+  const hasText = (title && String(title).trim()) || (text && String(text).trim());
+  const hasMedia = media_type && media_type !== "text" && media_url;
+  if (!hasText && !hasMedia) {
+    return res.status(400).json({ error: "title, text or media is required" });
   }
 
   const db = getDB();
@@ -198,17 +277,29 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
   const deviceId = req.body.device_id || null;
   const sender = String(req.body.sender_name || req.username || "unknown").slice(0, 64);
   const ts = Date.now();
+  const mediaType = hasMedia ? String(media_type).slice(0, 16) : "text";
 
   const result = db
-    .prepare(`INSERT INTO topic_messages (topic, user_id, device_id, sender_name, title, text, timestamp)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .run(name, req.userId, deviceId, sender, String(title || "").slice(0, 500), String(text || "").slice(0, 2000), ts);
+    .prepare(`INSERT INTO topic_messages (topic, user_id, device_id, sender_name, title, text, media_type, media_url, media_name, media_size, timestamp)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(
+      name, req.userId, deviceId, sender,
+      String(title || "").slice(0, 500), String(text || "").slice(0, 2000),
+      mediaType, hasMedia ? String(media_url).slice(0, 500) : null,
+      hasMedia ? String(media_name || "").slice(0, 200) : null,
+      hasMedia ? (parseInt(media_size) || 0) : 0,
+      ts
+    );
 
   const message = {
     id: result.lastInsertRowid,
     topic: name,
     title: title || "",
     text: text || "",
+    media_type: mediaType,
+    media_url: hasMedia ? media_url : null,
+    media_name: hasMedia ? (media_name || "") : null,
+    media_size: hasMedia ? (parseInt(media_size) || 0) : 0,
     sender_name: sender,
     timestamp: ts,
     device_id: deviceId,

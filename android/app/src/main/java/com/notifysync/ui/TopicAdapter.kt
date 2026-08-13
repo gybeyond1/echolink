@@ -1,12 +1,25 @@
 package com.notifysync.ui
 
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.media.MediaPlayer
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.notifysync.R
+import com.notifysync.data.AuthManager
 import com.notifysync.data.TopicMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -18,6 +31,7 @@ class TopicAdapter(
 
     private val items = mutableListOf<TopicMessage>()
     private val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     var selectionMode = false
         private set
@@ -37,7 +51,6 @@ class TopicAdapter(
         notifyItemRangeInserted(start, list.size)
     }
 
-    /** 长按进入多选，并选中被长按的那条 */
     fun enterSelection(item: TopicMessage) {
         selectionMode = true
         if (item.id > 0) selected.add(item.id)
@@ -72,6 +85,10 @@ class TopicAdapter(
         val tvTime: TextView = view.findViewById(R.id.tvTime)
         val tvTitle: TextView = view.findViewById(R.id.tvTitle)
         val tvText: TextView = view.findViewById(R.id.tvText)
+        val ivMedia: ImageView = view.findViewById(R.id.ivMedia)
+        val llVoice: android.view.View = view.findViewById(R.id.llVoice)
+        val llFile: android.view.View = view.findViewById(R.id.llFile)
+        val tvFile: TextView = view.findViewById(R.id.tvFile)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -82,12 +99,38 @@ class TopicAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
+        val isMedia = item.mediaType != "text" && !item.mediaUrl.isNullOrEmpty()
         holder.tvSender.text = item.senderName.ifEmpty { "unknown" }
         holder.tvTime.text = timeFormat.format(Date(item.timestamp))
         holder.tvTitle.text = item.title
         holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
         holder.tvText.text = item.text
         holder.tvText.visibility = if (item.text.isNotEmpty()) View.VISIBLE else View.GONE
+
+        // 媒体渲染
+        holder.ivMedia.visibility = View.GONE
+        holder.llVoice.visibility = View.GONE
+        holder.llFile.visibility = View.GONE
+        if (isMedia) {
+            when (item.mediaType) {
+                "image" -> {
+                    holder.ivMedia.visibility = View.VISIBLE
+                    loadImage(fullUrl(item.mediaUrl!!), holder.ivMedia)
+                }
+                "voice" -> {
+                    holder.llVoice.visibility = View.VISIBLE
+                    holder.llVoice.setOnClickListener { playVoice(fullUrl(item.mediaUrl!!)) }
+                }
+                "file" -> {
+                    holder.llFile.visibility = View.VISIBLE
+                    holder.tvFile.text = "📄 ${item.mediaName ?: "文件"}  (${formatSize(item.mediaSize)})"
+                    holder.llFile.setOnClickListener {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl(item.mediaUrl!!)))
+                        try { it.context.startActivity(intent) } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
 
         // 多选态视觉
         holder.cbSelect.visibility = if (selectionMode) View.VISIBLE else View.GONE
@@ -106,4 +149,49 @@ class TopicAdapter(
     }
 
     override fun getItemCount(): Int = items.size
+
+    private fun fullUrl(path: String): String {
+        val base = AuthManager.serverUrl.trimEnd('/')
+        return if (path.startsWith("http")) path else "$base$path"
+    }
+
+    private fun loadImage(url: String, iv: ImageView) {
+        iv.setImageBitmap(null)
+        scope.launch {
+            try {
+                val bmp = withContext(Dispatchers.IO) {
+                    val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 10000
+                        readTimeout = 15000
+                        doInput = true
+                    }
+                    conn.inputStream.use { BitmapFactory.decodeStream(it) }
+                }
+                iv.setImageBitmap(bmp)
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
+    private fun playVoice(url: String) {
+        try {
+            val mp = MediaPlayer()
+            mp.setDataSource(url)
+            mp.setOnPreparedListener { it.start() }
+            mp.setOnCompletionListener { it.release() }
+            mp.setOnErrorListener { m, _, _ -> m.release(); true }
+            mp.prepareAsync()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    private fun formatSize(bytes: Long): String {
+        return when {
+            bytes >= 1024 * 1024 -> String.format("%.1fMB", bytes / 1024f / 1024f)
+            bytes >= 1024 -> String.format("%.1fKB", bytes / 1024f)
+            else -> "${bytes}B"
+        }
+    }
 }
