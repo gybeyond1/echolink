@@ -1,0 +1,26 @@
+# 依赖
+node_modules/
+server/node_modules/
+
+# 运行时数据（SQLite）
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+
+# 本地环境变量（含密钥）
+server/.env.local
+
+# Android 构建产物
+android/.gradle/
+android/app/build/
+android/build/
+*.apk
+*.aar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
