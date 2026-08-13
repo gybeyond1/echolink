@@ -179,7 +179,7 @@ class TopicFragment : Fragment() {
     private fun showAddTopicDialog() {
         val input = TextInputEditText(requireContext()).apply {
             hint = "话题名：字母/数字/_/-（如 work、family）"
-            singleLine = true
+            isSingleLine = true
         }
         AlertDialog.Builder(requireContext())
             .setTitle("添加话题")
