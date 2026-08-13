@@ -1,0 +1,31 @@
+# NotifySync 一键部署
+#
+# 使用方法：
+#   1. 修改下方 JWT_SECRET（或设置环境变量）
+#   2. docker compose up -d --build
+#   3. 反向代理把 80/443 转发到本容器的 3000 端口
+#
+# 数据保存在 ./data 目录（SQLite 数据库）
+
+services:
+  notifysync:
+    build: .
+    container_name: notifysync
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      # 生产环境务必改成随机长字符串！
+      - JWT_SECRET=${JWT_SECRET:-change-this-to-a-random-secret-key}
+      - DB_PATH=/app/data/notifysync.db
+      - MAX_NOTIFICATION_HISTORY=${MAX_NOTIFICATION_HISTORY:-500}
+      - MAX_TOPIC_HISTORY=${MAX_TOPIC_HISTORY:-200}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
