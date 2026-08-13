@@ -1,0 +1,9 @@
+# 强制源码统一使用 LF 换行，避免 CI（Linux）构建时脚本出错
+* text=auto eol=lf
+
+# 二进制文件不转换
+*.png binary
+*.jpg binary
+*.jar binary
+*.node binary
+*.apk binary
