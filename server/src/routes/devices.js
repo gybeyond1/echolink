@@ -6,22 +6,43 @@ const { authMiddleware } = require("../middleware/auth");
 const router = express.Router();
 
 // 注册设备
+// 支持 client_id（每个物理设备安装时生成的稳定标识）：同一设备重登录时复用同一 device_id，
+// 保证"按设备"的清空/删除状态在不同会话间持久。无 client_id 时仍按旧逻辑新建。
 router.post("/register", authMiddleware, (req, res) => {
-  const { device_name, platform } = req.body;
+  const { device_name, platform, client_id } = req.body;
   if (!device_name) {
     return res.status(400).json({ error: "device_name is required" });
   }
 
   const db = getDB();
   const deviceToken = crypto.randomBytes(32).toString("hex");
+
+  // 若提供了稳定的 client_id，则尝试复用该用户下已有设备
+  if (client_id) {
+    const existing = db
+      .prepare("SELECT id, device_name FROM devices WHERE user_id = ? AND client_id = ?")
+      .get(req.userId, client_id);
+    if (existing) {
+      db.prepare("UPDATE devices SET device_name = ?, platform = ?, last_seen = datetime('now') WHERE id = ?")
+        .run(device_name, platform || "android", existing.id);
+      return res.status(200).json({
+        device_id: existing.id,
+        device_token: null,
+        device_name,
+        reused: true,
+      });
+    }
+  }
+
   const result = db
-    .prepare("INSERT INTO devices (user_id, device_name, device_token, platform, last_seen) VALUES (?, ?, ?, ?, datetime('now'))")
-    .run(req.userId, device_name, deviceToken, platform || "android");
+    .prepare("INSERT INTO devices (user_id, device_name, device_token, platform, client_id, last_seen) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+    .run(req.userId, device_name, deviceToken, platform || "android", client_id || null);
 
   res.status(201).json({
     device_id: result.lastInsertRowid,
     device_token: deviceToken,
     device_name,
+    reused: false,
   });
 });
 

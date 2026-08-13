@@ -5,7 +5,173 @@ const { publishToTopic, normalizeTopic } = require("../websocket");
 
 const router = express.Router();
 
-// 发布消息到话题（HTTP 方式，也可以走 WebSocket）
+function getTopic(name) {
+  return getDB().prepare("SELECT * FROM topics WHERE name = ?").get(name);
+}
+function getMembership(topicId, userId) {
+  return getDB().prepare("SELECT * FROM topic_members WHERE topic_id = ? AND user_id = ?").get(topicId, userId);
+}
+
+// 列出我参与（成员）的话题
+// GET /api/topics
+router.get("/", authMiddleware, (req, res) => {
+  const db = getDB();
+  const topics = db
+    .prepare(
+      `SELECT t.id, t.name, t.title, t.description, t.owner_id, u.username as owner_name,
+              m.role as my_role,
+              (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name) as message_count,
+              (SELECT MAX(timestamp) FROM topic_messages tm WHERE tm.topic = t.name) as last_message_at,
+              (SELECT COUNT(*) FROM topic_join_requests jr WHERE jr.topic_id = t.id AND jr.status='pending') as pending_requests
+       FROM topics t
+       JOIN topic_members m ON m.topic_id = t.id
+       LEFT JOIN users u ON t.owner_id = u.id
+       WHERE m.user_id = ?
+       ORDER BY last_message_at DESC, t.created_at DESC LIMIT 100`
+    )
+    .all(req.userId);
+  res.json({ topics });
+});
+
+// 发现话题（非成员可见，用于申请加入）
+// GET /api/topics/discover?q=
+router.get("/discover", authMiddleware, (req, res) => {
+  const db = getDB();
+  const q = (req.query.q || "").trim().toLowerCase();
+  const sql = `SELECT t.id, t.name, t.title, t.owner_id, u.username as owner_name,
+              (SELECT COUNT(*) FROM topic_members tm WHERE tm.topic_id = t.id) as member_count,
+              (SELECT COUNT(*) FROM topic_messages tm2 WHERE tm2.topic = t.name) as message_count
+       FROM topics t LEFT JOIN users u ON t.owner_id = u.id
+       WHERE NOT EXISTS (SELECT 1 FROM topic_members m WHERE m.topic_id = t.id AND m.user_id = ?)
+       ${q ? "AND t.name LIKE ?" : ""}
+       ORDER BY t.created_at DESC LIMIT 50`;
+  const rows = q ? db.prepare(sql).all(req.userId, "%" + q + "%") : db.prepare(sql).all(req.userId);
+  res.json({ topics: rows });
+});
+
+// 创建话题（群聊）。创建者成为 owner。
+// POST /api/topics  body: { name, title?, description? }
+router.post("/", authMiddleware, (req, res) => {
+  const name = normalizeTopic(req.body.name || req.body.topic);
+  if (!name) {
+    return res.status(400).json({ error: "Invalid topic name (1-64 chars of a-z0-9_-)" });
+  }
+  const db = getDB();
+  if (getTopic(name)) {
+    return res.status(409).json({ error: "Topic already exists" });
+  }
+  const info = db
+    .prepare("INSERT INTO topics (name, owner_id, title, description) VALUES (?, ?, ?, ?)")
+    .run(name, req.userId, String(req.body.title || "").slice(0, 120), String(req.body.description || "").slice(0, 500));
+  db.prepare("INSERT INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'owner')").run(info.lastInsertRowid, req.userId);
+  res.status(201).json({
+    message: "Topic created",
+    topic: { id: info.lastInsertRowid, name, owner_id: req.userId, my_role: "owner" },
+  });
+});
+
+// 申请加入话题（需创建者审批）
+// POST /api/topics/:topic/join  body: { message? }
+router.post("/:topic/join", authMiddleware, (req, res) => {
+  const name = normalizeTopic(req.params.topic);
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
+  const db = getDB();
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  if (getMembership(topic.id, req.userId)) return res.status(409).json({ error: "You are already a member" });
+  const existing = db.prepare("SELECT * FROM topic_join_requests WHERE topic_id = ? AND user_id = ?").get(topic.id, req.userId);
+  if (existing && existing.status === "pending") {
+    return res.status(409).json({ error: "Join request already pending", request: existing });
+  }
+  db.prepare(
+    "INSERT OR REPLACE INTO topic_join_requests (topic_id, user_id, status, message, requested_at, handled_at) VALUES (?, ?, 'pending', ?, datetime('now'), NULL)"
+  ).run(topic.id, req.userId, String(req.body.message || "").slice(0, 300));
+  res.status(201).json({ message: "Join request sent, awaiting owner approval", status: "pending" });
+});
+
+// 列出某话题成员（成员/管理员）
+// GET /api/topics/:topic/members
+router.get("/:topic/members", authMiddleware, (req, res) => {
+  const name = normalizeTopic(req.params.topic);
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
+  const db = getDB();
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
+    return res.status(403).json({ error: "Not a member of this topic" });
+  }
+  const members = db
+    .prepare(
+      `SELECT m.user_id, m.role, m.joined_at, u.username
+       FROM topic_members m LEFT JOIN users u ON m.user_id = u.id
+       WHERE m.topic_id = ? ORDER BY (m.role='owner') DESC, m.joined_at ASC`
+    )
+    .all(topic.id);
+  res.json({ members });
+});
+
+// 列出待审批申请（仅 owner/管理员）
+// GET /api/topics/:topic/requests
+router.get("/:topic/requests", authMiddleware, (req, res) => {
+  const name = normalizeTopic(req.params.topic);
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
+  const db = getDB();
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  const mem = getMembership(topic.id, req.userId);
+  if (!(mem && mem.role === "owner") && req.role !== "admin") {
+    return res.status(403).json({ error: "Only the topic owner or admin can view requests" });
+  }
+  const requests = db
+    .prepare(
+      `SELECT r.id, r.user_id, r.status, r.message, r.requested_at, u.username
+       FROM topic_join_requests r LEFT JOIN users u ON r.user_id = u.id
+       WHERE r.topic_id = ? ORDER BY r.requested_at DESC`
+    )
+    .all(topic.id);
+  res.json({ requests });
+});
+
+// 审批通过 / 拒绝
+// POST /api/topics/:topic/requests/:id/approve | /reject
+router.post("/:topic/requests/:id/approve", authMiddleware, (req, res) => handleRequest(req, res, "approved"));
+router.post("/:topic/requests/:id/reject", authMiddleware, (req, res) => handleRequest(req, res, "rejected"));
+
+function handleRequest(req, res, status) {
+  const name = normalizeTopic(req.params.topic);
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
+  const db = getDB();
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  const mem = getMembership(topic.id, req.userId);
+  if (!(mem && mem.role === "owner") && req.role !== "admin") {
+    return res.status(403).json({ error: "Only the topic owner or admin can handle requests" });
+  }
+  const reqRow = db.prepare("SELECT * FROM topic_join_requests WHERE id = ? AND topic_id = ?").get(parseInt(req.params.id), topic.id);
+  if (!reqRow) return res.status(404).json({ error: "Request not found" });
+  db.prepare("UPDATE topic_join_requests SET status = ?, handled_at = datetime('now') WHERE id = ?").run(status, reqRow.id);
+  if (status === "approved" && !getMembership(topic.id, reqRow.user_id)) {
+    db.prepare("INSERT OR IGNORE INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'member')").run(topic.id, reqRow.user_id);
+  }
+  res.json({ message: "Request " + status, request: { id: reqRow.id, status } });
+}
+
+// 退出话题（成员可退出；owner 不可退出）
+// POST /api/topics/:topic/leave
+router.post("/:topic/leave", authMiddleware, (req, res) => {
+  const name = normalizeTopic(req.params.topic);
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
+  const db = getDB();
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  const mem = getMembership(topic.id, req.userId);
+  if (!mem) return res.status(404).json({ error: "You are not a member" });
+  if (mem.role === "owner") return res.status(400).json({ error: "Owner cannot leave; delete the topic instead" });
+  db.prepare("DELETE FROM topic_members WHERE topic_id = ? AND user_id = ?").run(topic.id, req.userId);
+  res.json({ message: "Left topic" });
+});
+
+// 发布消息到话题（成员/管理员可发）
 // POST /api/topics/:topic/publish  body: { title, text, sender_name?, device_id? }
 router.post("/:topic/publish", authMiddleware, (req, res) => {
   const name = normalizeTopic(req.params.topic);
@@ -19,6 +185,16 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
   }
 
   const db = getDB();
+  let topic = getTopic(name);
+  // 首次发布且话题不存在：自动创建，发布者成为 owner（保持"输入即建"的易用性）
+  if (!topic) {
+    const info = db.prepare("INSERT INTO topics (name, owner_id, title, description) VALUES (?, ?, ?, ?)").run(name, req.userId, name, "");
+    topic = { id: info.lastInsertRowid, name };
+    db.prepare("INSERT INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'owner')").run(topic.id, req.userId);
+  } else if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
+    return res.status(403).json({ error: "You are not a member of this topic. Request to join first." });
+  }
+
   const deviceId = req.body.device_id || null;
   const sender = String(req.body.sender_name || req.username || "unknown").slice(0, 64);
   const ts = Date.now();
@@ -38,10 +214,8 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
     device_id: deviceId,
   };
 
-  // 推送给订阅者，排除发送者自己的设备连接（本机去重）
   const sent = publishToTopic(name, message, { excludeDeviceId: deviceId });
 
-  // 清理旧消息
   const maxHistory = parseInt(process.env.MAX_TOPIC_HISTORY || "200");
   db.prepare(`DELETE FROM topic_messages WHERE topic = ? AND id NOT IN (
       SELECT id FROM topic_messages WHERE topic = ? ORDER BY id DESC LIMIT ?)
@@ -50,40 +224,63 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
   res.status(201).json({ message: "Published", topic_message: message, delivered: sent });
 });
 
-// 获取话题消息列表
+// 获取话题消息列表（成员/管理员可见）
 // GET /api/topics/:topic/messages?limit=50&since=<timestamp>
 router.get("/:topic/messages", authMiddleware, (req, res) => {
   const name = normalizeTopic(req.params.topic);
-  if (!name) {
-    return res.status(400).json({ error: "Invalid topic name" });
-  }
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
 
   const db = getDB();
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
+    return res.status(403).json({ error: "Not a member of this topic" });
+  }
+
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
   const since = parseInt(req.query.since) || 0;
 
   const messages =
     since > 0
-      ? db
-          .prepare(`SELECT * FROM topic_messages WHERE topic = ? AND timestamp > ? ORDER BY id ASC LIMIT ?`)
-          .all(name, since, limit)
-      : db
-          .prepare(`SELECT * FROM topic_messages WHERE topic = ? ORDER BY id DESC LIMIT ?`)
-          .all(name, limit)
-          .reverse();
+      ? db.prepare(`SELECT * FROM topic_messages WHERE topic = ? AND timestamp > ? ORDER BY id ASC LIMIT ?`).all(name, since, limit)
+      : db.prepare(`SELECT * FROM topic_messages WHERE topic = ? ORDER BY id DESC LIMIT ?`).all(name, limit).reverse();
 
   res.json({ topic: name, messages });
 });
 
-// 列出服务器上有消息记录的话题
-// GET /api/topics
-router.get("/", authMiddleware, (req, res) => {
+// 删除单条话题消息（成员可删自己的；管理员可删任意）
+// DELETE /api/topics/:topic/messages/:id
+router.delete("/:topic/messages/:id", authMiddleware, (req, res) => {
+  const name = normalizeTopic(req.params.topic);
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
   const db = getDB();
-  const topics = db
-    .prepare(`SELECT topic, COUNT(*) as message_count, MAX(timestamp) as last_message_at
-              FROM topic_messages GROUP BY topic ORDER BY last_message_at DESC LIMIT 100`)
-    .all();
-  res.json({ topics });
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
+    return res.status(403).json({ error: "Not a member of this topic" });
+  }
+  const result = db
+    .prepare("DELETE FROM topic_messages WHERE id = ? AND topic = ? AND (user_id = ? OR ? = 'admin')")
+    .run(parseInt(req.params.id), name, req.userId, req.role);
+  if (result.changes === 0) return res.status(404).json({ error: "Message not found or no permission" });
+  res.json({ message: "Topic message deleted" });
+});
+
+// 删除整个话题（owner/管理员；同时清理消息）
+// DELETE /api/topics/:topic
+router.delete("/:topic", authMiddleware, (req, res) => {
+  const name = normalizeTopic(req.params.topic);
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
+  const db = getDB();
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  const mem = getMembership(topic.id, req.userId);
+  if (!(mem && mem.role === "owner") && req.role !== "admin") {
+    return res.status(403).json({ error: "Only the topic owner or admin can delete this topic" });
+  }
+  db.prepare("DELETE FROM topic_messages WHERE topic = ?").run(name);
+  db.prepare("DELETE FROM topics WHERE id = ?").run(topic.id); // 级联删除 members/requests
+  res.json({ message: "Topic deleted" });
 });
 
 module.exports = router;

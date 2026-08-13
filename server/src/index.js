@@ -6,7 +6,7 @@ const http = require("http");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
-const { initDB } = require("./db");
+const { initDB, seedAdmin } = require("./db");
 const { setupWebSocket } = require("./websocket");
 
 const app = express();
@@ -73,6 +73,7 @@ app.use("/api/devices", require("./routes/devices"));
 app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/filters", require("./routes/filters"));
 app.use("/api/topics", require("./routes/topics"));
+app.use("/api/admin", require("./routes/admin"));
 
 // 静态管理界面（WebUI）
 const publicDir = path.join(__dirname, "..", "public");
@@ -97,6 +98,12 @@ app.use((req, res) => {
 
 // 初始化数据库
 initDB();
+// 根据环境变量初始化/维护管理员账号
+try {
+  seedAdmin();
+} catch (e) {
+  console.error("[DB] seedAdmin error:", e);
+}
 
 // 启动 WebSocket
 setupWebSocket(server);

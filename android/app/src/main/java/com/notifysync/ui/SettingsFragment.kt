@@ -39,7 +39,18 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        try {
+            setupUI()
+        } catch (e: Exception) {
+            // 兜底：任何异常都不要在打开设置时直接闪退，给出可阅读的错误提示
+            android.util.Log.e("SettingsFragment", "onViewCreated error", e)
+            try {
+                Toast.makeText(requireContext(), "设置页出错: ${e.message}", Toast.LENGTH_LONG).show()
+            } catch (_: Exception) { /* ignore */ }
+        }
+    }
 
+    private fun setupUI() {
         // 显示当前信息
         binding.tvUsername.text = AuthManager.username ?: "未知"
         binding.tvDeviceName.text = AuthManager.deviceName ?: "未知"

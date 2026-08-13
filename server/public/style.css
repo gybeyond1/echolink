@@ -166,6 +166,29 @@ tr:hover td { background: #fafbff; }
   padding: 12px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 16px; }
 .hint b { color: #1f3a73; }
 
+/* ---------- Badges ---------- */
+.badge.admin { background: #e7e0ff; color: #6a3fd0; }
+.badge.owner { background: #fdeccb; color: #b9791b; }
+.badge.member { background: #e3f6ec; color: #1f9d5b; }
+.badge.warn { background: #fff1d6; color: #c08a1e; }
+
+/* ---------- Subtabs / topic cards ---------- */
+.subtabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.stab { border: 1px solid var(--border); background: #fff; color: var(--text);
+  padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.stab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.topic-card .label { line-height: 1.4; }
+
+/* ---------- Modal ---------- */
+.modal-mask { position: fixed; inset: 0; background: rgba(20,30,60,.45);
+  display: flex; align-items: center; justify-content: center; z-index: 500; padding: 20px; }
+.modal { background: #fff; border-radius: 14px; padding: 22px; max-width: 460px; width: 100%;
+  box-shadow: var(--shadow); max-height: 80vh; overflow: auto; }
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+.msgpre { background: #f7f9fd; border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 50vh; overflow: auto; }
+
+
 @media (max-width: 720px) {
   .layout { flex-direction: column; }
   .sidebar { width: 100%; display: flex; flex-wrap: wrap; gap: 4px; padding: 10px; }

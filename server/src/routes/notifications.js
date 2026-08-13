@@ -72,17 +72,34 @@ router.post("/", authMiddleware, (req, res) => {
 });
 
 // 获取通知列表
+// 支持 ?device_id= 实现「按设备」视图：该设备已清空/删除的通知对其隐藏，但不影响其他设备
 router.get("/", authMiddleware, (req, res) => {
   const db = getDB();
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
   const offset = parseInt(req.query.offset) || 0;
+  const deviceId = req.query.device_id ? parseInt(req.query.device_id) : null;
 
-  const notifications = db
-    .prepare(`SELECT n.*, d.device_name FROM notifications n
-              LEFT JOIN devices d ON n.device_id = d.id
-              WHERE n.user_id = ?
-              ORDER BY n.timestamp DESC LIMIT ? OFFSET ?`)
-    .all(req.userId, limit, offset);
+  let notifications;
+  if (deviceId) {
+    notifications = db
+      .prepare(`SELECT n.*, d.device_name FROM notifications n
+                LEFT JOIN devices d ON n.device_id = d.id
+                WHERE n.user_id = ?
+                  AND NOT EXISTS (
+                    SELECT 1 FROM notification_deletes nd
+                    WHERE nd.user_id = n.user_id AND nd.device_id = ? AND nd.notification_id = n.id
+                  )
+                ORDER BY n.timestamp DESC LIMIT ? OFFSET ?`)
+      .all(req.userId, deviceId, limit, offset);
+  } else {
+    // WebUI 管理后台（不带 device_id）查看该账号全部通知
+    notifications = db
+      .prepare(`SELECT n.*, d.device_name FROM notifications n
+                LEFT JOIN devices d ON n.device_id = d.id
+                WHERE n.user_id = ?
+                ORDER BY n.timestamp DESC LIMIT ? OFFSET ?`)
+      .all(req.userId, limit, offset);
+  }
 
   res.json({ notifications });
 });
@@ -103,8 +120,20 @@ router.get("/since/:timestamp", authMiddleware, (req, res) => {
 });
 
 // 删除通知
+// 带 ?device_id= 时：仅对该设备软删除（插入隐藏表），其他设备仍可见
+// 不带时（管理后台）：直接硬删除该记录
 router.delete("/:id", authMiddleware, (req, res) => {
   const db = getDB();
+  const deviceId = req.query.device_id ? parseInt(req.query.device_id) : null;
+
+  if (deviceId) {
+    db.prepare(
+      `INSERT OR IGNORE INTO notification_deletes (user_id, device_id, notification_id)
+       VALUES (?, ?, ?)`
+    ).run(req.userId, deviceId, parseInt(req.params.id));
+    return res.json({ message: "Notification hidden for this device" });
+  }
+
   const result = db.prepare("DELETE FROM notifications WHERE id = ? AND user_id = ?").run(req.params.id, req.userId);
   if (result.changes === 0) {
     return res.status(404).json({ error: "Notification not found" });
@@ -113,8 +142,20 @@ router.delete("/:id", authMiddleware, (req, res) => {
 });
 
 // 清空所有通知
+// 带 ?device_id= 时：仅对该设备软清空（该设备视图为空，其他设备不变）
+// 不带时（管理后台）：直接清空该账号全部
 router.delete("/", authMiddleware, (req, res) => {
   const db = getDB();
+  const deviceId = req.query.device_id ? parseInt(req.query.device_id) : null;
+
+  if (deviceId) {
+    db.prepare(
+      `INSERT OR IGNORE INTO notification_deletes (user_id, device_id, notification_id)
+       SELECT user_id, ?, id FROM notifications WHERE user_id = ?`
+    ).run(deviceId, req.userId);
+    return res.json({ message: "All notifications cleared for this device" });
+  }
+
   db.prepare("DELETE FROM notifications WHERE user_id = ?").run(req.userId);
   res.json({ message: "All notifications cleared" });
 });

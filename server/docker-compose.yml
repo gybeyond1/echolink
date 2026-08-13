@@ -22,6 +22,9 @@ services:
       - DB_PATH=/app/data/notifysync.db
       - MAX_NOTIFICATION_HISTORY=${MAX_NOTIFICATION_HISTORY:-500}
       - MAX_TOPIC_HISTORY=${MAX_TOPIC_HISTORY:-200}
+      # 管理员账号：首次启动自动创建；之后改这里并重启即可改密码。留空则不创建管理员。
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
     volumes:
       - ./data:/app/data
     healthcheck:
