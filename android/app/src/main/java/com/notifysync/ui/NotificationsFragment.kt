@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -15,7 +16,10 @@ import kotlinx.coroutines.launch
 class NotificationsFragment : Fragment() {
     private var _binding: FragmentNotificationsBinding? = null
     private val binding get() = _binding!!
-    private val adapter = NotificationAdapter()
+    private val adapter = NotificationAdapter(
+        onItemClick = { onItemClick(it) },
+        onItemLongClick = { onItemLongClick(it) }
+    )
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -32,14 +36,44 @@ class NotificationsFragment : Fragment() {
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
 
-        binding.btnRefresh.setOnClickListener { loadNotifications() }
-        binding.btnClear.setOnClickListener { clearNotifications() }
+        // 下拉刷新
+        binding.swipeRefresh.setOnRefreshListener { loadNotifications() }
+
+        // 多选操作栏
+        binding.btnCancelSel.setOnClickListener {
+            adapter.clearSelection()
+            updateSelectionUI()
+        }
+        binding.btnSelectAll.setOnClickListener {
+            adapter.selectAll()
+            updateSelectionUI()
+        }
+        binding.btnDeleteSelected.setOnClickListener { deleteSelected() }
 
         loadNotifications()
     }
 
     fun refresh() {
         if (_binding != null) loadNotifications()
+    }
+
+    private fun onItemClick(item: NotificationItem) {
+        if (adapter.isSelectionActive) {
+            adapter.toggleSelection(item.id)
+            updateSelectionUI()
+        }
+    }
+
+    private fun onItemLongClick(item: NotificationItem) {
+        adapter.enterSelectionMode()
+        adapter.toggleSelection(item.id)
+        updateSelectionUI()
+    }
+
+    private fun updateSelectionUI() {
+        val active = adapter.isSelectionActive
+        binding.selectionBar.visibility = if (active) View.VISIBLE else View.GONE
+        if (active) binding.tvSelectionCount.text = "已选 ${adapter.selectedCount}"
     }
 
     private fun loadNotifications() {
@@ -56,18 +90,23 @@ class NotificationsFragment : Fragment() {
                 binding.tvEmpty.visibility = View.VISIBLE
             } finally {
                 binding.progressBar.visibility = View.GONE
+                binding.swipeRefresh.isRefreshing = false
             }
         }
     }
 
-    private fun clearNotifications() {
+    private fun deleteSelected() {
+        val ids = adapter.getSelectedIds()
+        if (ids.isEmpty()) return
         lifecycleScope.launch {
             try {
-                ApiClient.clearAllNotifications()
-                adapter.submitList(emptyList())
-                binding.tvEmpty.visibility = View.VISIBLE
+                ids.forEach { id -> ApiClient.deleteNotification(id) }
+                adapter.clearSelection()
+                updateSelectionUI()
+                loadNotifications()
+                Toast.makeText(requireContext(), "已删除 ${ids.size} 条", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                // ignored
+                Toast.makeText(requireContext(), "删除失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }

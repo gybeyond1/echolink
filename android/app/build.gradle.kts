@@ -57,6 +57,9 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.viewpager2:viewpager2:1.0.0")
 
+    // 下拉刷新
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
     // OkHttp (HTTP + WebSocket)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

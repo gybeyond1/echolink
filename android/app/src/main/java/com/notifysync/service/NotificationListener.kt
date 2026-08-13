@@ -7,6 +7,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.notifysync.data.ApiClient
+import com.notifysync.data.AppFilterStore
 import com.notifysync.data.AuthManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,11 @@ class NotificationListener : NotificationListenerService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    override fun onCreate() {
+        super.onCreate()
+        AppFilterStore.init(applicationContext)
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
 
@@ -50,6 +56,9 @@ class NotificationListener : NotificationListenerService() {
 
         // 检查是否已登录
         if (!AuthManager.isLoggedIn) return
+
+        // 应用过滤：若已开启过滤，只同步白名单内的应用
+        if (!AppFilterStore.isAllowed(packageName)) return
 
         val notification = sbn.notification ?: return
         val extras = notification.extras ?: return

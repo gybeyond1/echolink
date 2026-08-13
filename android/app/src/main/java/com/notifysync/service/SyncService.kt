@@ -125,7 +125,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         Log.i(TAG, "Received synced notification: $appName - $title")
 
         val displayTitle = if (title.isNotEmpty()) "[$appName] $title" else "[$appName]"
-        showLocalNotification(displayTitle, text)
+        showLocalNotification(displayTitle, text, null)
 
         // 发送广播通知 UI 更新
         val broadcastIntent = Intent("com.notifysync.NOTIFICATION_RECEIVED").apply {
@@ -155,7 +155,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         Log.i(TAG, "Topic message on #$topicName from $sender: $title - $text")
 
         val displayTitle = if (title.isNotEmpty()) "[#$topicName] $title" else "[#$topicName] $sender"
-        showLocalNotification(displayTitle, text)
+        showLocalNotification(displayTitle, text, topicName)
 
         // 广播给 UI（话题页刷新）
         val broadcastIntent = Intent("com.notifysync.TOPIC_MESSAGE_RECEIVED").apply {
@@ -170,12 +170,16 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
     }
 
     // 展示一条本地系统通知（同步通知或话题消息）
-    private fun showLocalNotification(displayTitle: String, displayText: String) {
+    // topic 不为空时，点击通知会打开对应的话题页
+    private fun showLocalNotification(displayTitle: String, displayText: String, topic: String? = null) {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            if (topic != null) putExtra(MainActivity.EXTRA_TOPIC, topic)
         }
+        // 用不同 requestCode 区分「普通通知」与「话题消息」，避免 PendingIntent 相互覆盖
+        val requestCode = if (topic != null) 1 else 0
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+            this, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 

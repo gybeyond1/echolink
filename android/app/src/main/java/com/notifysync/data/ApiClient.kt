@@ -123,6 +123,10 @@ object ApiClient {
         execute(buildRequest("/api/notifications", "DELETE"))
     }
 
+    suspend fun deleteNotification(id: Long) {
+        execute(buildRequest("/api/notifications/$id", "DELETE"))
+    }
+
     // ===== 应用过滤器 =====
 
     suspend fun getFilters(): List<AppFilter> {

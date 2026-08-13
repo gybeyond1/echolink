@@ -7,11 +7,10 @@ import android.content.IntentFilter
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
+import com.notifysync.data.AppFilterStore
 import com.notifysync.data.AuthManager
 import com.notifysync.databinding.ActivityMainBinding
 import com.notifysync.service.SyncService
-import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -27,6 +26,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AuthManager.init(applicationContext)
+        AppFilterStore.init(applicationContext)
 
         if (!AuthManager.isLoggedIn) {
             startActivity(Intent(this, LoginActivity::class.java))
@@ -49,8 +49,21 @@ class MainActivity : AppCompatActivity() {
             Context.RECEIVER_NOT_EXPORTED
         )
 
-        // 默认显示通知页
         if (savedInstanceState == null) {
+            handleIntent(intent)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val topic = intent?.getStringExtra(EXTRA_TOPIC)
+        if (!topic.isNullOrEmpty()) {
+            openTopic(topic)
+        } else if (supportFragmentManager.fragments.isEmpty()) {
             switchFragment(NotificationsFragment())
         }
     }
@@ -60,7 +73,6 @@ class MainActivity : AppCompatActivity() {
             val fragment: Fragment = when (item.itemId) {
                 com.notifysync.R.id.nav_notifications -> NotificationsFragment()
                 com.notifysync.R.id.nav_topic -> TopicFragment()
-                com.notifysync.R.id.nav_apps -> AppFilterFragment()
                 com.notifysync.R.id.nav_settings -> SettingsFragment()
                 else -> return@setOnItemSelectedListener false
             }
@@ -76,6 +88,15 @@ class MainActivity : AppCompatActivity() {
             .commit()
     }
 
+    /** 打开话题页并定位到指定话题（用于点击状态栏话题通知） */
+    fun openTopic(topic: String) {
+        val frag = TopicFragment()
+        frag.arguments = Bundle().apply { putString("topic", topic) }
+        switchFragment(frag)
+        // 仅高亮底栏，不触发 onItemSelected 以免丢失话题参数
+        binding.bottomNav.menu.findItem(com.notifysync.R.id.nav_topic)?.isChecked = true
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         try {
@@ -83,5 +104,9 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             // ignored
         }
+    }
+
+    companion object {
+        const val EXTRA_TOPIC = "com.notifysync.topic"
     }
 }

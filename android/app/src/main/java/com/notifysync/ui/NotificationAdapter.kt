@@ -11,15 +11,24 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class NotificationAdapter :
-    ListAdapter<NotificationItem, NotificationAdapter.ViewHolder>(DIFF_CALLBACK) {
+class NotificationAdapter(
+    private val onItemClick: (NotificationItem) -> Unit,
+    private val onItemLongClick: (NotificationItem) -> Unit
+) : ListAdapter<NotificationItem, NotificationAdapter.ViewHolder>(DIFF_CALLBACK) {
 
     companion object {
         private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<NotificationItem>() {
             override fun areItemsTheSame(a: NotificationItem, b: NotificationItem) = a.id == b.id
             override fun areContentsTheSame(a: NotificationItem, b: NotificationItem) = a == b
         }
+
+        private val SELECTED_BG = 0xFFE3F2FD.toInt() // 浅蓝
+        private val NORMAL_BG = 0xFFFFFFFF.toInt()   // 白
     }
+
+    private val selected = mutableSetOf<Long>()
+    var isSelectionActive = false
+        private set
 
     private val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
 
@@ -44,6 +53,46 @@ class NotificationAdapter :
             binding.tvTime.text = dateFormat.format(Date(item.timestamp))
             binding.tvPackage.text = item.packageName
             binding.tvDevice.text = item.deviceName ?: ""
+
+            val isSel = isSelectionActive && selected.contains(item.id)
+            binding.root.setCardBackgroundColor(if (isSel) SELECTED_BG else NORMAL_BG)
+
+            binding.root.setOnClickListener { onItemClick(item) }
+            binding.root.setOnLongClickListener {
+                onItemLongClick(item)
+                true
+            }
         }
     }
+
+    // ===== 多选逻辑 =====
+
+    fun toggleSelection(id: Long) {
+        if (selected.contains(id)) selected.remove(id) else selected.add(id)
+        if (selected.isEmpty()) isSelectionActive = false
+        notifyDataSetChanged()
+    }
+
+    fun enterSelectionMode() {
+        isSelectionActive = true
+        notifyDataSetChanged()
+    }
+
+    fun selectAll() {
+        isSelectionActive = true
+        selected.clear()
+        selected.addAll(currentList.map { it.id })
+        notifyDataSetChanged()
+    }
+
+    fun clearSelection() {
+        selected.clear()
+        isSelectionActive = false
+        notifyDataSetChanged()
+    }
+
+    fun getSelectedIds(): List<Long> = selected.toList()
+
+    val selectedCount: Int
+        get() = selected.size
 }
