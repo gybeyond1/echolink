@@ -40,7 +40,7 @@ jobs:
       - name: Build Debug APK
         working-directory: android
         env:
-          KEYSTORE_FILE: app/notifysync.p12
+          KEYSTORE_FILE: notifysync.p12
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
