@@ -4,11 +4,15 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.notifysync.data.AuthManager
+import com.notifysync.data.AppFilterStore
 
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        AuthManager.init(this)
+        AppFilterStore.init(this)
         createNotificationChannels()
     }
 

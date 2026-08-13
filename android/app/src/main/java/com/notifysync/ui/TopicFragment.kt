@@ -82,6 +82,18 @@ class TopicFragment : Fragment() {
         }
 
         setupTopics()
+
+        // 若从状态栏通知（话题消息）进入，定位到对应话题
+        val argTopic = arguments?.getString("topic")
+        if (!argTopic.isNullOrEmpty()) {
+            if (argTopic !in topics) {
+                addTopic(argTopic)
+            } else {
+                val idx = topics.indexOf(argTopic)
+                binding.spTopic.setSelection(idx)
+                if (idx == binding.spTopic.selectedItemPosition) switchTopic(argTopic)
+            }
+        }
     }
 
     override fun onResume() {
