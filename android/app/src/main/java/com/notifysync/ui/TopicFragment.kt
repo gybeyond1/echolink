@@ -139,16 +139,13 @@ class TopicFragment : Fragment() {
         })
         touch.attachToRecyclerView(binding.rvTopics)
 
-        // 列表态：发现/加入
-        binding.btnDiscover.setOnClickListener { showDiscoverDialog() }
-        binding.btnChatDiscover.setOnClickListener { showDiscoverDialog() }
         // 聊天态：返回
         binding.btnBack.setOnClickListener { showListMode() }
         // 聊天态：待审批
         binding.btnPending.setOnClickListener { showPendingDialog() }
 
-        // 新建话题 FAB
-        binding.fabAddTopic.setOnClickListener { showCreateTopicDialog() }
+        // 列表态：底部「+」= 发现 / 加入 / 创建（含新建）
+        binding.fabAddTopic.setOnClickListener { showDiscoverDialog() }
 
         // 多选操作栏
         binding.btnCancelSel.setOnClickListener { chatAdapter.clearSelection(); updateSelectionUI() }
@@ -183,6 +180,9 @@ class TopicFragment : Fragment() {
         binding.etInput.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) hidePanels() }
         binding.moreImage.setOnClickListener { hidePanels(); pickImage() }
         binding.moreFile.setOnClickListener { hidePanels(); pickFile() }
+        binding.moreJoin.setOnClickListener { hidePanels(); showDiscoverDialog() }
+        binding.moreSearch.setOnClickListener { hidePanels(); showDiscoverDialog() }
+        binding.moreCreate.setOnClickListener { hidePanels(); showCreateTopicDialog() }
         setupEmojiGrid()
 
         showListMode()
@@ -215,10 +215,8 @@ class TopicFragment : Fragment() {
         binding.listLayout.visibility = View.VISIBLE
         binding.chatLayout.visibility = View.GONE
         binding.tvTitleList.visibility = View.VISIBLE
-        binding.btnDiscover.visibility = View.VISIBLE
         binding.btnBack.visibility = View.GONE
         binding.tvChatTitle.visibility = View.GONE
-        binding.btnChatDiscover.visibility = View.GONE
         binding.btnPending.visibility = View.GONE
         binding.fabAddTopic.visibility = View.VISIBLE
         loadTopicList()
@@ -230,11 +228,9 @@ class TopicFragment : Fragment() {
         binding.listLayout.visibility = View.GONE
         binding.chatLayout.visibility = View.VISIBLE
         binding.tvTitleList.visibility = View.GONE
-        binding.btnDiscover.visibility = View.GONE
         binding.btnBack.visibility = View.VISIBLE
         binding.tvChatTitle.visibility = View.VISIBLE
         binding.tvChatTitle.text = topic.name
-        binding.btnChatDiscover.visibility = View.VISIBLE
         binding.fabAddTopic.visibility = View.GONE
         binding.btnPending.visibility = if (topic.myRole == "owner" && topic.pendingRequests > 0) View.VISIBLE else View.GONE
         WebSocketClient.sendSubscribe(topic.name)
