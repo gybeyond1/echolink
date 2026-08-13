@@ -21,6 +21,18 @@ class NotificationListener : NotificationListenerService() {
         // 缓存已发送通知的 key，避免重复发送
         private val sentKeys = mutableSetOf<String>()
         private const val MAX_CACHE_SIZE = 200
+
+        // 检查通知监听权限是否已授予
+        fun isListenerEnabled(context: android.content.Context): Boolean {
+            val flat = android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                "enabled_notification_listeners"
+            ) ?: return false
+            return flat.split(":").any {
+                val cn = android.content.ComponentName.unflattenFromString(it)
+                cn?.packageName == context.packageName
+            }
+        }
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -94,20 +106,6 @@ class NotificationListener : NotificationListenerService() {
             pm.getApplicationLabel(info).toString()
         } catch (e: Exception) {
             packageName
-        }
-    }
-
-    companion object {
-        // 检查通知监听权限是否已授予
-        fun isListenerEnabled(context: android.content.Context): Boolean {
-            val flat = android.provider.Settings.Secure.getString(
-                context.contentResolver,
-                "enabled_notification_listeners"
-            ) ?: return false
-            return flat.split(":").any {
-                val cn = android.content.ComponentName.unflattenFromString(it)
-                cn?.packageName == context.packageName
-            }
         }
     }
 }
