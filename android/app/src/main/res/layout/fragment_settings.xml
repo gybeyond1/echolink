@@ -223,7 +223,7 @@
                         android:text="仅同步所选应用"
                         android:textSize="14sp" />
 
-                    <com.google.android.material.materialswitch.MaterialSwitch
+                    <androidx.appcompat.widget.SwitchCompat
                         android:id="@+id/swFilterEnabled"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />

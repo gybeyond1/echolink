@@ -31,7 +31,7 @@
             android:layout_marginTop="2dp" />
     </LinearLayout>
 
-    <com.google.android.material.materialswitch.MaterialSwitch
+    <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/switchSync"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />

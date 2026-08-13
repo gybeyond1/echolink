@@ -124,6 +124,110 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
     )
 }
 
+// ===== 话题（群聊）模型 =====
+
+// 我参与的话题
+data class MyTopic(
+    val name: String,
+    val myRole: String,        // "owner" | "member"
+    val messageCount: Int,
+    val pendingRequests: Int,   // 仅创建者可见：待审批数量
+    val ownerName: String?
+)
+
+// 可发现（非成员）的话题
+data class DiscoverTopic(
+    val name: String,
+    val ownerName: String?,
+    val memberCount: Int,
+    val messageCount: Int
+)
+
+// 话题成员
+data class TopicMember(
+    val userId: Long,
+    val username: String,
+    val role: String,
+    val joinedAt: String?
+)
+
+// 加入申请
+data class TopicJoinRequest(
+    val id: Long,
+    val userId: Long,
+    val username: String,
+    val status: String,        // "pending" | "approved" | "rejected"
+    val message: String?,
+    val requestedAt: String?
+)
+
+fun parseMyTopics(jsonArray: JSONArray): List<MyTopic> {
+    val list = mutableListOf<MyTopic>()
+    for (i in 0 until jsonArray.length()) {
+        val obj = jsonArray.getJSONObject(i)
+        list.add(
+            MyTopic(
+                name = obj.getString("name"),
+                myRole = obj.optString("my_role", "member"),
+                messageCount = obj.optInt("message_count", 0),
+                pendingRequests = obj.optInt("pending_requests", 0),
+                ownerName = obj.optString("owner_name", null)
+            )
+        )
+    }
+    return list
+}
+
+fun parseDiscoverTopics(jsonArray: JSONArray): List<DiscoverTopic> {
+    val list = mutableListOf<DiscoverTopic>()
+    for (i in 0 until jsonArray.length()) {
+        val obj = jsonArray.getJSONObject(i)
+        list.add(
+            DiscoverTopic(
+                name = obj.getString("name"),
+                ownerName = obj.optString("owner_name", null),
+                memberCount = obj.optInt("member_count", 0),
+                messageCount = obj.optInt("message_count", 0)
+            )
+        )
+    }
+    return list
+}
+
+fun parseTopicMembers(jsonArray: JSONArray): List<TopicMember> {
+    val list = mutableListOf<TopicMember>()
+    for (i in 0 until jsonArray.length()) {
+        val obj = jsonArray.getJSONObject(i)
+        list.add(
+            TopicMember(
+                userId = obj.getLong("user_id"),
+                username = obj.optString("username", "?"),
+                role = obj.optString("role", "member"),
+                joinedAt = obj.optString("joined_at", null)
+            )
+        )
+    }
+    return list
+}
+
+fun parseTopicRequests(jsonArray: JSONArray): List<TopicJoinRequest> {
+    val list = mutableListOf<TopicJoinRequest>()
+    for (i in 0 until jsonArray.length()) {
+        val obj = jsonArray.getJSONObject(i)
+        list.add(
+            TopicJoinRequest(
+                id = obj.getLong("id"),
+                userId = obj.getLong("user_id"),
+                username = obj.optString("username", "?"),
+                status = obj.optString("status", "pending"),
+                message = obj.optString("message", null),
+                requestedAt = obj.optString("requested_at", null)
+            )
+        )
+    }
+    return list
+}
+
 // ===== WebSocket 消息 =====
 
 data class WsMessage(

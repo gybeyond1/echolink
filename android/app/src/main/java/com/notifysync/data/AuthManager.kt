@@ -11,6 +11,7 @@ object AuthManager {
     private const val KEY_SERVER_URL = "server_url"
     private const val KEY_DEVICE_ID = "device_id"
     private const val KEY_DEVICE_NAME = "device_name"
+    private const val KEY_DEVICE_UUID = "device_uuid"
     private const val KEY_TOPICS = "subscribed_topics"
 
     private lateinit var prefs: SharedPreferences
@@ -42,6 +43,18 @@ object AuthManager {
     var deviceName: String?
         get() = prefs.getString(KEY_DEVICE_NAME, null)
         set(value) = prefs.edit().putString(KEY_DEVICE_NAME, value).apply()
+
+    // 稳定的设备标识：每个安装只生成一次，用于"按设备"持久化（重登录复用同一 deviceId）
+    var deviceUuid: String
+        get() {
+            var uuid = prefs.getString(KEY_DEVICE_UUID, null)
+            if (uuid.isNullOrBlank()) {
+                uuid = java.util.UUID.randomUUID().toString()
+                prefs.edit().putString(KEY_DEVICE_UUID, uuid).apply()
+            }
+            return uuid
+        }
+        set(value) = prefs.edit().putString(KEY_DEVICE_UUID, value).apply()
 
     // 已订阅的公共话题列表（逗号分隔存储）
     var subscribedTopics: Set<String>

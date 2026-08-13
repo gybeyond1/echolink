@@ -72,7 +72,10 @@ object ApiClient {
     // ===== 设备 =====
 
     suspend fun registerDevice(deviceName: String, platform: String = "android"): JSONObject {
-        val body = JSONObject().put("device_name", deviceName).put("platform", platform)
+        val body = JSONObject()
+            .put("device_name", deviceName)
+            .put("platform", platform)
+            .put("client_id", AuthManager.deviceUuid)
         return execute(buildRequest("/api/devices/register", "POST", body))
     }
 
@@ -110,21 +113,29 @@ object ApiClient {
     }
 
     suspend fun getNotifications(limit: Int = 50, offset: Int = 0): List<NotificationItem> {
-        val json = execute(buildRequest("/api/notifications?limit=$limit&offset=$offset", "GET"))
+        val dev = AuthManager.deviceId
+        val devParam = if (dev > 0) "&device_id=$dev" else ""
+        val json = execute(buildRequest("/api/notifications?limit=$limit&offset=$offset$devParam", "GET"))
         return parseNotifications(json.getJSONArray("notifications"))
     }
 
     suspend fun getNotificationsSince(timestamp: Long): List<NotificationItem> {
-        val json = execute(buildRequest("/api/notifications/since/$timestamp", "GET"))
+        val dev = AuthManager.deviceId
+        val devParam = if (dev > 0) "&device_id=$dev" else ""
+        val json = execute(buildRequest("/api/notifications/since/$timestamp$devParam", "GET"))
         return parseNotifications(json.getJSONArray("notifications"))
     }
 
     suspend fun clearAllNotifications() {
-        execute(buildRequest("/api/notifications", "DELETE"))
+        val dev = AuthManager.deviceId
+        val devParam = if (dev > 0) "?device_id=$dev" else ""
+        execute(buildRequest("/api/notifications$devParam", "DELETE"))
     }
 
     suspend fun deleteNotification(id: Long) {
-        execute(buildRequest("/api/notifications/$id", "DELETE"))
+        val dev = AuthManager.deviceId
+        val devParam = if (dev > 0) "?device_id=$dev" else ""
+        execute(buildRequest("/api/notifications/$id$devParam", "DELETE"))
     }
 
     // ===== 应用过滤器 =====
@@ -178,6 +189,73 @@ object ApiClient {
             )
         )
         return parseTopicMessages(json.getJSONArray("messages"))
+    }
+
+    // 删除单条话题消息
+    suspend fun deleteTopicMessage(topic: String, id: Long) {
+        execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/messages/$id", "DELETE"))
+    }
+
+    // 删除整个话题（该用户在此话题下的所有消息）
+    suspend fun deleteTopic(topic: String) {
+        execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}", "DELETE"))
+    }
+
+    // ===== 话题（群聊）成员 / 审批 =====
+
+    // 创建话题（当前用户成为创建者）
+    suspend fun createTopic(name: String, title: String, description: String): JSONObject {
+        val body = JSONObject()
+            .put("name", name)
+            .put("title", title)
+            .put("description", description)
+        return execute(buildRequest("/api/topics", "POST", body))
+    }
+
+    // 申请加入话题（需创建者审批）
+    suspend fun requestJoinTopic(name: String, message: String = ""): JSONObject {
+        val body = JSONObject().put("message", message)
+        return execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(name, "UTF-8")}/join", "POST", body))
+    }
+
+    // 我参与的话题列表
+    suspend fun getMyTopics(): List<MyTopic> {
+        val json = execute(buildRequest("/api/topics", "GET"))
+        return parseMyTopics(json.getJSONArray("topics"))
+    }
+
+    // 可发现（非成员）的话题列表
+    suspend fun getDiscoverTopics(query: String = ""): List<DiscoverTopic> {
+        val q = if (query.isNotBlank()) "?q=${java.net.URLEncoder.encode(query, "UTF-8")}" else ""
+        val json = execute(buildRequest("/api/topics/discover$q", "GET"))
+        return parseDiscoverTopics(json.getJSONArray("topics"))
+    }
+
+    // 话题成员列表
+    suspend fun getTopicMembers(topic: String): List<TopicMember> {
+        val json = execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/members", "GET"))
+        return parseTopicMembers(json.getJSONArray("members"))
+    }
+
+    // 待审批申请（创建者/管理员）
+    suspend fun getTopicRequests(topic: String): List<TopicJoinRequest> {
+        val json = execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/requests", "GET"))
+        return parseTopicRequests(json.getJSONArray("requests"))
+    }
+
+    // 审批通过
+    suspend fun approveTopicRequest(topic: String, requestId: Long) {
+        execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/requests/$requestId/approve", "POST"))
+    }
+
+    // 审批拒绝
+    suspend fun rejectTopicRequest(topic: String, requestId: Long) {
+        execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/requests/$requestId/reject", "POST"))
+    }
+
+    // 退出话题（成员）
+    suspend fun leaveTopic(topic: String) {
+        execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/leave", "POST"))
     }
 
     // ===== 健康检查 =====

@@ -8,6 +8,7 @@
   const state = {
     token: localStorage.getItem("ns_token") || "",
     username: localStorage.getItem("ns_username") || "",
+    role: localStorage.getItem("ns_role") || "user",
     tab: "overview",
     topic: null,
   };
@@ -57,15 +58,17 @@
     return data;
   }
 
-  function saveAuth(token, username) {
-    state.token = token; state.username = username;
+  function saveAuth(token, username, role) {
+    state.token = token; state.username = username; state.role = role || "user";
     localStorage.setItem("ns_token", token);
     localStorage.setItem("ns_username", username);
+    localStorage.setItem("ns_role", state.role);
   }
   function logout() {
-    state.token = ""; state.username = ""; state.topic = null;
+    state.token = ""; state.username = ""; state.role = "user"; state.topic = null;
     localStorage.removeItem("ns_token");
     localStorage.removeItem("ns_username");
+    localStorage.removeItem("ns_role");
     render();
   }
 
@@ -95,8 +98,6 @@
     let mode = "login";
     const submit = document.getElementById("au-submit");
     const toggle = document.getElementById("au-toggle");
-    const passInput = document.getElementById("au-pass");
-    passInput.autocomplete = "current-password";
 
     toggle.onclick = () => {
       mode = mode === "login" ? "register" : "login";
@@ -111,7 +112,7 @@
       try {
         const ep = mode === "login" ? "/api/auth/login" : "/api/auth/register";
         const r = await api(ep, { method: "POST", body: { username, password } });
-        saveAuth(r.token, r.user.username);
+        saveAuth(r.token, r.user.username, r.user.role);
         toast(mode === "login" ? "登录成功" : "注册成功，已自动登录", "ok");
         render();
       } catch (e) {
@@ -123,7 +124,7 @@
   }
 
   // ---------- Dashboard shell ----------
-  const NAV = [
+  const BASE_NAV = [
     { id: "overview", ic: "📊", label: "概览" },
     { id: "devices", ic: "📱", label: "设备" },
     { id: "filters", ic: "🧩", label: "应用过滤" },
@@ -131,6 +132,15 @@
     { id: "topics", ic: "💬", label: "话题" },
     { id: "account", ic: "👤", label: "账号" },
   ];
+  const ADMIN_NAV = [
+    { id: "admin_users", ic: "🛡️", label: "用户管理" },
+    { id: "admin_topics", ic: "📚", label: "全部话题" },
+    { id: "admin_notifs", ic: "📥", label: "全部通知" },
+  ];
+
+  function navItems() {
+    return state.role === "admin" ? BASE_NAV.concat(ADMIN_NAV) : BASE_NAV;
+  }
 
   function render() {
     if (!state.token) { renderAuth(); return; }
@@ -138,9 +148,9 @@
       <div class="layout">
         <aside class="sidebar">
           <div class="brand"><div class="logo">N</div><h1>NotifySync</h1></div>
-          ${NAV.map(n => `<button class="nav-item ${state.tab === n.id ? "active" : ""}" data-tab="${n.id}"><span class="ic">${n.ic}</span>${n.label}</button>`).join("")}
+          ${navItems().map(n => `<button class="nav-item ${state.tab === n.id ? "active" : ""}" data-tab="${n.id}"><span class="ic">${n.ic}</span>${n.label}</button>`).join("")}
           <div class="spacer"></div>
-          <div class="user-box">已登录 <b>${esc(state.username)}</b></div>
+          <div class="user-box">已登录 <b>${esc(state.username)}</b>${state.role === "admin" ? '<span class="badge admin">管理员</span>' : ""}</div>
         </aside>
         <main class="main" id="main"></main>
       </div>`;
@@ -159,6 +169,9 @@
       if (state.tab === "notifications") return renderNotifications(main);
       if (state.tab === "topics") return renderTopics(main);
       if (state.tab === "account") return renderAccount(main);
+      if (state.tab === "admin_users") return renderAdminUsers(main);
+      if (state.tab === "admin_topics") return renderAdminTopics(main);
+      if (state.tab === "admin_notifs") return renderAdminNotifs(main);
     } catch (e) {
       main.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
     }
@@ -167,18 +180,20 @@
   // ---------- Overview ----------
   async function renderOverview(main) {
     main.innerHTML = `<h2 class="page-title">概览</h2><p class="page-sub">服务器状态与快速信息</p><div id="ov">加载中…</div>`;
-    const [info, dev, topics] = await Promise.all([
+    const [info, dev, topics, stats] = await Promise.all([
       api("/api/info"),
       api("/api/devices").catch(() => ({ devices: [] })),
       api("/api/topics").catch(() => ({ topics: [] })),
+      api("/api/admin/stats").catch(() => null),
     ]);
     const notif = await api("/api/notifications?limit=50").catch(() => ({ notifications: [] }));
-    const total = dev.devices.length + topics.topics.length;
+    const s = stats || {};
     document.getElementById("ov").innerHTML = `
       <div class="grid" style="margin-bottom:16px">
         <div class="card stat"><div class="label">已注册设备</div><div class="value">${dev.devices.length}</div></div>
-        <div class="card stat"><div class="label">话题数</div><div class="value">${topics.topics.length}</div></div>
+        <div class="card stat"><div class="label">我的话题数</div><div class="value">${topics.topics.length}</div></div>
         <div class="card stat"><div class="label">最近通知(50条内)</div><div class="value">${notif.notifications.length}</div></div>
+        ${state.role === "admin" ? `<div class="card stat"><div class="label">平台用户总数</div><div class="value">${s.users ?? "-"}</div></div>` : ""}
       </div>
       <div class="card">
         <div class="kv"><span class="k">服务名称</span><span>${esc(info.name)}</span></div>
@@ -187,9 +202,9 @@
         <div class="kv"><span class="k">数据目录</span><span class="mono">${esc(info.dataDir)}</span></div>
       </div>
       <div class="hint" style="margin-top:16px">
-        <b>快速上手：</b>① 在「账号」里可修改密码；② 在手机 App 用本后台注册的账号登录；
-        ③ 在「应用过滤」里决定同步哪些 App；④ 在「话题」里创建多设备共享频道。
-        所有数据已持久化到数据目录，重启不丢。
+        <b>快速上手：</b>① 在「账号」里可修改密码；② 用本后台注册的账号登录手机 App；
+        ③ 在「应用过滤」里决定同步哪些 App；④ 在「话题」里创建群聊，其他人需经你审批才能加入。
+        ${state.role === "admin" ? "⑤ 你拥有「用户管理 / 全部话题 / 全部通知」管理权限。" : ""}
       </div>`;
   }
 
@@ -265,10 +280,10 @@
     });
   }
 
-  // ---------- Notifications ----------
+  // ---------- Notifications (my own) ----------
   async function renderNotifications(main) {
     main.innerHTML = `<h2 class="page-title">通知</h2>
-      <p class="page-sub">从各设备同步过来的通知记录</p>
+      <p class="page-sub">从各设备同步过来的通知记录（仅你账号可见）</p>
       <div class="toolbar">
         <div class="grow"></div>
         <button class="btn danger" id="n-clear">清空全部</button>
@@ -300,63 +315,169 @@
     });
   }
 
-  // ---------- Topics ----------
+  // ---------- Topics (group chat) ----------
   async function renderTopics(main) {
-    main.innerHTML = `<h2 class="page-title">话题</h2>
-      <p class="page-sub">类似 ntfy 的公共频道，多设备按话题名互通消息</p>
+    main.innerHTML = `<h2 class="page-title">话题（群聊）</h2>
+      <p class="page-sub">话题类似于群聊：你创建的话题，他人需经你审批才能加入；不同账号之间默认相互隔离。</p>
       <div class="toolbar">
-        <input id="t-new" type="text" placeholder="新话题名（字母/数字/_/-）" style="max-width:260px" />
-        <button class="btn" id="t-add">新建</button>
+        <input id="t-new" type="text" placeholder="新话题名（字母/数字/_/-）" style="max-width:200px" />
+        <input id="t-title" type="text" placeholder="标题（可选）" style="max-width:160px" />
+        <button class="btn" id="t-add">新建话题</button>
         <div class="grow"></div>
       </div>
-      <div class="grid" id="tlist">加载中…</div>
+      <div class="subtabs">
+        <button class="stab active" data-st="mine">我的话题</button>
+        <button class="stab" data-st="discover">发现 / 加入</button>
+      </div>
+      <div id="tlist">加载中…</div>
       <div id="tview" style="margin-top:18px"></div>`;
+
     document.getElementById("t-add").onclick = async () => {
       const name = document.getElementById("t-new").value.trim().toLowerCase();
+      const title = document.getElementById("t-title").value.trim();
       if (!/^[a-z0-9_-]{1,64}$/.test(name)) return toast("话题名不合法（1-64位字母/数字/_/-）", "err");
-      try { await api("/api/topics/" + name + "/publish", { method: "POST", body: { title: "频道已创建", text: "" } }); toast("已创建", "ok"); state.topic = name; renderTopics(main); }
+      try { await api("/api/topics", { method: "POST", body: { name, title } }); toast("话题已创建", "ok"); document.getElementById("t-new").value = ""; document.getElementById("t-title").value = ""; renderTopics(main); }
       catch (e) { toast(e.message, "err"); }
     };
-    const r = await api("/api/topics");
+
+    let subtab = "mine";
     const list = document.getElementById("tlist");
-    if (!r.topics.length) { list.innerHTML = `<div class="empty">还没有话题。在上方新建一个，或等手机端发布后自动出现。</div>`; }
-    else {
-      list.innerHTML = r.topics.map(t => `<div class="card" style="cursor:pointer" data-topic="${esc(t.topic)}">
-        <div style="font-weight:600">#${esc(t.topic)}</div>
-        <div class="label" style="color:var(--muted);font-size:12px;margin-top:4px">${t.message_count} 条消息</div>
-      </div>`).join("");
-      list.querySelectorAll("[data-topic]").forEach(c => c.onclick = () => { state.topic = c.dataset.topic; renderTopics(main); });
+    const view = document.getElementById("tview");
+    const stabs = main.querySelectorAll(".stab");
+    stabs.forEach(b => b.onclick = () => {
+      subtab = b.dataset.st;
+      stabs.forEach(x => x.classList.toggle("active", x === b));
+      loadList();
+    });
+
+    async function loadList() {
+      view.innerHTML = ""; state.topic = null;
+      if (subtab === "mine") {
+        const r = await api("/api/topics").catch(() => ({ topics: [] }));
+        if (!r.topics.length) { list.innerHTML = `<div class="empty">你还没有加入任何话题。去「发现 / 加入」找找，或新建一个。</div>`; return; }
+        list.innerHTML = `<div class="grid">` + r.topics.map(t => `
+          <div class="card topic-card" data-topic="${esc(t.name)}" style="cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <b>#${esc(t.name)}</b>
+              <span class="badge ${t.my_role === "owner" ? "owner" : "member"}">${t.my_role === "owner" ? "创建者" : "成员"}</span>
+            </div>
+            <div class="label" style="color:var(--muted);font-size:12px;margin-top:4px">${t.message_count} 条消息${t.owner_name && t.my_role !== "owner" ? " · 创建者 " + esc(t.owner_name) : ""}</div>
+            ${t.pending_requests > 0 ? `<div class="badge warn" style="margin-top:6px">${t.pending_requests} 个待审批</div>` : ""}
+          </div>`).join("") + `</div>`;
+        list.querySelectorAll(".topic-card").forEach(c => c.onclick = () => { state.topic = c.dataset.topic; renderTopicView(main, state.topic); });
+      } else {
+        const r = await api("/api/topics/discover").catch(() => ({ topics: [] }));
+        if (!r.topics.length) { list.innerHTML = `<div class="empty">没有可发现的话题。你也可以凭话题名直接申请加入：</div>`; }
+        else {
+          list.innerHTML = `<div class="grid">` + r.topics.map(t => `
+            <div class="card topic-card" data-topic="${esc(t.name)}">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <b>#${esc(t.name)}</b>
+                <span class="badge member">${t.member_count} 人</span>
+              </div>
+              <div class="label" style="color:var(--muted);font-size:12px;margin-top:4px">创建者 ${esc(t.owner_name || "-")} · ${t.message_count} 条消息</div>
+              <button class="btn sm" data-join="${esc(t.name)}" style="margin-top:8px">申请加入</button>
+            </div>`).join("") + `</div>`;
+          list.querySelectorAll("[data-join]").forEach(b => b.onclick = () => joinTopic(b.dataset.join, main));
+        }
+        list.innerHTML += `
+          <div class="card" style="margin-top:14px">
+            <label>凭话题名申请加入（需创建者审批）</label>
+            <div class="row">
+              <input id="t-join-name" type="text" placeholder="话题名" />
+              <button class="btn" id="t-join-go" style="flex:0 0 auto">申请加入</button>
+            </div>
+          </div>`;
+        const go = document.getElementById("t-join-go");
+        if (go) go.onclick = () => {
+          const n = document.getElementById("t-join-name").value.trim().toLowerCase();
+          if (!n) return toast("请输入话题名", "err");
+          joinTopic(n, main);
+        };
+      }
     }
-    if (state.topic) await renderTopicView(main, state.topic);
+    await loadList();
+  }
+
+  async function joinTopic(name, main) {
+    try {
+      await api("/api/topics/" + name + "/join", { method: "POST", body: { message: "" } });
+      toast("已发送加入申请，等待创建者审批", "ok");
+    } catch (e) { toast(e.message, "err"); }
   }
 
   async function renderTopicView(main, topic) {
     const box = document.getElementById("tview");
     box.innerHTML = `<div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <b>话题 #${esc(topic)}</b>
-        <button class="btn ghost sm" id="t-back">返回列表</button>
+        <div>
+          <button class="btn ghost sm" id="t-req">待审批</button>
+          <button class="btn ghost sm" id="t-members">成员</button>
+          <button class="btn ghost sm" id="t-back">返回列表</button>
+        </div>
       </div>
       <div id="tmsg" style="max-height:300px;overflow:auto">加载中…</div>
       <div class="row" style="margin-top:12px">
-        <input id="t-title" type="text" placeholder="标题（可选）" />
+        <input id="t-title2" type="text" placeholder="标题（可选）" />
         <input id="t-text" type="text" placeholder="输入消息内容…" />
         <button class="btn" id="t-send" style="flex:0 0 auto">发送</button>
       </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn ghost sm" id="t-leave">退出话题</button>
+        <button class="btn danger sm" id="t-del">删除话题</button>
+      </div>
     </div>`;
     document.getElementById("t-back").onclick = () => { state.topic = null; renderTopics(main); };
-    const send = async () => {
-      const title = document.getElementById("t-title").value.trim();
+    document.getElementById("t-send").onclick = async () => {
+      const title = document.getElementById("t-title2").value.trim();
       const text = document.getElementById("t-text").value.trim();
       if (!title && !text) return toast("消息不能为空", "err");
       try {
         await api("/api/topics/" + topic + "/publish", { method: "POST", body: { title, text, sender_name: state.username } });
-        document.getElementById("t-title").value = ""; document.getElementById("t-text").value = "";
+        document.getElementById("t-title2").value = ""; document.getElementById("t-text").value = "";
         renderTopicView(main, topic);
       } catch (e) { toast(e.message, "err"); }
     };
-    document.getElementById("t-send").onclick = send;
-    const r = await api("/api/topics/" + topic + "/messages?limit=50");
+    document.getElementById("t-leave").onclick = async () => {
+      if (!confirm("确定退出该话题？")) return;
+      try { await api("/api/topics/" + topic + "/leave", { method: "POST" }); toast("已退出", "ok"); state.topic = null; renderTopics(main); }
+      catch (e) { toast(e.message, "err"); }
+    };
+    document.getElementById("t-del").onclick = async () => {
+      if (!confirm("确定删除该话题？所有消息将被清除，且不可恢复。")) return;
+      try { await api("/api/topics/" + topic, { method: "DELETE" }); toast("已删除", "ok"); state.topic = null; renderTopics(main); }
+      catch (e) { toast(e.message, "err"); }
+    };
+    document.getElementById("t-members").onclick = async () => {
+      try {
+        const r = await api("/api/topics/" + topic + "/members");
+        alert("成员：\n" + r.members.map(m => (m.username || "?") + " (" + m.role + ")").join("\n"));
+      } catch (e) { toast(e.message, "err"); }
+    };
+    document.getElementById("t-req").onclick = async () => {
+      try {
+        const r = await api("/api/topics/" + topic + "/requests");
+        const pending = r.requests.filter(x => x.status === "pending");
+        if (!pending.length) return toast("暂无待审批申请", "ok");
+        const html = pending.map(x => `<div class="card" style="margin-bottom:8px"><div><b>${esc(x.username)}</b> 申请加入</div>${x.message ? `<div style="color:var(--muted);font-size:12px">${esc(x.message)}</div>` : ""}<div style="margin-top:8px"><button class="btn sm" data-ap="${x.id}">通过</button> <button class="btn danger sm" data-rj="${x.id}">拒绝</button></div></div>`).join("");
+        const overlay = document.createElement("div");
+        overlay.className = "modal-mask";
+        overlay.innerHTML = `<div class="modal"><div class="modal-title">待审批申请</div>${html}<button class="btn ghost" id="m-close" style="margin-top:10px">关闭</button></div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelectorAll("[data-ap]").forEach(b => b.onclick = async () => {
+          try { await api(`/api/topics/${topic}/requests/${b.dataset.ap}/approve`, { method: "POST" }); toast("已通过", "ok"); overlay.remove(); document.getElementById("t-req").click(); }
+          catch (e) { toast(e.message, "err"); }
+        });
+        overlay.querySelectorAll("[data-rj]").forEach(b => b.onclick = async () => {
+          try { await api(`/api/topics/${topic}/requests/${b.dataset.rj}/reject`, { method: "POST" }); toast("已拒绝", "ok"); overlay.remove(); document.getElementById("t-req").click(); }
+          catch (e) { toast(e.message, "err"); }
+        });
+        overlay.querySelector("#m-close").onclick = () => overlay.remove();
+      } catch (e) { toast(e.message, "err"); }
+    };
+
+    const r = await api("/api/topics/" + topic + "/messages?limit=50").catch(() => ({ messages: [] }));
     const msg = document.getElementById("tmsg");
     if (!r.messages.length) { msg.innerHTML = `<div class="empty">还没有消息</div>`; return; }
     msg.innerHTML = r.messages.map(m => `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
@@ -370,7 +491,7 @@
   // ---------- Account ----------
   function renderAccount(main) {
     main.innerHTML = `<h2 class="page-title">账号</h2>
-      <p class="page-sub">当前登录：<b>${esc(state.username)}</b></p>
+      <p class="page-sub">当前登录：<b>${esc(state.username)}</b>${state.role === "admin" ? "（管理员）" : ""}</p>
       <div class="card" style="max-width:420px;margin-bottom:16px">
         <label>当前密码</label>
         <input id="a-old" type="password" />
@@ -392,10 +513,139 @@
     document.getElementById("a-out").onclick = () => { logout(); };
   }
 
+  // ---------- Admin: Users ----------
+  async function renderAdminUsers(main) {
+    main.innerHTML = `<h2 class="page-title">用户管理</h2>
+      <p class="page-sub">管理平台所有用户：新增、查看、删除。</p>
+      <div class="card" style="margin-bottom:16px">
+        <div class="row">
+          <div><label>用户名</label><input id="u-name" placeholder="3-32 位" /></div>
+          <div><label>密码</label><input id="u-pass" type="password" placeholder="至少 6 位" /></div>
+          <div style="flex:0 0 140px"><label>角色</label>
+            <select id="u-role"><option value="user">普通用户</option><option value="admin">管理员</option></select>
+          </div>
+        </div>
+        <button class="btn" id="u-add" style="margin-top:14px">新增用户</button>
+      </div>
+      <div id="ul">加载中…</div>`;
+    document.getElementById("u-add").onclick = async () => {
+      const username = document.getElementById("u-name").value.trim();
+      const password = document.getElementById("u-pass").value;
+      const role = document.getElementById("u-role").value;
+      if (!username || !password) return toast("用户名和密码都要填", "err");
+      try { await api("/api/admin/users", { method: "POST", body: { username, password, role } }); toast("用户已创建", "ok"); document.getElementById("u-name").value = ""; document.getElementById("u-pass").value = ""; renderAdminUsers(main); }
+      catch (e) { toast(e.message, "err"); }
+    };
+    const r = await api("/api/admin/users");
+    const box = document.getElementById("ul");
+    if (!r.users.length) { box.innerHTML = `<div class="empty">暂无用户。</div>`; return; }
+    box.innerHTML = `<table><thead><tr><th>用户名</th><th>角色</th><th>通知</th><th>话题</th><th>设备</th><th>创建时间</th><th></th></tr></thead><tbody>
+      ${r.users.map(u => `<tr>
+        <td>${esc(u.username)}</td>
+        <td><span class="badge ${u.role === "admin" ? "admin" : "member"}">${u.role === "admin" ? "管理员" : "用户"}</span></td>
+        <td>${u.notification_count}</td>
+        <td>${u.topic_count}</td>
+        <td>${u.device_count}</td>
+        <td>${fmtTime(u.created_at)}</td>
+        <td style="text-align:right"><button class="btn danger sm" data-del="${u.id}" ${u.username === state.username ? "disabled" : ""}>删除</button></td>
+      </tr>`).join("")}
+    </tbody></table>`;
+    box.querySelectorAll("[data-del]").forEach(b => {
+      b.onclick = async () => {
+        if (!confirm("删除该用户及其所有数据？此操作不可恢复。")) return;
+        try { await api("/api/admin/users/" + b.dataset.del, { method: "DELETE" }); toast("已删除", "ok"); renderAdminUsers(main); }
+        catch (e) { toast(e.message, "err"); }
+      };
+    });
+  }
+
+  // ---------- Admin: All Topics ----------
+  async function renderAdminTopics(main) {
+    main.innerHTML = `<h2 class="page-title">全部话题</h2>
+      <p class="page-sub">查看平台上所有话题及其消息（管理员可见）。</p>
+      <div id="at">加载中…</div>`;
+    const r = await api("/api/admin/topics");
+    const box = document.getElementById("at");
+    if (!r.topics.length) { box.innerHTML = `<div class="empty">暂无话题。</div>`; return; }
+    box.innerHTML = `<table><thead><tr><th>话题</th><th>创建者</th><th>成员</th><th>消息</th><th>创建时间</th><th></th></tr></thead><tbody>
+      ${r.topics.map(t => `<tr>
+        <td><b>#${esc(t.name)}</b>${t.title ? `<div style="color:var(--muted);font-size:12px">${esc(t.title)}</div>` : ""}</td>
+        <td>${esc(t.owner_name || "-")}</td>
+        <td>${t.member_count}</td>
+        <td>${t.message_count}</td>
+        <td>${fmtTime(t.created_at)}</td>
+        <td style="text-align:right">
+          <button class="btn ghost sm" data-view="${esc(t.name)}">查看消息</button>
+          <button class="btn danger sm" data-del="${esc(t.name)}">删除</button>
+        </td>
+      </tr>`).join("")}
+    </tbody></table>`;
+    box.querySelectorAll("[data-view]").forEach(b => b.onclick = async () => {
+      try {
+        const r2 = await api("/api/admin/topics/" + b.dataset.view + "/messages?limit=100");
+        const txt = r2.messages.map(m => `[${fmtTime(m.timestamp)}] ${m.sender_name || "?"}: ${m.text || ""}`).join("\n");
+        const overlay = document.createElement("div");
+        overlay.className = "modal-mask";
+        overlay.innerHTML = `<div class="modal" style="max-width:560px"><div class="modal-title">#${esc(b.dataset.view)} 的消息（${r2.messages.length}）</div><pre class="msgpre">${esc(txt || "（无消息）")}</pre><button class="btn ghost" id="m-close">关闭</button></div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector("#m-close").onclick = () => overlay.remove();
+      } catch (e) { toast(e.message, "err"); }
+    });
+    box.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+      if (!confirm("删除该话题及其全部消息？")) return;
+      try { await api("/api/admin/topics/" + b.dataset.del, { method: "DELETE" }); toast("已删除", "ok"); renderAdminTopics(main); }
+      catch (e) { toast(e.message, "err"); }
+    });
+  }
+
+  // ---------- Admin: All Notifications ----------
+  async function renderAdminNotifs(main) {
+    main.innerHTML = `<h2 class="page-title">全部通知</h2>
+      <p class="page-sub">平台上所有用户的通知记录（按用户筛选）。</p>
+      <div class="toolbar">
+        <input id="an-user" type="text" placeholder="按用户名筛选（可选）" style="max-width:200px" />
+        <button class="btn" id="an-go">筛选</button>
+        <div class="grow"></div>
+      </div>
+      <div id="an">加载中…</div>`;
+    const load = async () => {
+      const user = document.getElementById("an-user").value.trim();
+      let url = "/api/admin/notifications?limit=200";
+      if (user) {
+        // 通过用户名解析 userId
+        const ur = await api("/api/admin/users").catch(() => ({ users: [] }));
+        const found = ur.users.find(u => u.username === user);
+        if (!found) { document.getElementById("an").innerHTML = `<div class="empty">未找到用户 ${esc(user)}</div>`; return; }
+        url += "&userId=" + found.id;
+      }
+      const r = await api(url);
+      const box = document.getElementById("an");
+      if (!r.notifications.length) { box.innerHTML = `<div class="empty">暂无通知。</div>`; return; }
+      box.innerHTML = `<table><thead><tr><th>用户</th><th>应用</th><th>标题</th><th>内容</th><th>来源设备</th><th>时间</th><th></th></tr></thead><tbody>
+        ${r.notifications.map(n => `<tr>
+          <td>${esc(n.username || "-")}</td>
+          <td>${esc(n.app_name)}</td>
+          <td>${esc(n.title)}</td>
+          <td>${esc(n.text)}</td>
+          <td>${esc(n.device_name || "-")}</td>
+          <td>${fmtTime(n.timestamp)}</td>
+          <td style="text-align:right"><button class="btn danger sm" data-del="${n.id}">删除</button></td>
+        </tr>`).join("")}
+      </tbody></table>`;
+      box.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+        try { await api("/api/admin/notifications/" + b.dataset.del, { method: "DELETE" }); b.closest("tr").remove(); toast("已删除", "ok"); }
+        catch (e) { toast(e.message, "err"); }
+      });
+    };
+    document.getElementById("an-go").onclick = load;
+    await load();
+  }
+
   // ---------- boot ----------
   if (state.token) {
-    // 校验 token 是否仍然有效
-    api("/api/auth/me").catch(() => { logout(); });
+    api("/api/auth/me")
+      .then(r => { state.username = r.user.username; state.role = r.user.role || "user"; localStorage.setItem("ns_username", state.username); localStorage.setItem("ns_role", state.role); })
+      .catch(() => { logout(); });
   }
   render();
 })();

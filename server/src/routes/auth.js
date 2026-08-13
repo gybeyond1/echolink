@@ -33,14 +33,14 @@ router.post("/register", (req, res) => {
   const result = db.prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)").run(username, passwordHash);
 
   const token = jwt.sign(
-    { userId: result.lastInsertRowid, username },
+    { userId: result.lastInsertRowid, username, role: "user" },
     process.env.JWT_SECRET || "default-secret",
     { expiresIn: "365d" }
   );
 
   res.status(201).json({
     token,
-    user: { id: result.lastInsertRowid, username },
+    user: { id: result.lastInsertRowid, username, role: "user" },
   });
 });
 
@@ -63,20 +63,20 @@ router.post("/login", (req, res) => {
   }
 
   const token = jwt.sign(
-    { userId: user.id, username: user.username },
+    { userId: user.id, username: user.username, role: user.role || "user" },
     process.env.JWT_SECRET || "default-secret",
     { expiresIn: "365d" }
   );
 
   res.json({
     token,
-    user: { id: user.id, username: user.username },
+    user: { id: user.id, username: user.username, role: user.role || "user" },
   });
 });
 
 // 验证 token 有效性
 router.get("/me", authMiddleware, (req, res) => {
-  res.json({ user: { id: req.userId, username: req.username } });
+  res.json({ user: { id: req.userId, username: req.username, role: req.role } });
 });
 
 // 修改密码
