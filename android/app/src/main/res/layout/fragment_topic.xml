@@ -130,30 +130,36 @@
                 android:textColor="@android:color/white" />
         </LinearLayout>
 
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-            android:id="@+id/swipeRefresh"
+        <!-- 消息区：列表与「空态」叠加，空态不会挤压底部输入栏 -->
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recyclerView"
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipeRefresh"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingBottom="8dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+            <TextView
+                android:id="@+id/tvEmptyChat"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingBottom="8dp" />
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
-        <TextView
-            android:id="@+id/tvEmptyChat"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:text="暂无消息\n发送一条消息开始聊天"
-            android:gravity="center"
-            android:padding="48dp"
-            android:textColor="@android:color/darker_gray"
-            android:textSize="16sp"
-            android:visibility="gone" />
+                android:text="暂无消息\n发送一条消息开始聊天"
+                android:gravity="center"
+                android:padding="48dp"
+                android:textColor="@android:color/darker_gray"
+                android:textSize="16sp"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <!-- 底部输入栏（微信式） -->
         <LinearLayout

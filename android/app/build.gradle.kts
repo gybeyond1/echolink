@@ -19,7 +19,7 @@ android {
 
     signingConfigs {
         create("fixed") {
-            val keystoreFile = System.getenv("KEYSTORE_FILE") ?: "app/notifysync.p12"
+            val keystoreFile = System.getenv("KEYSTORE_FILE") ?: "notifysync.p12"
             storeFile = file(keystoreFile)
             storeType = "PKCS12"
             storePassword = System.getenv("KEYSTORE_PASSWORD")
