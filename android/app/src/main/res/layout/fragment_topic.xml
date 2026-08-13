@@ -23,13 +23,6 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDiscover"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="发现/加入"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
-
         <!-- 聊天态 -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnBack"
@@ -57,13 +50,6 @@
             android:visibility="gone"
             style="@style/Widget.MaterialComponents.Button.TextButton" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnChatDiscover"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="发现/加入"
-            android:visibility="gone"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
     </LinearLayout>
 
     <!-- 列表态：话题会话列表 -->
@@ -84,7 +70,7 @@
             android:id="@+id/tvEmptyTopics"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="还没有话题\n点击右上角「发现/加入」或底部「+」新建"
+            android:text="还没有话题\n点击底部「+」发现或新建话题"
             android:gravity="center"
             android:padding="48dp"
             android:textColor="@android:color/darker_gray"
@@ -272,55 +258,142 @@
                 android:id="@+id/moreLayout"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:orientation="horizontal"
-                android:padding="20dp"
+                android:orientation="vertical"
+                android:padding="16dp"
                 android:gravity="center_vertical"
                 android:visibility="gone">
 
                 <LinearLayout
-                    android:id="@+id/moreImage"
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:background="?attr/selectableItemBackgroundBorderless">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:background="@drawable/bg_round_grey"
-                        android:src="@drawable/ic_image"
-                        android:padding="14dp" />
-                    <TextView
-                        android:layout_width="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:id="@+id/moreImage"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="图片"
-                        android:textSize="13sp"
-                        android:textColor="#444444" />
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="?attr/selectableItemBackgroundBorderless">
+                        <ImageView
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_round_grey"
+                            android:src="@drawable/ic_image"
+                            android:padding="14dp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="图片"
+                            android:textSize="13sp"
+                            android:textColor="#444444" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/moreFile"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="?attr/selectableItemBackgroundBorderless">
+                        <ImageView
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_round_grey"
+                            android:src="@drawable/ic_file"
+                            android:padding="14dp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="文件"
+                            android:textSize="13sp"
+                            android:textColor="#444444" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/moreJoin"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="?attr/selectableItemBackgroundBorderless">
+                        <ImageView
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_round_grey"
+                            android:src="@drawable/ic_join"
+                            android:padding="14dp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="加入话题"
+                            android:textSize="13sp"
+                            android:textColor="#444444" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout
-                    android:id="@+id/moreFile"
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:background="?attr/selectableItemBackgroundBorderless">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:background="@drawable/bg_round_grey"
-                        android:src="@drawable/ic_file"
-                        android:padding="14dp" />
-                    <TextView
-                        android:layout_width="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="16dp">
+
+                    <LinearLayout
+                        android:id="@+id/moreSearch"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="文件"
-                        android:textSize="13sp"
-                        android:textColor="#444444" />
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="?attr/selectableItemBackgroundBorderless">
+                        <ImageView
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_round_grey"
+                            android:src="@drawable/ic_search"
+                            android:padding="14dp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="搜索话题"
+                            android:textSize="13sp"
+                            android:textColor="#444444" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/moreCreate"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="?attr/selectableItemBackgroundBorderless">
+                        <ImageView
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_round_grey"
+                            android:src="@drawable/ic_create"
+                            android:padding="14dp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="创建话题"
+                            android:textSize="13sp"
+                            android:textColor="#444444" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
                 </LinearLayout>
             </LinearLayout>
         </FrameLayout>
