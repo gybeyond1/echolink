@@ -16,8 +16,9 @@ services:
       - "${PORT:-3000}:3000"
     environment:
       - PORT=3000
-      # 生产环境务必改成随机长字符串！
-      - JWT_SECRET=${JWT_SECRET:-change-this-to-a-random-secret-key}
+      # JWT_SECRET 现在由服务端首次启动时自动生成并持久化到数据卷（/app/data/.jwt_secret），
+      # 无需手动设置。如需固定密钥，可在此取消注释并设置强随机串：
+      # - JWT_SECRET=你的强随机串
       - DB_PATH=/app/data/notifysync.db
       - MAX_NOTIFICATION_HISTORY=${MAX_NOTIFICATION_HISTORY:-500}
       - MAX_TOPIC_HISTORY=${MAX_TOPIC_HISTORY:-200}
