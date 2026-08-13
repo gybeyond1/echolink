@@ -1,0 +1,92 @@
+package com.notifysync.data
+
+import android.content.Context
+import android.content.SharedPreferences
+
+object AuthManager {
+    private const val PREFS_NAME = "notifysync_prefs"
+    private const val KEY_TOKEN = "auth_token"
+    private const val KEY_USER_ID = "user_id"
+    private const val KEY_USERNAME = "username"
+    private const val KEY_SERVER_URL = "server_url"
+    private const val KEY_DEVICE_ID = "device_id"
+    private const val KEY_DEVICE_NAME = "device_name"
+    private const val KEY_TOPICS = "subscribed_topics"
+
+    private lateinit var prefs: SharedPreferences
+
+    fun init(context: Context) {
+        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    var token: String?
+        get() = prefs.getString(KEY_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_TOKEN, value).apply()
+
+    var userId: Long
+        get() = prefs.getLong(KEY_USER_ID, -1)
+        set(value) = prefs.edit().putLong(KEY_USER_ID, value).apply()
+
+    var username: String?
+        get() = prefs.getString(KEY_USERNAME, null)
+        set(value) = prefs.edit().putString(KEY_USERNAME, value).apply()
+
+    var serverUrl: String
+        get() = prefs.getString(KEY_SERVER_URL, "http://10.0.2.2:3000") ?: "http://10.0.2.2:3000"
+        set(value) = prefs.edit().putString(KEY_SERVER_URL, value.trimEnd('/')).apply()
+
+    var deviceId: Long
+        get() = prefs.getLong(KEY_DEVICE_ID, -1)
+        set(value) = prefs.edit().putLong(KEY_DEVICE_ID, value).apply()
+
+    var deviceName: String?
+        get() = prefs.getString(KEY_DEVICE_NAME, null)
+        set(value) = prefs.edit().putString(KEY_DEVICE_NAME, value).apply()
+
+    // 已订阅的公共话题列表（逗号分隔存储）
+    var subscribedTopics: Set<String>
+        get() = prefs.getString(KEY_TOPICS, "")
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet()
+        set(value) = prefs.edit().putString(KEY_TOPICS, value.joinToString(",")).apply()
+
+    fun addTopic(topic: String) {
+        val topics = subscribedTopics.toMutableSet()
+        topics.add(topic.trim().lowercase())
+        subscribedTopics = topics
+    }
+
+    fun removeTopic(topic: String) {
+        val topics = subscribedTopics.toMutableSet()
+        topics.remove(topic.trim().lowercase())
+        subscribedTopics = topics
+    }
+
+    val isLoggedIn: Boolean
+        get() = !token.isNullOrEmpty() && userId > 0
+
+    fun logout() {
+        prefs.edit()
+            .remove(KEY_TOKEN)
+            .remove(KEY_USER_ID)
+            .remove(KEY_USERNAME)
+            .remove(KEY_DEVICE_ID)
+            .remove(KEY_TOPICS)
+            .apply()
+    }
+
+    // 获取 WebSocket URL（附带 device_id，供服务器过滤本机自己发的通知）
+    fun getWsUrl(): String {
+        val httpUrl = serverUrl
+        val wsUrl = if (httpUrl.startsWith("https")) {
+            httpUrl.replace("https", "wss")
+        } else {
+            httpUrl.replace("http", "ws")
+        }
+        val device = if (deviceId > 0) "&device_id=$deviceId" else ""
+        return "$wsUrl/ws?token=${token ?: ""}$device"
+    }
+}
