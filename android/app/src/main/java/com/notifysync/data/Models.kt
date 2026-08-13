@@ -46,7 +46,11 @@ data class TopicMessage(
     val text: String,
     val senderName: String,
     val timestamp: Long,
-    val deviceId: Long
+    val deviceId: Long,
+    val mediaType: String = "text",   // "text" | "voice" | "image" | "file"
+    val mediaUrl: String? = null,
+    val mediaName: String? = null,
+    val mediaSize: Long = 0
 )
 
 // ===== JSON 解析扩展 =====
@@ -105,7 +109,11 @@ fun parseTopicMessages(jsonArray: JSONArray): List<TopicMessage> {
                 text = obj.optString("text", ""),
                 senderName = obj.optString("sender_name", ""),
                 timestamp = obj.getLong("timestamp"),
-                deviceId = obj.optLong("device_id", -1)
+                deviceId = obj.optLong("device_id", -1),
+                mediaType = obj.optString("media_type", "text"),
+                mediaUrl = obj.optString("media_url", null),
+                mediaName = obj.optString("media_name", null),
+                mediaSize = obj.optLong("media_size", 0)
             )
         )
     }
@@ -118,9 +126,13 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
         topic = json.getString("topic"),
         title = json.optString("title", ""),
         text = json.optString("text", ""),
-        senderName = json.optString("sender_name", ""),
+        senderName = obj.optString("sender_name", ""),
         timestamp = json.getLong("timestamp"),
-        deviceId = json.optLong("device_id", -1)
+        deviceId = obj.optLong("device_id", -1),
+        mediaType = obj.optString("media_type", "text"),
+        mediaUrl = obj.optString("media_url", null),
+        mediaName = obj.optString("media_name", null),
+        mediaSize = obj.optLong("media_size", 0)
     )
 }
 
@@ -132,7 +144,8 @@ data class MyTopic(
     val myRole: String,        // "owner" | "member"
     val messageCount: Int,
     val pendingRequests: Int,   // 仅创建者可见：待审批数量
-    val ownerName: String?
+    val ownerName: String?,
+    val lastMessage: String? = null
 )
 
 // 可发现（非成员）的话题
@@ -171,7 +184,8 @@ fun parseMyTopics(jsonArray: JSONArray): List<MyTopic> {
                 myRole = obj.optString("my_role", "member"),
                 messageCount = obj.optInt("message_count", 0),
                 pendingRequests = obj.optInt("pending_requests", 0),
-                ownerName = obj.optString("owner_name", null)
+                ownerName = obj.optString("owner_name", null),
+                lastMessage = obj.optString("last_message", null)
             )
         )
     }

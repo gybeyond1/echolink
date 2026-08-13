@@ -3,8 +3,10 @@ package com.notifysync.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
@@ -172,13 +174,50 @@ object ApiClient {
 
     // ===== 公共话题 =====
 
-    suspend fun publishTopicMessage(topic: String, title: String, text: String): JSONObject {
+    suspend fun publishTopicMessage(
+        topic: String,
+        title: String,
+        text: String,
+        mediaType: String = "text",
+        mediaUrl: String? = null,
+        mediaName: String? = null,
+        mediaSize: Long = 0
+    ): JSONObject {
         val body = JSONObject()
             .put("title", title)
             .put("text", text)
             .put("sender_name", AuthManager.username ?: "android")
             .put("device_id", AuthManager.deviceId)
+            .put("media_type", mediaType)
+        if (mediaUrl != null) body.put("media_url", mediaUrl)
+        if (mediaName != null) body.put("media_name", mediaName)
+        if (mediaSize > 0) body.put("media_size", mediaSize)
         return execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/publish", "POST", body))
+    }
+
+    // 上传话题媒体（图片/语音/文件），返回 { url, name, size, type }
+    suspend fun uploadTopicMedia(topic: String, file: java.io.File, kind: String): JSONObject {
+        val url = "${AuthManager.serverUrl}/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/media?kind=$kind"
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "file",
+                file.name,
+                file.asRequestBody("*/*".toMediaType())
+            )
+            .build()
+        val request = Request.Builder().url(url)
+            .addHeader("Authorization", "Bearer ${AuthManager.token}")
+            .post(body)
+            .build()
+        return withContext(Dispatchers.IO) {
+            client.newCall(request).execute().use { response ->
+                val json = JSONObject(response.body?.string() ?: "{}")
+                if (!response.isSuccessful) {
+                    throw ApiException(response.code, json.optString("error", "upload failed"))
+                }
+                json
+            }
+        }
     }
 
     suspend fun getTopicMessages(topic: String, limit: Int = 50): List<TopicMessage> {

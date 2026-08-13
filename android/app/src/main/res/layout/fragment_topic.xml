@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- 顶部：话题选择 + 操作 -->
+    <!-- 顶部栏（列表态 / 聊天态 切换可见性） -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -13,60 +13,15 @@
         android:padding="12dp"
         android:gravity="center_vertical">
 
+        <!-- 列表态 -->
         <TextView
-            android:id="@+id/tvTitle"
-            android:layout_width="wrap_content"
+            android:id="@+id/tvTitleList"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="话题消息"
+            android:layout_weight="1"
+            android:text="话题"
             android:textSize="20sp"
             android:textStyle="bold" />
-
-        <Spinner
-            android:id="@+id/spTopic"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="12dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnAddTopic"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="添加"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnRefresh"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="刷新"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDeleteTopic"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="删除话题"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
-    </LinearLayout>
-
-    <!-- 话题信息 + 加入/审批/退出 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:gravity="center_vertical">
-
-        <TextView
-            android:id="@+id/tvTopicInfo"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text=""
-            android:textSize="12sp"
-            android:textColor="@android:color/darker_gray" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDiscover"
@@ -74,6 +29,25 @@
             android:layout_height="wrap_content"
             android:text="发现/加入"
             style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+        <!-- 聊天态 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="‹ 返回"
+            android:visibility="gone"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+        <TextView
+            android:id="@+id/tvChatTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=""
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPending"
@@ -84,71 +58,176 @@
             style="@style/Widget.MaterialComponents.Button.TextButton" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnLeave"
+            android:id="@+id/btnChatDiscover"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="退出"
+            android:text="发现/加入"
             android:visibility="gone"
             style="@style/Widget.MaterialComponents.Button.TextButton" />
     </LinearLayout>
 
-    <!-- 多选操作栏（默认隐藏） -->
-    <LinearLayout
-        android:id="@+id/selectionBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="8dp"
-        android:gravity="center_vertical"
-        android:background="#E3F2FD"
-        android:visibility="gone">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCancelSel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="取消"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
-
-        <TextView
-            android:id="@+id/tvSelectedCount"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="已选 0"
-            android:textStyle="bold" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSelectAll"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="全选"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDeleteSel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="删除"
-            android:backgroundTint="@android:color/holo_red_light"
-            android:textColor="@android:color/white" />
-    </LinearLayout>
-
-    <!-- 消息列表（支持下拉刷新） -->
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipeRefresh"
+    <!-- 列表态：话题会话列表 -->
+    <FrameLayout
+        android:id="@+id/listLayout"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
         <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerView"
+            android:id="@+id/rvTopics"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
             android:paddingBottom="8dp" />
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <TextView
+            android:id="@+id/tvEmptyTopics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="还没有话题\n点击右上角「发现/加入」或底部「+」新建"
+            android:gravity="center"
+            android:padding="48dp"
+            android:textColor="@android:color/darker_gray"
+            android:textSize="16sp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- 聊天态 -->
+    <LinearLayout
+        android:id="@+id/chatLayout"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- 多选操作栏（默认隐藏） -->
+        <LinearLayout
+            android:id="@+id/selectionBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:gravity="center_vertical"
+            android:background="#E3F2FD"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCancelSel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="取消"
+                style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+            <TextView
+                android:id="@+id/tvSelectedCount"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="已选 0"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSelectAll"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="全选"
+                style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDeleteSel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="删除"
+                android:backgroundTint="@android:color/holo_red_light"
+                android:textColor="@android:color/white" />
+        </LinearLayout>
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp" />
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <TextView
+            android:id="@+id/tvEmptyChat"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:text="暂无消息\n发送一条消息开始聊天"
+            android:gravity="center"
+            android:padding="48dp"
+            android:textColor="@android:color/darker_gray"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <!-- 底部：输入 + 发送 + 附件/语音 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:gravity="center_vertical">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAttach"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📎"
+                style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:hintEnabled="false">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="输入消息..."
+                    android:inputType="textMultiLine"
+                    android:maxLines="3"
+                    android:minLines="1" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnVoice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎤"
+                android:layout_marginStart="4dp"
+                style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSend"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="发送" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 底部「+」新建话题（仅列表态显示） -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabAddTopic"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_margin="16dp"
+        android:contentDescription="新建话题"
+        android:src="@android:drawable/ic_input_add"
+        android:visibility="gone" />
 
     <ProgressBar
         android:id="@+id/progressBar"
@@ -156,49 +235,5 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/tvEmpty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="暂无话题消息\n添加话题后可与其他设备实时互通"
-        android:gravity="center"
-        android:padding="48dp"
-        android:textColor="@android:color/darker_gray"
-        android:textSize="16sp"
-        android:visibility="gone" />
-
-    <!-- 底部：输入 + 发送 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:gravity="center_vertical">
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            app:hintEnabled="false">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="输入消息..."
-                android:inputType="textMultiLine"
-                android:maxLines="3"
-                android:minLines="1" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSend"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="发送" />
-    </LinearLayout>
 
 </LinearLayout>

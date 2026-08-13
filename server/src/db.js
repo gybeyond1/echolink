@@ -79,8 +79,20 @@ function initDB() {
       sender_name TEXT,
       title TEXT,
       text TEXT,
+      media_type TEXT,       -- 'text' | 'voice' | 'image' | 'file'
+      media_url TEXT,
+      media_name TEXT,
+      media_size INTEGER,
       timestamp INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 服务器设置（文件/图片/语音大小上限、话题历史上限等），key/value 存储
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
     )
   `);
 
@@ -163,8 +175,72 @@ function initDB() {
     db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
   }
 
+  // 话题消息媒体列（兼容旧库）
+  const tmCols = db.pragma("table_info(topic_messages)").map((c) => c.name);
+  ["media_type", "media_url", "media_name", "media_size"].forEach((c) => {
+    if (!tmCols.includes(c)) {
+      db.exec(`ALTER TABLE topic_messages ADD COLUMN ${c} TEXT`);
+    }
+  });
+
   console.log("[DB] SQLite initialized at", dbPath);
   return db;
+}
+
+// ===== 服务器设置（带内存缓存）=====
+const SETTINGS_DEFAULTS = {
+  max_image_size: "10", // MB
+  max_voice_size: "5",  // MB
+  max_file_size: "20",  // MB
+  max_topic_history: "200",
+};
+
+let settingsCache = null;
+
+function loadSettingsCache() {
+  const database = getDB();
+  const rows = database.prepare("SELECT key, value FROM settings").all();
+  const map = {};
+  for (const r of rows) map[r.key] = r.value;
+  for (const k of Object.keys(SETTINGS_DEFAULTS)) {
+    if (!(k in map)) {
+      database.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(k, SETTINGS_DEFAULTS[k]);
+      map[k] = SETTINGS_DEFAULTS[k];
+    }
+  }
+  settingsCache = map;
+  return map;
+}
+
+function getSettings() {
+  if (!settingsCache) loadSettingsCache();
+  return settingsCache;
+}
+
+function getSetting(key) {
+  const s = getSettings();
+  return key in s ? s[key] : SETTINGS_DEFAULTS[key];
+}
+
+// 返回某类媒体的大小上限（字节）；kind: image|voice|file
+function getMediaLimitBytes(kind) {
+  const mb = parseFloat(getSetting(`max_${kind}_size`)) || 0;
+  return Math.round(mb * 1024 * 1024);
+}
+
+function setSettings(patch) {
+  const database = getDB();
+  const map = {};
+  for (const k of Object.keys(SETTINGS_DEFAULTS)) {
+    if (k in patch && patch[k] != null) {
+      const v = String(patch[k]);
+      database.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(k, v);
+      map[k] = v;
+    }
+  }
+  if (!settingsCache) loadSettingsCache();
+  Object.assign(settingsCache, map);
+  return getSettings();
 }
 
 // 由环境变量 ADMIN_USERNAME / ADMIN_PASSWORD 初始化/维护管理员账号
@@ -198,4 +274,4 @@ function getDB() {
   return db;
 }
 
-module.exports = { initDB, getDB, seedAdmin };
+module.exports = { initDB, getDB, seedAdmin, getSettings, getSetting, getMediaLimitBytes, setSettings };

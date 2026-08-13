@@ -1,6 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const { getDB } = require("../db");
+const { getDB, getSettings, setSettings } = require("../db");
 const { authMiddleware, requireAdmin } = require("../middleware/auth");
 
 const router = express.Router();
@@ -21,6 +21,21 @@ router.get("/stats", (req, res) => {
     notifications: count("SELECT COUNT(*) c FROM notifications"),
     devices: count("SELECT COUNT(*) c FROM devices"),
   });
+});
+
+// 服务器设置（文件/图片/语音大小上限等）
+router.get("/settings", (req, res) => {
+  res.json({ settings: getSettings() });
+});
+
+router.put("/settings", (req, res) => {
+  const patch = req.body && req.body.settings ? req.body.settings : req.body;
+  try {
+    const updated = setSettings(patch);
+    res.json({ message: "Settings updated", settings: updated });
+  } catch (e) {
+    res.status(400).json({ error: "更新失败: " + e.message });
+  }
 });
 
 // 用户列表（含各用户的数据量统计）
