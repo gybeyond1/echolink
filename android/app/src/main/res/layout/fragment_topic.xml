@@ -169,53 +169,161 @@
             android:textSize="16sp"
             android:visibility="gone" />
 
-        <!-- 底部：输入 + 发送 + 附件/语音 -->
+        <!-- 底部输入栏（微信式） -->
         <LinearLayout
+            android:id="@+id/inputBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="8dp"
+            android:background="#F7F7F7"
+            android:padding="6dp"
             android:gravity="center_vertical">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnAttach"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="📎"
-                style="@style/Widget.MaterialComponents.Button.TextButton" />
+            <ImageButton
+                android:id="@+id/btnVoiceToggle"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_mic"
+                android:contentDescription="语音/键盘切换" />
 
-            <com.google.android.material.textfield.TextInputLayout
+            <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                app:hintEnabled="false">
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp">
 
-                <com.google.android.material.textfield.TextInputEditText
+                <EditText
                     android:id="@+id/etInput"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="输入消息..."
+                    android:minHeight="40dp"
+                    android:background="@drawable/bg_input"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:hint="说点什么..."
+                    android:textSize="15sp"
+                    android:maxLines="4"
                     android:inputType="textMultiLine"
-                    android:maxLines="3"
-                    android:minLines="1" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:imeOptions="actionSend" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnVoice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🎤"
-                android:layout_marginStart="4dp"
-                style="@style/Widget.MaterialComponents.Button.TextButton" />
+                <Button
+                    android:id="@+id/btnHoldTalk"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_input"
+                    android:text="按住 说话"
+                    android:textSize="15sp"
+                    android:textColor="#333333"
+                    android:visibility="gone" />
+            </FrameLayout>
 
-            <com.google.android.material.button.MaterialButton
+            <ImageButton
+                android:id="@+id/btnEmoji"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_emoji"
+                android:contentDescription="表情" />
+
+            <ImageButton
+                android:id="@+id/btnPlus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="2dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_plus"
+                android:contentDescription="更多" />
+
+            <Button
                 android:id="@+id/btnSend"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_marginStart="4dp"
-                android:text="发送" />
+                android:backgroundTint="#07C160"
+                android:text="发送"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:visibility="gone" />
         </LinearLayout>
+
+        <!-- 表情 / 更多 面板 -->
+        <FrameLayout
+            android:id="@+id/panelContainer"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:background="#F7F7F7"
+            android:visibility="gone">
+
+            <GridView
+                android:id="@+id/emojiGrid"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:numColumns="7"
+                android:verticalSpacing="10dp"
+                android:horizontalSpacing="6dp"
+                android:padding="12dp"
+                android:gravity="center"
+                android:stretchMode="columnWidth"
+                android:visibility="visible" />
+
+            <LinearLayout
+                android:id="@+id/moreLayout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:padding="20dp"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/moreImage"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="?attr/selectableItemBackgroundBorderless">
+                    <ImageView
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/bg_round_grey"
+                        android:src="@drawable/ic_image"
+                        android:padding="14dp" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="图片"
+                        android:textSize="13sp"
+                        android:textColor="#444444" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/moreFile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="?attr/selectableItemBackgroundBorderless">
+                    <ImageView
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/bg_round_grey"
+                        android:src="@drawable/ic_file"
+                        android:padding="14dp" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="文件"
+                        android:textSize="13sp"
+                        android:textColor="#444444" />
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
 
     <!-- 底部「+」新建话题（仅列表态显示） -->

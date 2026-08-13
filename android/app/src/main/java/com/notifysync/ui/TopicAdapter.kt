@@ -26,7 +26,8 @@ import java.util.Locale
 
 class TopicAdapter(
     private val onItemLongClick: (TopicMessage) -> Unit,
-    private val onItemClick: (TopicMessage) -> Unit
+    private val onItemClick: (TopicMessage) -> Unit,
+    private val onImageClick: ((String) -> Unit)? = null
 ) : RecyclerView.Adapter<TopicAdapter.ViewHolder>() {
 
     private val items = mutableListOf<TopicMessage>()
@@ -116,6 +117,9 @@ class TopicAdapter(
                 "image" -> {
                     holder.ivMedia.visibility = View.VISIBLE
                     loadImage(fullUrl(item.mediaUrl!!), holder.ivMedia)
+                    holder.ivMedia.setOnClickListener {
+                        if (!selectionMode) onImageClick?.invoke(fullUrl(item.mediaUrl!!))
+                    }
                 }
                 "voice" -> {
                     holder.llVoice.visibility = View.VISIBLE

@@ -14,11 +14,16 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.GridView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -38,7 +43,9 @@ import com.notifysync.data.TopicMessage
 import com.notifysync.data.WebSocketClient
 import com.notifysync.data.parseTopicMessage
 import com.notifysync.databinding.FragmentTopicBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -56,6 +63,9 @@ class TopicFragment : Fragment() {
 
     private var mediaRecorder: MediaRecorder? = null
     private var voiceFile: File? = null
+
+    private var voiceMode = false          // true=按住说话  false=键盘输入
+    private var panelMode: String? = null  // null | "emoji" | "more"
 
     private val topicReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -113,7 +123,8 @@ class TopicFragment : Fragment() {
             onItemLongClick = { msg -> enterSelection(msg) },
             onItemClick = { msg ->
                 if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
-            }
+            },
+            onImageClick = { url -> showImageFullscreen(url) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = chatAdapter
@@ -147,16 +158,32 @@ class TopicFragment : Fragment() {
         // 下拉刷新（保留）
         binding.swipeRefresh.setOnRefreshListener { loadMessages() }
 
-        // 发送 / 附件 / 语音
+        // ===== 微信式输入栏 =====
         binding.btnSend.setOnClickListener { sendText() }
-        binding.btnAttach.setOnClickListener { pickFile() }
-        binding.btnVoice.setOnTouchListener { _, event ->
+        binding.btnVoiceToggle.setOnClickListener { toggleVoiceMode() }
+        binding.btnEmoji.setOnClickListener { togglePanel("emoji") }
+        binding.btnPlus.setOnClickListener { togglePanel("more") }
+        binding.btnHoldTalk.setOnTouchListener { _, event ->
             when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> { ensureRecordPermission(); true }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> { stopRecordingAndSend(); true }
+                MotionEvent.ACTION_DOWN -> { ensureRecordPermission(); true }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { stopRecordingAndSend(); true }
                 else -> false
             }
         }
+        binding.etInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val has = !s.isNullOrEmpty()
+                binding.btnSend.visibility = if (has) View.VISIBLE else View.GONE
+                binding.btnPlus.visibility = if (has) View.GONE else View.VISIBLE
+                if (has) hidePanels()
+            }
+        })
+        binding.etInput.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) hidePanels() }
+        binding.moreImage.setOnClickListener { hidePanels(); pickImage() }
+        binding.moreFile.setOnClickListener { hidePanels(); pickFile() }
+        setupEmojiGrid()
 
         showListMode()
         listRefreshHandler.postDelayed(listRefreshRunnable, 15000)
@@ -312,6 +339,7 @@ class TopicFragment : Fragment() {
         val text = binding.etInput.text?.toString()?.trim() ?: ""
         if (text.isEmpty()) return
         binding.etInput.setText("")
+        hidePanels()
         publish(topic, "", text, "text", null, null, 0)
     }
 
@@ -333,6 +361,77 @@ class TopicFragment : Fragment() {
     private fun scrollToBottom() {
         if (chatAdapter.itemCount > 0) binding.recyclerView.scrollToPosition(chatAdapter.itemCount - 1)
     }
+
+    // ===== 微信式输入栏交互 =====
+
+    private fun toggleVoiceMode() {
+        voiceMode = !voiceMode
+        if (voiceMode) {
+            binding.etInput.visibility = View.GONE
+            binding.btnHoldTalk.visibility = View.VISIBLE
+            binding.btnVoiceToggle.setImageResource(R.drawable.ic_keyboard)
+            hideKeyboard()
+            hidePanels()
+        } else {
+            binding.etInput.visibility = View.VISIBLE
+            binding.btnHoldTalk.visibility = View.GONE
+            binding.btnVoiceToggle.setImageResource(R.drawable.ic_mic)
+            binding.etInput.requestFocus()
+        }
+    }
+
+    private fun togglePanel(which: String) {
+        if (panelMode == which) { hidePanels(); return }
+        panelMode = which
+        binding.panelContainer.visibility = View.VISIBLE
+        binding.emojiGrid.visibility = if (which == "emoji") View.VISIBLE else View.GONE
+        binding.moreLayout.visibility = if (which == "more") View.VISIBLE else View.GONE
+        if (which == "emoji") hideKeyboard()
+    }
+
+    private fun hidePanels() {
+        panelMode = null
+        binding.panelContainer.visibility = View.GONE
+    }
+
+    private fun hideKeyboard() {
+        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.etInput.windowToken, 0)
+    }
+
+    private val EMOJIS = listOf(
+        "😀","😁","😂","🤣","😊","😍","😘","😎","🤔","😜","😭","😡",
+        "👍","👎","👌","🙏","💪","🤝","❤️","💔","🔥","⭐","🎉","✨",
+        "🌹","🌟","😅","😏","😴","🤗","😇","🥺","😋","🤩","😱","😤",
+        "🤯","🥳","😬","🙄","😳","💯","✅","❌","⚡","🌈","☀️","🌙",
+        "💡","📌","🎯","🍻","🍺","☕","🍎","🎁","💰","🚀","⏰","📱",
+        "💬","👀","🔔","🐶","🐱","🌻","⚽","🎮","🎵","⌫"
+    )
+
+    private fun setupEmojiGrid() {
+        val adapter = ArrayAdapter(requireContext(), R.layout.item_emoji, EMOJIS)
+        binding.emojiGrid.adapter = adapter
+        binding.emojiGrid.setOnItemClickListener { _, _, pos, _ ->
+            val e = EMOJIS[pos]
+            val et = binding.etInput
+            if (e == "⌫") {
+                val t = et.text
+                if (!t.isNullOrEmpty()) {
+                    val start = et.selectionStart
+                    val end = et.selectionEnd
+                    if (start == end && start > 0) et.text?.delete(start - 1, start)
+                    else if (start != end) et.text?.delete(start, end)
+                }
+            } else {
+                val start = et.selectionStart
+                val end = et.selectionEnd
+                et.text?.replace(start, end, e, 0, e.length)
+                et.setSelection(start + e.length)
+            }
+        }
+    }
+
+    private fun pickImage() { getContent.launch("image/*") }
 
     // ===== 多选删除消息 =====
 
@@ -556,5 +655,39 @@ class TopicFragment : Fragment() {
     private fun releaseRecorder() {
         try { mediaRecorder?.release() } catch (_: Exception) {}
         mediaRecorder = null
+    }
+
+    // ===== 图片全屏查看 =====
+
+    private fun showImageFullscreen(url: String) {
+        val dialog = AlertDialog.Builder(requireContext()).create()
+        val iv = android.widget.ImageView(requireContext())
+        iv.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        iv.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        iv.setBackgroundColor(0xFF000000.toInt())
+        iv.setOnClickListener { dialog.dismiss() }
+        dialog.setView(iv)
+        dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.show()
+        lifecycleScope.launch {
+            try {
+                val bmp = downloadBitmap(url)
+                if (bmp != null) iv.setImageBitmap(bmp)
+            } catch (_: Exception) {}
+        }
+    }
+
+    private suspend fun downloadBitmap(url: String): android.graphics.Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 10000
+                readTimeout = 15000
+                doInput = true
+            }
+            conn.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) }
+        } catch (_: Exception) {
+            null
+        }
     }
 }
