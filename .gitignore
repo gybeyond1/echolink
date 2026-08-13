@@ -17,6 +17,11 @@ android/build/
 *.apk
 *.aar
 
+# 签名密钥（仅存于 GitHub Secrets / 本地备份，禁止入库）
+*.p12
+*.keystore
+notifysync.p12
+
 # IDE
 .idea/
 .vscode/
