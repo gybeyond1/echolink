@@ -146,7 +146,9 @@ class SettingsFragment : Fragment() {
         val granted = NotificationListener.isListenerEnabled(requireContext())
         binding.tvPermissionStatus.text = if (granted) "已授权" else "未授权"
         binding.tvPermissionStatus.setTextColor(
-            if (granted) 0xFF4CAF50.toInt() else 0xFFF44336.toInt()
+            requireContext().getColor(
+                if (granted) R.color.ok else R.color.danger
+            )
         )
     }
 
