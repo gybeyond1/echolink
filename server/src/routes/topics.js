@@ -276,18 +276,25 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
 
   const deviceId = req.body.device_id || null;
   const sender = String(req.body.sender_name || req.username || "unknown").slice(0, 64);
+  // 设备名：客户端上报优先；未上报则回退查 devices 表
+  let deviceName = String(req.body.device_name || "").slice(0, 64);
+  if (!deviceName && deviceId) {
+    const dev = db.prepare("SELECT device_name FROM devices WHERE id = ?").get(deviceId);
+    if (dev && dev.device_name) deviceName = String(dev.device_name).slice(0, 64);
+  }
   const ts = Date.now();
   const mediaType = hasMedia ? String(media_type).slice(0, 16) : "text";
 
   const result = db
-    .prepare(`INSERT INTO topic_messages (topic, user_id, device_id, sender_name, title, text, media_type, media_url, media_name, media_size, timestamp)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO topic_messages (topic, user_id, device_id, sender_name, title, text, media_type, media_url, media_name, media_size, device_name, timestamp)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       name, req.userId, deviceId, sender,
       String(title || "").slice(0, 500), String(text || "").slice(0, 2000),
       mediaType, hasMedia ? String(media_url).slice(0, 500) : null,
       hasMedia ? String(media_name || "").slice(0, 200) : null,
       hasMedia ? (parseInt(media_size) || 0) : 0,
+      deviceName || null,
       ts
     );
 
@@ -303,6 +310,7 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
     sender_name: sender,
     timestamp: ts,
     device_id: deviceId,
+    device_name: deviceName || null,
   };
 
   const sent = publishToTopic(name, message, { excludeDeviceId: deviceId });

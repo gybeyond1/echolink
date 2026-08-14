@@ -194,6 +194,7 @@ object ApiClient {
             .put("text", text)
             .put("sender_name", AuthManager.username ?: "android")
             .put("device_id", AuthManager.deviceId)
+            .put("device_name", AuthManager.deviceName ?: "")
             .put("media_type", mediaType)
         if (mediaUrl != null) body.put("media_url", mediaUrl)
         if (mediaName != null) body.put("media_name", mediaName)

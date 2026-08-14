@@ -175,9 +175,9 @@ function initDB() {
     db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
   }
 
-  // 话题消息媒体列（兼容旧库）
+  // 话题消息媒体列 + 设备名列（兼容旧库）
   const tmCols = db.pragma("table_info(topic_messages)").map((c) => c.name);
-  ["media_type", "media_url", "media_name", "media_size"].forEach((c) => {
+  ["media_type", "media_url", "media_name", "media_size", "device_name"].forEach((c) => {
     if (!tmCols.includes(c)) {
       db.exec(`ALTER TABLE topic_messages ADD COLUMN ${c} TEXT`);
     }
