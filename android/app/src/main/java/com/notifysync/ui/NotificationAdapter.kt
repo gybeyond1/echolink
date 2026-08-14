@@ -6,11 +6,11 @@ import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewConfiguration
 import android.widget.Toast
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -54,11 +54,52 @@ class NotificationAdapter(
     inner class ViewHolder(private val binding: ItemNotificationBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        var longPressRunnable: Runnable? = null
+        var item: NotificationItem? = null
+
+        init {
+            // 行业通用做法：ViewHolder 构造时一次性建立手势处理（与 TopicAdapter 同构）。
+            // onBindViewHolder 只更新数据，不再重建 listener，杜绝复用池 / submitList 刷新
+            // 打断手势状态导致的"点不动 / 要点好几下"。
+            val ctx = binding.root.context
+            val gestureListener = object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: MotionEvent): Boolean = true
+
+                // 单击：多选模式立即 toggle；普通模式忽略（通知页普通模式单击无操作）
+                override fun onSingleTapUp(e: MotionEvent): Boolean {
+                    val it = item ?: return false
+                    if (isSelectionActive) {
+                        onItemClick(it)
+                        return true
+                    }
+                    return false
+                }
+
+                // 单击确认：通知页普通模式单击无操作
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean = true
+
+                // 双击：复制 + 震动（仅普通模式；多选模式吞掉，避免误复制）
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    val it = item ?: return false
+                    if (!isSelectionActive) copyText(it)
+                    return true
+                }
+
+                // 长按：多选 → toggle；普通 → 进入多选
+                override fun onLongPress(e: MotionEvent) {
+                    val it = item ?: return
+                    if (isSelectionActive) onItemClick(it) else onItemLongClick(it)
+                }
+            }
+            val detector = GestureDetector(ctx, gestureListener)
+            detector.setOnDoubleTapListener(gestureListener)  // 关键：不设置则双击/单击确认永不回调
+            binding.root.setOnTouchListener { _, ev ->
+                detector.onTouchEvent(ev)
+                true
+            }
+        }
 
         fun bind(item: NotificationItem) {
-            longPressRunnable?.let { binding.root.removeCallbacks(it) }
-            longPressRunnable = null
+            this.item = item
             binding.tvAppName.text = item.appName
             binding.tvTitle.text = item.title.ifEmpty { "(无标题)" }
             binding.tvText.text = item.text.ifEmpty { "(无内容)" }
@@ -72,129 +113,6 @@ class NotificationAdapter(
                 if (isSel) ctx.getColor(R.color.brand_primary_light)
                 else ctx.getColor(R.color.surface)
             )
-
-            // 触摸处理（统一由 root 接管，子 View 全部递归禁用触摸）：
-            // 普通模式：整条卡片任意位置双击复制、长按进入多选。
-            // 多选模式：整条卡片任意位置单击/长按 = 选中或取消（toggle）。
-            // 不用 clickable + OnClickListener（复用池中 setOnClickListener(null) 的 clickable 状态
-            // 会反复翻转导致点击偶发丢失），改用 OnTouchListener 直接判定抬起，100% 可靠；
-            // 滚动由 RecyclerView 拦截机制接管，不受影响。
-            clearTouchListeners()
-            if (isSelectionActive) {
-                var downX = 0f
-                var downY = 0f
-                var downTime = 0L
-                binding.root.setOnTouchListener { _, ev ->
-                    when (ev.actionMasked) {
-                        MotionEvent.ACTION_DOWN -> {
-                            downX = ev.x
-                            downY = ev.y
-                            downTime = System.currentTimeMillis()
-                            binding.root.isPressed = true
-                            true
-                        }
-                        MotionEvent.ACTION_UP -> {
-                            binding.root.isPressed = false
-                            if (downTime > 0) {  // downTime==0 表示模式切换前旧手势的 UP，忽略，防止误 toggle
-                                downTime = 0L
-                                val slop = ViewConfiguration.get(binding.root.context).scaledTouchSlop
-                                if (Math.abs(ev.x - downX) <= slop && Math.abs(ev.y - downY) <= slop) {
-                                    onItemClick(item)
-                                }
-                            }
-                            true
-                        }
-                        MotionEvent.ACTION_CANCEL -> {
-                            binding.root.isPressed = false
-                            downTime = 0L
-                            true
-                        }
-                        else -> true
-                    }
-                }
-            } else {
-                // 普通模式：手写手势判定（与多选模式同一套 OnTouchListener 机制，最可靠）。
-                // 长按 = DOWN 后 400ms 内未移动/未抬起 -> 进入多选；位移超 touchSlop 或提前抬起则取消。
-                // 双击 = 两次单击间隔 < doubleTapTimeout -> 复制并震动；单击 = 无操作。
-                // downTime 守卫：模式切换瞬间旧手势的 UP 不再误触发单击/双击。
-                var downX = 0f
-                var downY = 0f
-                var downTime = 0L
-                var moved = false
-                var longPressFired = false
-                var lastUpTime = 0L
-                val longPressRunnable = Runnable {
-                    longPressFired = true
-                    onItemLongClick(item)
-                }
-                longPressRunnable.let { longPressRunnable ->
-                    binding.root.setOnTouchListener { _, ev ->
-                        when (ev.actionMasked) {
-                            MotionEvent.ACTION_DOWN -> {
-                                downX = ev.x
-                                downY = ev.y
-                                downTime = System.currentTimeMillis()
-                                moved = false
-                                longPressFired = false
-                                // 双击第二下（距上次单击 < doubleTapTimeout）不启动长按，避免双击误入多选
-                                if (System.currentTimeMillis() - lastUpTime >= ViewConfiguration.getDoubleTapTimeout().toLong()) {
-                                    binding.root.postDelayed(longPressRunnable, ViewConfiguration.getLongPressTimeout().toLong())
-                                }
-                                binding.root.isPressed = true
-                                true
-                            }
-                            MotionEvent.ACTION_MOVE -> {
-                                val slop = ViewConfiguration.get(binding.root.context).scaledTouchSlop
-                                if (Math.abs(ev.x - downX) > slop || Math.abs(ev.y - downY) > slop) {
-                                    moved = true
-                                    binding.root.removeCallbacks(longPressRunnable)
-                                }
-                                true
-                            }
-                            MotionEvent.ACTION_UP -> {
-                                binding.root.removeCallbacks(longPressRunnable)
-                                binding.root.isPressed = false
-                                if (downTime > 0L) {  // 忽略模式切换前的旧手势 UP
-                                    downTime = 0L
-                                    val slop = ViewConfiguration.get(binding.root.context).scaledTouchSlop
-                                    val withinSlop = Math.abs(ev.x - downX) <= slop && Math.abs(ev.y - downY) <= slop
-                                    if (!longPressFired && !moved && withinSlop) {
-                                        val now = System.currentTimeMillis()
-                                        if (now - lastUpTime < ViewConfiguration.getDoubleTapTimeout().toLong()) {
-                                            lastUpTime = 0L
-                                            copyText(item)
-                                        } else {
-                                            lastUpTime = now
-                                        }
-                                    }
-                                }
-                                true
-                            }
-                            MotionEvent.ACTION_CANCEL -> {
-                                binding.root.removeCallbacks(longPressRunnable)
-                                binding.root.isPressed = false
-                                downTime = 0L
-                                true
-                            }
-                            else -> true
-                        }
-                    }
-                }
-            }
-        }
-
-        private fun clearTouchListeners() {
-            disableTouch(binding.root)
-        }
-
-        private fun disableTouch(v: View) {
-            v.setOnClickListener(null)
-            v.setOnLongClickListener(null)
-            v.isClickable = false
-            v.isFocusable = false
-            if (v is ViewGroup) {
-                for (i in 0 until v.childCount) disableTouch(v.getChildAt(i))
-            }
         }
 
         private fun copyText(item: NotificationItem) {

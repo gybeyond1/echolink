@@ -10,11 +10,11 @@ import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewConfiguration
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -91,7 +91,7 @@ class TopicAdapter(
     fun getSelectedIds(): List<Long> = selected.filter { it > 0 }
     val selectedCount: Int get() = selected.size
 
-    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+    inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvSender: TextView = view.findViewById(R.id.tvSender)
         val tvTime: TextView = view.findViewById(R.id.tvTime)
         val tvTitle: TextView = view.findViewById(R.id.tvTitle)
@@ -100,7 +100,84 @@ class TopicAdapter(
         val llVoice: android.view.View = view.findViewById(R.id.llVoice)
         val llFile: android.view.View = view.findViewById(R.id.llFile)
         val tvFile: TextView = view.findViewById(R.id.tvFile)
-        var longPressRunnable: Runnable? = null
+        var item: TopicMessage? = null
+
+        init {
+            // 行业通用做法：ViewHolder 构造时一次性建立手势处理，onBindViewHolder 只更新数据，
+            // 不再重建任何 listener。这样 RecyclerView 复用池 / notifyDataSetChanged 全量刷新
+            // 都不会打断或重置手势状态，从根本上杜绝"点不动 / 要点好几下才选中"。
+            // 关键配置：
+            //  1. onDown 必须返回 true，事件序列才会持续交给 GestureDetector；
+            //  2. 必须 setOnDoubleTapListener，否则 onDoubleTap / onSingleTapConfirmed 永不回调
+            //     （上一轮 GestureDetector "失灵"很可能就是漏了这一步）；
+            //  3. 普通模式单击走 onSingleTapConfirmed（等双击判定，避免双击时误开媒体）；
+            //  4. 多选模式单击走 onSingleTapUp（立即 toggle，没有双击等待延迟）；
+            //  5. 长按触发后 GestureDetector 不会再回调单击，天然避免"长按进多选后误 toggle"。
+            val ctx = view.context
+            val gestureListener = object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: MotionEvent): Boolean = true
+
+                // 单击：多选模式立即 toggle；普通模式忽略（等 onSingleTapConfirmed 判定非双击）
+                override fun onSingleTapUp(e: MotionEvent): Boolean {
+                    val it = item ?: return false
+                    if (selectionMode) {
+                        onItemClick(it)
+                        return true
+                    }
+                    return false
+                }
+
+                // 单击确认（非双击）：普通模式按落点打开媒体（图片/语音/文件）
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                    val it = item ?: return false
+                    if (!selectionMode) openMediaIfHit(it, e)
+                    return true
+                }
+
+                // 双击：复制 + 震动（仅普通模式；多选模式吞掉，避免误复制）
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    val it = item ?: return false
+                    if (!selectionMode) copyText(view.context, it)
+                    return true
+                }
+
+                // 长按：多选 → toggle；普通 → 进入多选
+                override fun onLongPress(e: MotionEvent) {
+                    val it = item ?: return
+                    if (selectionMode) onItemClick(it) else onItemLongClick(it)
+                }
+            }
+            val detector = GestureDetector(ctx, gestureListener)
+            detector.setOnDoubleTapListener(gestureListener)  // 关键：不设置则双击/单击确认永不回调
+            view.setOnTouchListener { _, ev ->
+                detector.onTouchEvent(ev)
+                true
+            }
+        }
+
+        // 普通模式单击：按落点打开媒体
+        private fun openMediaIfHit(item: TopicMessage, ev: MotionEvent) {
+            when {
+                ivMedia.visibility == View.VISIBLE && inViewBounds(ivMedia, ev) -> {
+                    if (!item.mediaUrl.isNullOrEmpty()) onImageClick?.invoke(fullUrl(item.mediaUrl))
+                }
+                llVoice.visibility == View.VISIBLE && inViewBounds(llVoice, ev) -> {
+                    if (!item.mediaUrl.isNullOrEmpty()) playVoice(fullUrl(item.mediaUrl))
+                }
+                llFile.visibility == View.VISIBLE && inViewBounds(llFile, ev) -> {
+                    if (!item.mediaUrl.isNullOrEmpty()) {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl(item.mediaUrl)))
+                        try { itemView.context.startActivity(intent) } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
+
+        private fun inViewBounds(v: View, ev: MotionEvent): Boolean {
+            val rect = android.graphics.Rect()
+            v.getHitRect(rect)
+            return rect.contains(ev.x.toInt(), ev.y.toInt())
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -110,9 +187,8 @@ class TopicAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.longPressRunnable?.let { holder.itemView.removeCallbacks(it) }
-        holder.longPressRunnable = null
         val item = items[position]
+        holder.item = item
         val isMedia = item.mediaType != "text" && !item.mediaUrl.isNullOrEmpty()
         holder.tvSender.text = item.senderName.ifEmpty { "unknown" }
         holder.tvTime.text = timeFormat.format(Date(item.timestamp))
@@ -121,7 +197,7 @@ class TopicAdapter(
         holder.tvText.text = item.text
         holder.tvText.visibility = if (item.text.isNotEmpty()) View.VISIBLE else View.GONE
 
-        // 媒体渲染
+        // 媒体渲染（点击打开媒体统一由 ViewHolder 的手势单击按落点分发，不再给子 View 设 listener）
         holder.ivMedia.visibility = View.GONE
         holder.llVoice.visibility = View.GONE
         holder.llFile.visibility = View.GONE
@@ -130,21 +206,13 @@ class TopicAdapter(
                 "image" -> {
                     holder.ivMedia.visibility = View.VISIBLE
                     loadImage(fullUrl(item.mediaUrl!!), holder.ivMedia)
-                    holder.ivMedia.setOnClickListener {
-                        if (!selectionMode) onImageClick?.invoke(fullUrl(item.mediaUrl!!))
-                    }
                 }
                 "voice" -> {
                     holder.llVoice.visibility = View.VISIBLE
-                    holder.llVoice.setOnClickListener { playVoice(fullUrl(item.mediaUrl!!)) }
                 }
                 "file" -> {
                     holder.llFile.visibility = View.VISIBLE
                     holder.tvFile.text = "📄 ${item.mediaName ?: "文件"}  (${formatSize(item.mediaSize)})"
-                    holder.llFile.setOnClickListener {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl(item.mediaUrl!!)))
-                        try { it.context.startActivity(intent) } catch (_: Exception) {}
-                    }
                 }
             }
         }
@@ -155,149 +223,6 @@ class TopicAdapter(
                 holder.itemView.context.getColor(R.color.brand_primary_light)
             else 0x00000000
         )
-
-        // 触摸处理（统一由 itemView 接管，子 View 全部递归禁用触摸）：
-        // 普通模式：整条消息任意位置双击复制、长按进入多选；单击按落点打开媒体。
-        // 多选模式：整条消息任意位置单击/长按 = 选中或取消（toggle）。
-        // 不用 clickable + OnClickListener（复用池中 setOnClickListener(null) 的 clickable 状态
-        // 会反复翻转导致点击偶发丢失），改用 OnTouchListener 直接判定抬起，100% 可靠；
-        // 滚动由 RecyclerView 拦截机制接管，不受影响。
-        clearTouchListeners(holder)
-        if (selectionMode) {
-            var downX = 0f
-            var downY = 0f
-            var downTime = 0L
-            holder.itemView.setOnTouchListener { _, ev ->
-                when (ev.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        downX = ev.x
-                        downY = ev.y
-                        downTime = System.currentTimeMillis()
-                        holder.itemView.isPressed = true
-                        true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        holder.itemView.isPressed = false
-                        if (downTime > 0) {  // downTime==0 表示模式切换前旧手势的 UP，忽略，防止误 toggle
-                            downTime = 0L
-                            val slop = ViewConfiguration.get(holder.itemView.context).scaledTouchSlop
-                            if (Math.abs(ev.x - downX) <= slop && Math.abs(ev.y - downY) <= slop) {
-                                onItemClick(item)
-                            }
-                        }
-                        true
-                    }
-                    MotionEvent.ACTION_CANCEL -> {
-                        holder.itemView.isPressed = false
-                        downTime = 0L
-                        true
-                    }
-                    else -> true
-                }
-            }
-        } else {
-            // 普通模式：手写手势判定（与多选模式同一套 OnTouchListener 机制，最可靠）。
-            // 长按 = DOWN 后 400ms 内未移动/未抬起 -> 进入多选；位移超 touchSlop 或提前抬起则取消。
-            // 双击 = 两次单击间隔 < doubleTapTimeout -> 复制并震动；单击 = 按落点打开媒体。
-            // downTime 守卫：模式切换瞬间旧手势的 UP 不再误触发单击/双击。
-            var downX = 0f
-            var downY = 0f
-            var downTime = 0L
-            var moved = false
-            var longPressFired = false
-            var lastUpTime = 0L
-            val longPressRunnable = Runnable {
-                longPressFired = true
-                onItemLongClick(item)
-            }
-            holder.longPressRunnable = longPressRunnable
-            holder.itemView.setOnTouchListener { _, ev ->
-                when (ev.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        downX = ev.x
-                        downY = ev.y
-                        downTime = System.currentTimeMillis()
-                        moved = false
-                        longPressFired = false
-                        // 双击第二下（距上次单击 < doubleTapTimeout）不启动长按，避免双击误入多选
-                        if (System.currentTimeMillis() - lastUpTime >= ViewConfiguration.getDoubleTapTimeout().toLong()) {
-                            holder.itemView.postDelayed(longPressRunnable, ViewConfiguration.getLongPressTimeout().toLong())
-                        }
-                        holder.itemView.isPressed = true
-                        true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        val slop = ViewConfiguration.get(holder.itemView.context).scaledTouchSlop
-                        if (Math.abs(ev.x - downX) > slop || Math.abs(ev.y - downY) > slop) {
-                            moved = true
-                            holder.itemView.removeCallbacks(longPressRunnable)
-                        }
-                        true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        holder.itemView.removeCallbacks(longPressRunnable)
-                        holder.itemView.isPressed = false
-                        if (downTime > 0L) {  // 忽略模式切换前的旧手势 UP
-                            downTime = 0L
-                            val slop = ViewConfiguration.get(holder.itemView.context).scaledTouchSlop
-                            val withinSlop = Math.abs(ev.x - downX) <= slop && Math.abs(ev.y - downY) <= slop
-                            if (!longPressFired && !moved && withinSlop) {
-                                val now = System.currentTimeMillis()
-                                if (now - lastUpTime < ViewConfiguration.getDoubleTapTimeout().toLong()) {
-                                    lastUpTime = 0L
-                                    copyText(holder.itemView.context, item)
-                                } else {
-                                    lastUpTime = now
-                                    // 单击：按落点打开媒体
-                                    when {
-                                        holder.ivMedia.visibility == View.VISIBLE && inViewBounds(holder.ivMedia, ev) -> {
-                                            if (!item.mediaUrl.isNullOrEmpty()) onImageClick?.invoke(fullUrl(item.mediaUrl))
-                                        }
-                                        holder.llVoice.visibility == View.VISIBLE && inViewBounds(holder.llVoice, ev) -> {
-                                            if (!item.mediaUrl.isNullOrEmpty()) playVoice(fullUrl(item.mediaUrl))
-                                        }
-                                        holder.llFile.visibility == View.VISIBLE && inViewBounds(holder.llFile, ev) -> {
-                                            if (!item.mediaUrl.isNullOrEmpty()) {
-                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl(item.mediaUrl)))
-                                                try { holder.itemView.context.startActivity(intent) } catch (_: Exception) {}
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        true
-                    }
-                    MotionEvent.ACTION_CANCEL -> {
-                        holder.itemView.removeCallbacks(longPressRunnable)
-                        holder.itemView.isPressed = false
-                        downTime = 0L
-                        true
-                    }
-                    else -> true
-                }
-            }
-        }
-    }
-
-    private fun clearTouchListeners(holder: ViewHolder) {
-        disableTouch(holder.itemView)
-    }
-
-    private fun disableTouch(v: View) {
-        v.setOnClickListener(null)
-        v.setOnLongClickListener(null)
-        v.isClickable = false
-        v.isFocusable = false
-        if (v is ViewGroup) {
-            for (i in 0 until v.childCount) disableTouch(v.getChildAt(i))
-        }
-    }
-
-    private fun inViewBounds(v: View, ev: MotionEvent): Boolean {
-        val rect = android.graphics.Rect()
-        v.getHitRect(rect)
-        return rect.contains(ev.x.toInt(), ev.y.toInt())
     }
 
     val isAllSelected: Boolean
