@@ -7,6 +7,7 @@
 
     <!-- 顶部栏（列表态 / 聊天态 切换可见性） -->
     <LinearLayout
+        android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -19,7 +20,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="话题"
+            android:text=""
+            android:visibility="gone"
             android:textSize="20sp"
             android:textStyle="bold" />
 
@@ -29,6 +31,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_gravity="center"
+            android:gravity="center"
             android:text=""
             android:textSize="18sp"
             android:textStyle="bold"
@@ -215,8 +219,8 @@
                 android:layout_marginStart="2dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:scaleType="centerInside"
-                android:src="@drawable/ic_plus"
-                android:contentDescription="更多" />
+                android:src="@drawable/ic_attachment"
+                android:contentDescription="附件" />
 
             <Button
                 android:id="@+id/btnSend"
@@ -251,148 +255,6 @@
                 android:stretchMode="columnWidth"
                 android:visibility="visible" />
 
-            <LinearLayout
-                android:id="@+id/moreLayout"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical"
-                android:padding="16dp"
-                android:gravity="center_vertical"
-                android:visibility="gone">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <LinearLayout
-                        android:id="@+id/moreImage"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="?attr/selectableItemBackgroundBorderless">
-                        <ImageView
-                            android:layout_width="56dp"
-                            android:layout_height="56dp"
-                            android:background="@drawable/bg_round_grey"
-                            android:src="@drawable/ic_image"
-                            android:padding="14dp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:text="图片"
-                            android:textSize="13sp"
-                            android:textColor="?android:attr/textColorPrimary" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/moreFile"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="?attr/selectableItemBackgroundBorderless">
-                        <ImageView
-                            android:layout_width="56dp"
-                            android:layout_height="56dp"
-                            android:background="@drawable/bg_round_grey"
-                            android:src="@drawable/ic_file"
-                            android:padding="14dp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:text="文件"
-                            android:textSize="13sp"
-                            android:textColor="?android:attr/textColorPrimary" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/moreJoin"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="?attr/selectableItemBackgroundBorderless">
-                        <ImageView
-                            android:layout_width="56dp"
-                            android:layout_height="56dp"
-                            android:background="@drawable/bg_round_grey"
-                            android:src="@drawable/ic_join"
-                            android:padding="14dp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:text="加入话题"
-                            android:textSize="13sp"
-                            android:textColor="?android:attr/textColorPrimary" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="16dp">
-
-                    <LinearLayout
-                        android:id="@+id/moreSearch"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="?attr/selectableItemBackgroundBorderless">
-                        <ImageView
-                            android:layout_width="56dp"
-                            android:layout_height="56dp"
-                            android:background="@drawable/bg_round_grey"
-                            android:src="@drawable/ic_search"
-                            android:padding="14dp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:text="搜索话题"
-                            android:textSize="13sp"
-                            android:textColor="?android:attr/textColorPrimary" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/moreCreate"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="?attr/selectableItemBackgroundBorderless">
-                        <ImageView
-                            android:layout_width="56dp"
-                            android:layout_height="56dp"
-                            android:background="@drawable/bg_round_grey"
-                            android:src="@drawable/ic_create"
-                            android:padding="14dp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:text="创建话题"
-                            android:textSize="13sp"
-                            android:textColor="?android:attr/textColorPrimary" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:layout_weight="1" />
-                </LinearLayout>
-            </LinearLayout>
         </FrameLayout>
     </LinearLayout>
 

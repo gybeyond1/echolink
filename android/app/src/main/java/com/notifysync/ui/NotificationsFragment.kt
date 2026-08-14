@@ -13,6 +13,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.notifysync.R
 import com.notifysync.data.ApiClient
 import com.notifysync.data.NotificationItem
@@ -63,6 +65,13 @@ class NotificationsFragment : Fragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
 
         loadNotifications()
+
+        // 全面屏沉浸式：根布局顶部避开状态栏
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(0, systemBars.top, 0, 0)
+            insets
+        }
     }
 
     fun refresh() {
@@ -131,6 +140,13 @@ class NotificationsFragment : Fragment() {
                 adapter.clearSelection()
                 updateSelectionUI()
                 loadNotifications()
+
+        // 全面屏沉浸式：根布局顶部避开状态栏
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(0, systemBars.top, 0, 0)
+            insets
+        }
                 Toast.makeText(requireContext(), "已删除 ${ids.size} 条", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "删除失败: ${e.message}", Toast.LENGTH_SHORT).show()

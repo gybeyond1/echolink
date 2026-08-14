@@ -30,6 +30,8 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -175,8 +177,8 @@ class TopicFragment : Fragment() {
         // ===== 微信式输入栏 =====
         binding.btnSend.setOnClickListener { sendText() }
         binding.btnVoiceToggle.setOnClickListener { toggleVoiceMode() }
-        binding.btnEmoji.setOnClickListener { togglePanel("emoji") }
-        binding.btnPlus.setOnClickListener { togglePanel("more") }
+        binding.btnEmoji.setOnClickListener { togglePanel() }
+        binding.btnPlus.setOnClickListener { hidePanels(); pickFile() }
         binding.btnHoldTalk.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> { ensureRecordPermission(); true }
@@ -195,12 +197,14 @@ class TopicFragment : Fragment() {
             }
         })
         binding.etInput.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) hidePanels() }
-        binding.moreImage.setOnClickListener { hidePanels(); pickImage() }
-        binding.moreFile.setOnClickListener { hidePanels(); pickFile() }
-        binding.moreJoin.setOnClickListener { hidePanels(); showDiscoverDialog() }
-        binding.moreSearch.setOnClickListener { hidePanels(); showDiscoverDialog() }
-        binding.moreCreate.setOnClickListener { hidePanels(); showCreateTopicDialog() }
         setupEmojiGrid()
+
+        // 全面屏沉浸式：顶部栏避开状态栏
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            binding.topBar.setPadding(binding.topBar.paddingLeft, systemBars.top, binding.topBar.paddingRight, binding.topBar.paddingBottom)
+            insets
+        }
 
         showListMode()
         listRefreshHandler.postDelayed(listRefreshRunnable, 15000)
@@ -393,13 +397,12 @@ class TopicFragment : Fragment() {
         }
     }
 
-    private fun togglePanel(which: String) {
-        if (panelMode == which) { hidePanels(); return }
-        panelMode = which
+    private fun togglePanel() {
+        if (panelMode == "emoji") { hidePanels(); return }
+        panelMode = "emoji"
         binding.panelContainer.visibility = View.VISIBLE
-        binding.emojiGrid.visibility = if (which == "emoji") View.VISIBLE else View.GONE
-        binding.moreLayout.visibility = if (which == "more") View.VISIBLE else View.GONE
-        if (which == "emoji") hideKeyboard()
+        binding.emojiGrid.visibility = View.VISIBLE
+        hideKeyboard()
     }
 
     private fun hidePanels() {

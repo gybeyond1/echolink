@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import com.notifysync.data.AppFilterStore
 import com.notifysync.data.AuthManager
@@ -36,6 +37,9 @@ class MainActivity : AppCompatActivity() {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // 全面屏沉浸式：内容延伸到状态栏/导航栏，不保留系统预留内边距
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setupBottomNav()
 
