@@ -5,12 +5,15 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.notifysync.App
 import com.notifysync.R
@@ -147,8 +150,17 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
                 list.forEach { n ->
                     if (n.timestamp > maxTs) maxTs = n.timestamp
                     if (n.deviceId == AuthManager.deviceId) return@forEach
-                    val displayTitle = if (n.title.isNotEmpty()) "[${n.appName}] ${n.title}" else "[${n.appName}]"
-                    showLocalNotification(displayTitle, n.text, null)
+                    // 短信验证码：自动复制到剪贴板
+                    if (n.packageName == "com.android.sms" || n.appName == "短信验证码") {
+                        val code = Regex("(?:验证码\\s*)?([0-9]{4,8})").find(n.title)?.groupValues?.get(1)
+                        if (code != null) copyCodeToClipboard(code)
+                        val displayTitle = if (n.title.isNotEmpty()) n.title else "短信验证码"
+                        val displayText = if (code != null) "${n.text}\n验证码 $code 已复制到剪贴板" else n.text
+                        showLocalNotification(displayTitle, displayText, null)
+                    } else {
+                        val displayTitle = if (n.title.isNotEmpty()) "[${n.appName}] ${n.title}" else "[${n.appName}]"
+                        showLocalNotification(displayTitle, n.text, null)
+                    }
                 }
                 if (maxTs > AuthManager.lastNotificationTs) AuthManager.lastNotificationTs = maxTs
             } catch (e: Exception) {
@@ -189,6 +201,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         val title = data.optString("title", "")
         val text = data.optString("text", "")
         val timestamp = data.optLong("timestamp", System.currentTimeMillis())
+        val packageName = data.optString("package_name", "")
 
         // 双保险：服务器已排除本机，这里再过滤一次自己设备发出的通知
         val fromDeviceId = data.optLong("device_id", -1)
@@ -196,8 +209,19 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
 
         Log.i(TAG, "Received synced notification: $appName - $title")
 
-        val displayTitle = if (title.isNotEmpty()) "[$appName] $title" else "[$appName]"
-        showLocalNotification(displayTitle, text, null)
+        // 短信验证码：自动复制到剪贴板 + 高优先级提示
+        if (packageName == "com.android.sms" || appName == "短信验证码") {
+            val code = Regex("(?:验证码\\s*)?([0-9]{4,8})").find(title)?.groupValues?.get(1)
+            if (code != null) {
+                copyCodeToClipboard(code)
+            }
+            val displayTitle = if (title.isNotEmpty()) title else "短信验证码"
+            val displayText = if (code != null) "$text\n验证码 $code 已复制到剪贴板" else text
+            showLocalNotification(displayTitle, displayText, null)
+        } else {
+            val displayTitle = if (title.isNotEmpty()) "[$appName] $title" else "[$appName]"
+            showLocalNotification(displayTitle, text, null)
+        }
 
         // 发送广播通知 UI 更新
         val broadcastIntent = Intent("com.notifysync.NOTIFICATION_RECEIVED").apply {
@@ -245,6 +269,19 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
 
     // 展示一条本地系统通知（同步通知或话题消息）
     // topic 不为空时，点击通知会打开对应的话题页
+    /** 将验证码复制到剪贴板并 Toast 提示 */
+    private fun copyCodeToClipboard(code: String) {
+        try {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("短信验证码", code))
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Toast.makeText(this, "验证码 $code 已复制到剪贴板", Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "copyCodeToClipboard failed: ${e.message}")
+        }
+    }
+
     private fun showLocalNotification(displayTitle: String, displayText: String, topic: String? = null) {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
