@@ -11,6 +11,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewConfiguration
 import android.widget.Toast
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -69,18 +70,48 @@ class NotificationAdapter(
                 else ctx.getColor(R.color.surface)
             )
 
-            // 触摸处理：
-            // 普通模式：整条卡片任意位置双击复制、长按进入多选；子 View 不再消费事件，
-            // 统一由 root 的 GestureDetector 处理，单击不执行额外操作。
-            // 多选模式：root 响应点击 toggle，所有子 View 不拦截触摸。
-            // 注意：setOnClickListener(null) 不会恢复 clickable=false，必须显式 isClickable=false。
+            // 触摸处理（统一由 root 接管，子 View 全部递归禁用触摸）：
+            // 普通模式：整条卡片任意位置双击复制、长按进入多选。
+            // 多选模式：整条卡片任意位置单击/长按 = 选中或取消（toggle）。
+            // 不用 clickable + OnClickListener（复用池中 setOnClickListener(null) 的 clickable 状态
+            // 会反复翻转导致点击偶发丢失），改用 OnTouchListener 直接判定抬起，100% 可靠；
+            // 滚动由 RecyclerView 拦截机制接管，不受影响。
             clearTouchListeners()
             if (isSelectionActive) {
-                binding.root.setOnTouchListener(null)
-                binding.root.setOnClickListener { onItemClick(item) }
-                binding.root.setOnLongClickListener { onItemLongClick(item); true }
+                var downX = 0f
+                var downY = 0f
+                var downTime = 0L
+                binding.root.setOnTouchListener { _, ev ->
+                    when (ev.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> {
+                            downX = ev.x
+                            downY = ev.y
+                            downTime = System.currentTimeMillis()
+                            binding.root.isPressed = true
+                            true
+                        }
+                        MotionEvent.ACTION_UP -> {
+                            binding.root.isPressed = false
+                            if (downTime > 0) {  // downTime==0 表示模式切换前旧手势的 UP，忽略，防止误 toggle
+                                downTime = 0L
+                                val slop = ViewConfiguration.get(binding.root.context).scaledTouchSlop
+                                if (Math.abs(ev.x - downX) <= slop && Math.abs(ev.y - downY) <= slop) {
+                                    onItemClick(item)
+                                }
+                            }
+                            true
+                        }
+                        MotionEvent.ACTION_CANCEL -> {
+                            binding.root.isPressed = false
+                            downTime = 0L
+                            true
+                        }
+                        else -> true
+                    }
+                }
             } else {
                 val gesture = GestureDetector(binding.root.context, object : GestureDetector.SimpleOnGestureListener() {
+                    override fun onDown(e: MotionEvent): Boolean = true
                     override fun onSingleTapConfirmed(e: MotionEvent): Boolean = true
                     override fun onDoubleTap(e: MotionEvent): Boolean {
                         copyText(item)
@@ -91,20 +122,21 @@ class NotificationAdapter(
                     }
                 })
                 binding.root.setOnTouchListener { _, ev -> gesture.onTouchEvent(ev) }
-                binding.root.setOnClickListener(null)
-                binding.root.setOnLongClickListener(null)
             }
         }
 
         private fun clearTouchListeners() {
-            binding.tvTitle.setOnClickListener(null)
-            binding.tvTitle.setOnLongClickListener(null)
-            binding.tvTitle.isClickable = false
-            binding.tvTitle.isFocusable = false
-            binding.tvText.setOnClickListener(null)
-            binding.tvText.setOnLongClickListener(null)
-            binding.tvText.isClickable = false
-            binding.tvText.isFocusable = false
+            disableTouch(binding.root)
+        }
+
+        private fun disableTouch(v: View) {
+            v.setOnClickListener(null)
+            v.setOnLongClickListener(null)
+            v.isClickable = false
+            v.isFocusable = false
+            if (v is ViewGroup) {
+                for (i in 0 until v.childCount) disableTouch(v.getChildAt(i))
+            }
         }
 
         private fun copyText(item: NotificationItem) {

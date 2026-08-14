@@ -15,6 +15,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewConfiguration
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -153,26 +154,48 @@ class TopicAdapter(
             else 0x00000000
         )
 
-        holder.itemView.setOnClickListener {
-            if (selectionMode) onItemClick(item)
-        }
-        holder.itemView.setOnLongClickListener {
-            onItemLongClick(item)
-            true
-        }
-
-        // 触摸处理：
-        // 普通模式：整条消息（含媒体区）任意位置双击复制、长按进入多选；子 View 不再消费事件，
-        // 统一由 itemView 的 GestureDetector 处理，单击根据落点执行媒体打开等操作。
-        // 多选模式：itemView 响应点击 toggle，所有子 View 不拦截触摸。
-        // 注意：setOnClickListener(null) 不会恢复 clickable=false，必须显式 isClickable=false。
+        // 触摸处理（统一由 itemView 接管，子 View 全部递归禁用触摸）：
+        // 普通模式：整条消息任意位置双击复制、长按进入多选；单击按落点打开媒体。
+        // 多选模式：整条消息任意位置单击/长按 = 选中或取消（toggle）。
+        // 不用 clickable + OnClickListener（复用池中 setOnClickListener(null) 的 clickable 状态
+        // 会反复翻转导致点击偶发丢失），改用 OnTouchListener 直接判定抬起，100% 可靠；
+        // 滚动由 RecyclerView 拦截机制接管，不受影响。
         clearTouchListeners(holder)
         if (selectionMode) {
-            holder.itemView.setOnTouchListener(null)
-            holder.itemView.setOnClickListener { onItemClick(item) }
-            holder.itemView.setOnLongClickListener { onItemLongClick(item); true }
+            var downX = 0f
+            var downY = 0f
+            var downTime = 0L
+            holder.itemView.setOnTouchListener { _, ev ->
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = ev.x
+                        downY = ev.y
+                        downTime = System.currentTimeMillis()
+                        holder.itemView.isPressed = true
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        holder.itemView.isPressed = false
+                        if (downTime > 0) {  // downTime==0 表示模式切换前旧手势的 UP，忽略，防止误 toggle
+                            downTime = 0L
+                            val slop = ViewConfiguration.get(holder.itemView.context).scaledTouchSlop
+                            if (Math.abs(ev.x - downX) <= slop && Math.abs(ev.y - downY) <= slop) {
+                                onItemClick(item)
+                            }
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        holder.itemView.isPressed = false
+                        downTime = 0L
+                        true
+                    }
+                    else -> true
+                }
+            }
         } else {
             val gesture = GestureDetector(holder.itemView.context, object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: MotionEvent): Boolean = true
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                     when {
                         holder.ivMedia.visibility == View.VISIBLE && inViewBounds(holder.ivMedia, e) -> {
@@ -199,17 +222,20 @@ class TopicAdapter(
                 }
             })
             holder.itemView.setOnTouchListener { _, ev -> gesture.onTouchEvent(ev) }
-            holder.itemView.setOnClickListener(null)
-            holder.itemView.setOnLongClickListener(null)
         }
     }
 
     private fun clearTouchListeners(holder: ViewHolder) {
-        listOf(holder.tvTitle, holder.tvText, holder.ivMedia, holder.llVoice, holder.llFile).forEach {
-            it.setOnClickListener(null)
-            it.setOnLongClickListener(null)
-            it.isClickable = false
-            it.isFocusable = false
+        disableTouch(holder.itemView)
+    }
+
+    private fun disableTouch(v: View) {
+        v.setOnClickListener(null)
+        v.setOnLongClickListener(null)
+        v.isClickable = false
+        v.isFocusable = false
+        if (v is ViewGroup) {
+            for (i in 0 until v.childCount) disableTouch(v.getChildAt(i))
         }
     }
 
