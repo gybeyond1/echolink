@@ -101,6 +101,7 @@ class TopicAdapter(
         val llFile: android.view.View = view.findViewById(R.id.llFile)
         val tvFile: TextView = view.findViewById(R.id.tvFile)
         var item: TopicMessage? = null
+        private var selectionTapHandled = false  // 本次点击已在多选模式处理（onSingleTapConfirmed 不再当普通单击）
 
         init {
             // 行业通用做法：ViewHolder 构造时一次性建立手势处理，onBindViewHolder 只更新数据，
@@ -115,21 +116,30 @@ class TopicAdapter(
             //  5. 长按触发后 GestureDetector 不会再回调单击，天然避免"长按进多选后误 toggle"。
             val ctx = view.context
             val gestureListener = object : GestureDetector.SimpleOnGestureListener() {
-                override fun onDown(e: MotionEvent): Boolean = true
+                override fun onDown(e: MotionEvent): Boolean {
+                    selectionTapHandled = false  // 每次按下重置，防止 ViewHolder 复用时残留标记
+                    return true
+                }
 
                 // 单击：多选模式立即 toggle；普通模式忽略（等 onSingleTapConfirmed 判定非双击）
                 override fun onSingleTapUp(e: MotionEvent): Boolean {
                     val it = item ?: return false
                     if (selectionMode) {
+                        selectionTapHandled = true
                         onItemClick(it)
                         return true
                     }
                     return false
                 }
 
-                // 单击确认（非双击）：普通模式按落点打开媒体（图片/语音/文件）
+                // 单击确认（非双击）：普通模式按落点打开媒体（图片/语音/文件）。
+                // 若本次点击已在多选模式处理过（如取消最后一项退出多选），不再当普通单击。
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                     val it = item ?: return false
+                    if (selectionTapHandled) {
+                        selectionTapHandled = false
+                        return true
+                    }
                     if (!selectionMode) openMediaIfHit(it, e)
                     return true
                 }
