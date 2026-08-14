@@ -4,48 +4,40 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- 多选操作栏（默认隐藏） -->
+    <!-- 多选操作栏（默认隐藏）：与话题页一致——右上角两个等大图标（全选 / 删除）；
+         退出多选用系统返回手势，不再显示取消按钮/已选计数 -->
     <LinearLayout
         android:id="@+id/selectionBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="6dp"
-        android:gravity="center_vertical"
-        android:background="?attr/colorPrimary"
+        android:padding="4dp"
+        android:gravity="center_vertical|end"
+        android:background="@color/brand_primary_light"
         android:visibility="gone">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCancelSel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="取消"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
-
-        <TextView
-            android:id="@+id/tvSelectionCount"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="已选 0"
-            android:textColor="@android:color/white"
-            android:gravity="center"
-            android:textSize="14sp" />
-
-        <com.google.android.material.button.MaterialButton
+        <ImageButton
             android:id="@+id/btnSelectAll"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="全选"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="全选"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_select_all" />
 
-        <com.google.android.material.button.MaterialButton
+        <ImageButton
             android:id="@+id/btnDeleteSelected"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="删除"
-            android:textColor="@color/danger"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="删除"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_delete" />
     </LinearLayout>
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout

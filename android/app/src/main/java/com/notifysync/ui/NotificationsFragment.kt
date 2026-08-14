@@ -1,10 +1,14 @@
 package com.notifysync.ui
 
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,6 +24,7 @@ class NotificationsFragment : Fragment() {
         onItemClick = { onItemClick(it) },
         onItemLongClick = { onItemLongClick(it) }
     )
+    private lateinit var backCallback: OnBackPressedCallback
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -39,16 +44,21 @@ class NotificationsFragment : Fragment() {
         // 下拉刷新
         binding.swipeRefresh.setOnRefreshListener { loadNotifications() }
 
-        // 多选操作栏
-        binding.btnCancelSel.setOnClickListener {
-            adapter.clearSelection()
-            updateSelectionUI()
-        }
+        // 多选操作栏（右上角：全选 / 删除；退出多选用系统返回手势）
         binding.btnSelectAll.setOnClickListener {
             adapter.selectAll()
             updateSelectionUI()
         }
         binding.btnDeleteSelected.setOnClickListener { deleteSelected() }
+
+        // 系统返回：多选态 → 先退出多选（不再直接退到桌面）；非多选态不拦截
+        backCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                adapter.clearSelection()
+                updateSelectionUI()
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
 
         loadNotifications()
     }
@@ -65,15 +75,29 @@ class NotificationsFragment : Fragment() {
     }
 
     private fun onItemLongClick(item: NotificationItem) {
+        val firstEnter = !adapter.isSelectionActive
         adapter.enterSelectionMode()
         adapter.toggleSelection(item.id)
+        if (firstEnter) vibrate()  // 只有进入多选那一下震动，点选其他不震动
         updateSelectionUI()
     }
 
     private fun updateSelectionUI() {
         val active = adapter.isSelectionActive
         binding.selectionBar.visibility = if (active) View.VISIBLE else View.GONE
-        if (active) binding.tvSelectionCount.text = "已选 ${adapter.selectedCount}"
+        backCallback.isEnabled = active
+    }
+
+    // 触觉反馈：长按进入多选时短震动一次
+    private fun vibrate() {
+        try {
+            val v = requireContext().getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION") v.vibrate(30)
+            }
+        } catch (_: Exception) {}
     }
 
     private fun loadNotifications() {

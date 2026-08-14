@@ -7,6 +7,9 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -201,7 +204,19 @@ class TopicAdapter(
         if (text.isBlank()) return
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("话题消息", text))
+        vibrate(context)  // 双击复制震动反馈
         Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun vibrate(context: Context) {
+        try {
+            val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION") v.vibrate(30)
+            }
+        } catch (_: Exception) {}
     }
 
     override fun getItemCount(): Int = items.size
