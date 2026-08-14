@@ -66,7 +66,8 @@ class TopicAdapter(
         if (item.id > 0) {
             if (selected.contains(item.id)) selected.remove(item.id) else selected.add(item.id)
         }
-        notifyDataSetChanged()
+        val pos = items.indexOfFirst { it.id == item.id }
+        if (pos >= 0) notifyItemChanged(pos) else notifyDataSetChanged()
     }
 
     fun selectAll() {
@@ -154,16 +155,32 @@ class TopicAdapter(
             true
         }
 
-        // 双击文字区域复制；多选模式下不拦截点击，让事件冒泡到 itemView 执行 toggle
+        // 触摸处理：普通模式文字支持双击复制 + 长按进入多选；
+        // 多选模式所有子 View 不再拦截触摸，整条消息任意位置点击/长按都落到 itemView（toggle）。
+        // 注意：setOnClickListener(null) 不会恢复 clickable=false，必须显式 isClickable=false，
+        // 否则 TextView 仍会消费触摸事件，导致多选点击/普通长按经常无效。
         if (selectionMode) {
-            holder.tvTitle.setOnClickListener(null)
-            holder.tvText.setOnClickListener(null)
+            listOf(holder.tvTitle, holder.tvText).forEach {
+                it.setOnClickListener(null)
+                it.setOnLongClickListener(null)
+                it.isClickable = false
+                it.isFocusable = false
+            }
+            holder.ivMedia.isClickable = false
+            holder.llVoice.isClickable = false
+            holder.llFile.isClickable = false
         } else {
             val doubleClickListener = object : DoubleClickListener() {
                 override fun onDoubleClick(v: View) { copyText(holder.itemView.context, item) }
             }
+            val longPressListener = View.OnLongClickListener {
+                onItemLongClick(item)
+                true
+            }
             holder.tvTitle.setOnClickListener(doubleClickListener)
+            holder.tvTitle.setOnLongClickListener(longPressListener)
             holder.tvText.setOnClickListener(doubleClickListener)
+            holder.tvText.setOnLongClickListener(longPressListener)
         }
     }
 

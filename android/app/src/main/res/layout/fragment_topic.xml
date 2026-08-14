@@ -23,15 +23,7 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <!-- 聊天态 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnBack"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="‹ 返回"
-            android:visibility="gone"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
-
+        <!-- 聊天态（返回交给系统返回手势/按键，不再显示返回按钮） -->
         <TextView
             android:id="@+id/tvChatTitle"
             android:layout_width="0dp"
