@@ -49,8 +49,24 @@ class NotificationListener : NotificationListenerService() {
         }
     }
 
+    // 系统重新连接通知监听服务时（如重启后、用户重新授权后），确保 SyncService 也跟着启动
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        if (AuthManager.isLoggedIn && !SyncService.isRunning) {
+            Log.i(TAG, "onListenerConnected: SyncService not running, starting it")
+            SyncService.start(applicationContext)
+        }
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
+
+        // 保活 SyncService：NotificationListenerService 是系统绑定服务极难被杀，
+        // 每次收到通知时检查 SyncService 是否还在，不在就拉起它（覆盖被系统回收的场景）
+        if (AuthManager.isLoggedIn && !SyncService.isRunning) {
+            Log.i(TAG, "onNotificationPosted: SyncService dead, restarting")
+            SyncService.start(applicationContext)
+        }
 
         val packageName = sbn.packageName
 
