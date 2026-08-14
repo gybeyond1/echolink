@@ -13,6 +13,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.provider.MediaStore
 import android.text.Editable
 import android.text.TextWatcher
@@ -124,9 +126,9 @@ class TopicFragment : Fragment() {
 
         chatAdapter = TopicAdapter(
             onItemLongClick = { msg ->
-                // 已处于多选：长按 = 选中/取消该条；否则长按进入多选并选中
+                // 已处于多选：长按 = 选中/取消该条（不震动）；否则长按进入多选并选中（震动反馈）
                 if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
-                else enterSelection(msg)
+                else { enterSelection(msg); vibrate() }
             },
             onItemClick = { msg ->
                 if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
@@ -163,8 +165,7 @@ class TopicFragment : Fragment() {
         // 列表态：底部「+」= 发现 / 加入 / 创建（含新建）
         binding.fabAddTopic.setOnClickListener { showDiscoverDialog() }
 
-        // 多选操作栏
-        binding.btnCancelSel.setOnClickListener { chatAdapter.clearSelection(); updateSelectionUI() }
+        // 多选操作栏（右上角：全选 / 删除；退出多选用系统返回手势）
         binding.btnSelectAll.setOnClickListener { chatAdapter.selectAll(); updateSelectionUI() }
         binding.btnDeleteSel.setOnClickListener { confirmDeleteSelected() }
 
@@ -449,10 +450,19 @@ class TopicFragment : Fragment() {
 
     private fun enterSelection(msg: TopicMessage) { chatAdapter.enterSelection(msg); updateSelectionUI() }
     private fun updateSelectionUI() {
-        if (chatAdapter.selectionMode) {
-            binding.selectionBar.visibility = View.VISIBLE
-            binding.tvSelectedCount.text = "已选 ${chatAdapter.selectedCount}"
-        } else binding.selectionBar.visibility = View.GONE
+        binding.selectionBar.visibility = if (chatAdapter.selectionMode) View.VISIBLE else View.GONE
+    }
+
+    // 触觉反馈：长按进入多选时短震动一次
+    private fun vibrate() {
+        try {
+            val v = requireContext().getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION") v.vibrate(30)
+            }
+        } catch (_: Exception) {}
     }
     private fun confirmDeleteSelected() {
         val ids = chatAdapter.getSelectedIds()

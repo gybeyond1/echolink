@@ -3,6 +3,9 @@ package com.notifysync.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -105,7 +108,19 @@ class NotificationAdapter(
             if (text.isBlank()) return
             val cm = binding.root.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("通知内容", text))
+            vibrate(binding.root.context)  // 双击复制震动反馈
             Toast.makeText(binding.root.context, "已复制", Toast.LENGTH_SHORT).show()
+        }
+
+        private fun vibrate(context: Context) {
+            try {
+                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION") v.vibrate(30)
+                }
+            } catch (_: Exception) {}
         }
     }
 
