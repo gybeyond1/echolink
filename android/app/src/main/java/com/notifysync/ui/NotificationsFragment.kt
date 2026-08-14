@@ -13,6 +13,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.notifysync.R
 import com.notifysync.data.ApiClient
 import com.notifysync.data.NotificationItem
 import com.notifysync.databinding.FragmentNotificationsBinding
