@@ -527,9 +527,9 @@
     const r = await api("/api/topics/" + topic + "/messages?limit=50").catch(() => ({ messages: [] }));
     const msg = document.getElementById("tmsg");
     if (!r.messages.length) { msg.innerHTML = `<div class="empty">还没有消息</div>`; return; }
-    msg.innerHTML = r.messages.map(m => `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="font-size:13px"><b>${esc(m.sender_name || "未知")}</b> <span style="color:var(--muted);font-size:11px">${fmtTime(m.timestamp)}</span></div>
-      ${m.title ? `<div style="font-weight:600">${esc(m.title)}</div>` : ""}
+    msg.innerHTML = r.messages.map(m => `<div class="tmsg-item">
+      <div class="tmsg-sender"><b>${esc(m.sender_name || "未知")}</b><span class="tmsg-time">${fmtTime(m.timestamp)}</span></div>
+      ${m.title ? `<div style="font-weight:600;margin-top:2px">${esc(m.title)}</div>` : ""}
       <div>${esc(m.text)}</div>
       ${mediaHtml(m)}
     </div>`).join("");
@@ -734,7 +734,42 @@
     };
   }
 
+  // ---------- 主题切换（浅色 / 深色 / 跟随系统 三态循环） ----------
+  const THEME_ICON = { light: "🌙", dark: "☀️", system: "🖥️" };
+  const THEME_LABEL = { light: "已切换到浅色主题", dark: "已切换到深色主题", system: "已跟随系统外观" };
+  function currentTheme() {
+    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  }
+  function applyTheme(mode) {
+    const dark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme-mode", mode);
+    const btn = document.getElementById("themeToggle");
+    if (btn) btn.textContent = THEME_ICON[mode] || THEME_ICON.system;
+  }
+  function setupThemeToggle() {
+    const btn = document.getElementById("themeToggle");
+    if (!btn) return;
+    const saved = localStorage.getItem("ns_theme") || "system";
+    applyTheme(saved);
+    btn.textContent = THEME_ICON[saved] || THEME_ICON.system;
+    btn.onclick = () => {
+      const cur = localStorage.getItem("ns_theme") || "system";
+      const next = cur === "light" ? "dark" : cur === "dark" ? "system" : "light";
+      localStorage.setItem("ns_theme", next);
+      applyTheme(next);
+      toast(THEME_LABEL[next], "ok");
+    };
+    // 跟随系统模式下，系统外观变化时实时跟随
+    if (saved === "system") {
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+        if ((localStorage.getItem("ns_theme") || "system") === "system") applyTheme("system");
+      });
+    }
+  }
+
   // ---------- boot ----------
+  setupThemeToggle();
   if (state.token) {
     api("/api/auth/me")
       .then(r => { state.username = r.user.username; state.role = r.user.role || "user"; localStorage.setItem("ns_username", state.username); localStorage.setItem("ns_role", state.role); })

@@ -13,6 +13,7 @@ object AuthManager {
     private const val KEY_DEVICE_NAME = "device_name"
     private const val KEY_DEVICE_UUID = "device_uuid"
     private const val KEY_TOPICS = "subscribed_topics"
+    private const val KEY_THEME = "theme_mode"
 
     private lateinit var prefs: SharedPreferences
 
@@ -70,6 +71,11 @@ object AuthManager {
             ?.toSet()
             ?: emptySet()
         set(value) = prefs.edit().putString(KEY_TOPICS, value.joinToString(",")).apply()
+
+    // 主题模式："system"（跟随系统）/ "light"（浅色）/ "dark"（深色）
+    var themeMode: String
+        get() = prefs.getString(KEY_THEME, "system") ?: "system"
+        set(value) = prefs.edit().putString(KEY_THEME, value).apply()
 
     fun addTopic(topic: String) {
         val topics = subscribedTopics.toMutableSet()

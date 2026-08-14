@@ -1,11 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.NotifySync" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <item name="colorPrimary">@color/purple_500</item>
-        <item name="colorPrimaryVariant">@color/purple_700</item>
-        <item name="colorOnPrimary">@color/white</item>
-        <item name="colorSecondary">@color/teal_200</item>
-        <item name="colorOnSecondary">@color/black</item>
-        <item name="android:statusBarColor">@color/purple_700</item>
+    <!--
+      NotifySync 主题：哔哩紫品牌色 + DayNight（亮/暗双主题）
+      parent 用 MaterialComponents.DayNight，可通过
+      AppCompatDelegate.setDefaultNightMode() 切换亮/暗/跟随系统。
+      颜色全部引用 @color，亮暗由 values/ 与 values-night/ 自动适配。
+    -->
+    <style name="Theme.NotifySync" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorPrimaryVariant">@color/brand_primary_dark</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorOnSecondary">@color/on_secondary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="colorError">@color/error</item>
+        <item name="android:colorBackground">@color/background</item>
+        <item name="colorOnBackground">@color/on_surface</item>
+        <item name="colorControlNormal">@color/on_surface_variant</item>
+        <item name="colorControlActivated">@color/brand_primary</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
     </style>
 </resources>

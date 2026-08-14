@@ -41,6 +41,6 @@
         android:text="暂无可发现的话题"
         android:gravity="center"
         android:padding="24dp"
-        android:textColor="@android:color/darker_gray"
+        android:textColor="@color/on_surface_variant"
         android:visibility="gone" />
 </LinearLayout>

@@ -20,7 +20,7 @@
         android:layout_height="wrap_content"
         android:text="NotifySync - 跨设备通知同步"
         android:textSize="14sp"
-        android:textColor="@android:color/darker_gray"
+        android:textColor="@color/on_surface_variant"
         android:layout_marginBottom="32dp" />
 
     <com.google.android.material.textfield.TextInputLayout

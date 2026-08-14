@@ -5,8 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>NotifySync 管理后台</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    // 主题预加载（防闪烁）：localStorage 优先，否则跟随系统
+    (function () {
+      try {
+        var t = localStorage.getItem("ns_theme") || "system";
+        var dark = t === "dark" ||
+          (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme-mode", t);
+      } catch (e) { document.documentElement.setAttribute("data-theme", "light"); }
+    })();
+  </script>
 </head>
 <body>
+  <button id="themeToggle" class="theme-toggle" title="切换主题" aria-label="切换主题（浅色/深色/跟随系统）"></button>
   <div id="app"></div>
   <div id="toast"></div>
   <script src="app.js"></script>
