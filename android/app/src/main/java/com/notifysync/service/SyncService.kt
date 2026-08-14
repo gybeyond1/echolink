@@ -1,5 +1,6 @@
 package com.notifysync.service
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -8,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.notifysync.App
@@ -67,11 +69,42 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // 系统用 START_STICKY 重启 Service 时 intent == null，
+        // 必须重新调 startForeground，否则 Android 12+ 会崩溃
+        startForeground(FOREGROUND_NOTIFICATION_ID, buildForegroundNotification(connectionStatus))
+
         if (!AuthManager.isLoggedIn) {
             stopSelf()
             return START_NOT_STICKY
         }
+
+        // WS 断了就重连（覆盖：进程被杀重启、静默断连、onCreate 里 connect 失败等场景）
+        if (!WebSocketClient.isConnected) {
+            Log.i(TAG, "onStartCommand: WS not connected, connecting...")
+            WebSocketClient.connect()
+        }
+
         return START_STICKY
+    }
+
+    /**
+     * 用户从最近任务列表划掉 App 时触发。
+     * 用 AlarmManager 1s 后重启 Service，保证同步不断。
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val restartIntent = Intent(applicationContext, SyncService::class.java)
+        val pendingIntent = PendingIntent.getService(
+            applicationContext, 1, restartIntent,
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        alarmManager.set(
+            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+            SystemClock.elapsedRealtime() + 1000,
+            pendingIntent
+        )
+        Log.i(TAG, "onTaskRemoved: scheduled service restart in 1s")
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
