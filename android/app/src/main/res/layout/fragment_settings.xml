@@ -50,7 +50,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="用户名: "
-                        android:textColor="@android:color/darker_gray" />
+                        android:textColor="@color/on_surface_variant" />
                     <TextView
                         android:id="@+id/tvUsername"
                         android:layout_width="wrap_content"
@@ -66,13 +66,77 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="设备名: "
-                        android:textColor="@android:color/darker_gray" />
+                        android:textColor="@color/on_surface_variant" />
                     <TextView
                         android:id="@+id/tvDeviceName"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="—" />
                 </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 外观（主题切换） -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="外观"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="选择界面主题，立即生效"
+                    android:textSize="12sp"
+                    android:textColor="@color/on_surface_variant"
+                    android:layout_marginBottom="12dp" />
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/toggleTheme"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true"
+                    app:selectionRequired="true">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnThemeSystem"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="跟随系统" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnThemeLight"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="浅色" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnThemeDark"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="深色" />
+                </com.google.android.material.button.MaterialButtonToggleGroup>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -175,7 +239,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="未授权"
-                        android:textColor="@android:color/holo_red_light"
+                        android:textColor="@color/danger"
                         android:textStyle="bold" />
                 </LinearLayout>
 
@@ -234,7 +298,7 @@
                     android:layout_height="wrap_content"
                     android:text="关闭 = 同步所有应用；开启后只同步下方勾选的应用"
                     android:textSize="12sp"
-                    android:textColor="@android:color/darker_gray"
+                    android:textColor="@color/on_surface_variant"
                     android:layout_marginBottom="8dp" />
 
                 <androidx.recyclerview.widget.RecyclerView
@@ -257,7 +321,7 @@
                     android:text="未找到可同步的应用"
                     android:gravity="center"
                     android:padding="24dp"
-                    android:textColor="@android:color/darker_gray"
+                    android:textColor="@color/on_surface_variant"
                     android:visibility="gone" />
 
                 <com.google.android.material.button.MaterialButton
@@ -275,7 +339,7 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:text="退出登录"
-            android:backgroundTint="@android:color/holo_red_light"
+            android:backgroundTint="@color/danger"
             android:textColor="@android:color/white" />
 
     </LinearLayout>

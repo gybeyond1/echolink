@@ -28,7 +28,7 @@
                 android:text="应用名"
                 android:textStyle="bold"
                 android:textSize="15sp"
-                android:textColor="#1565C0" />
+                android:textColor="?attr/colorPrimary" />
 
             <TextView
                 android:id="@+id/tvTime"
@@ -36,7 +36,7 @@
                 android:layout_height="wrap_content"
                 android:text="时间"
                 android:textSize="12sp"
-                android:textColor="@android:color/darker_gray" />
+                android:textColor="@color/on_surface_variant" />
         </LinearLayout>
 
         <TextView
@@ -53,7 +53,7 @@
             android:layout_height="wrap_content"
             android:text="内容"
             android:textSize="13sp"
-            android:textColor="#424242"
+            android:textColor="?android:attr/textColorSecondary"
             android:layout_marginTop="2dp"
             android:maxLines="4"
             android:ellipsize="end" />
@@ -71,7 +71,7 @@
                 android:layout_weight="1"
                 android:text="包名"
                 android:textSize="11sp"
-                android:textColor="#9E9E9E" />
+                android:textColor="@color/on_surface_variant" />
 
             <TextView
                 android:id="@+id/tvDevice"
@@ -79,7 +79,7 @@
                 android:layout_height="wrap_content"
                 android:text=""
                 android:textSize="11sp"
-                android:textColor="#9E9E9E" />
+                android:textColor="@color/on_surface_variant" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

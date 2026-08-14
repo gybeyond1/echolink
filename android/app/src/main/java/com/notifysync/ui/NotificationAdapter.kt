@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.notifysync.R
 import com.notifysync.data.NotificationItem
 import com.notifysync.databinding.ItemNotificationBinding
 import java.text.SimpleDateFormat
@@ -21,9 +22,6 @@ class NotificationAdapter(
             override fun areItemsTheSame(a: NotificationItem, b: NotificationItem) = a.id == b.id
             override fun areContentsTheSame(a: NotificationItem, b: NotificationItem) = a == b
         }
-
-        private val SELECTED_BG = 0xFFE3F2FD.toInt() // 浅蓝
-        private val NORMAL_BG = 0xFFFFFFFF.toInt()   // 白
     }
 
     private val selected = mutableSetOf<Long>()
@@ -55,7 +53,11 @@ class NotificationAdapter(
             binding.tvDevice.text = item.deviceName ?: ""
 
             val isSel = isSelectionActive && selected.contains(item.id)
-            binding.root.setCardBackgroundColor(if (isSel) SELECTED_BG else NORMAL_BG)
+            val ctx = binding.root.context
+            binding.root.setCardBackgroundColor(
+                if (isSel) ctx.getColor(R.color.brand_primary_light)
+                else ctx.getColor(R.color.surface)
+            )
 
             binding.root.setOnClickListener { onItemClick(item) }
             binding.root.setOnLongClickListener {

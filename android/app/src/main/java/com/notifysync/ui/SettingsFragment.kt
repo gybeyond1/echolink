@@ -9,9 +9,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.notifysync.R
 import com.notifysync.data.ApiClient
 import com.notifysync.data.AppFilter
 import com.notifysync.data.AppFilterStore
@@ -55,6 +57,9 @@ class SettingsFragment : Fragment() {
         binding.tvUsername.text = AuthManager.username ?: "未知"
         binding.tvDeviceName.text = AuthManager.deviceName ?: "未知"
         binding.etServerUrl.setText(AuthManager.serverUrl)
+
+        // 外观主题切换（跟随系统 / 浅色 / 深色）
+        setupThemeToggle()
 
         // 通知监听权限状态
         updatePermissionStatus()
@@ -105,6 +110,31 @@ class SettingsFragment : Fragment() {
 
         // 应用过滤
         setupAppFilter()
+    }
+
+    // ===== 外观主题切换 =====
+
+    private fun setupThemeToggle() {
+        // 初始化选中态
+        when (AuthManager.themeMode) {
+            "light" -> binding.toggleTheme.check(R.id.btnThemeLight)
+            "dark" -> binding.toggleTheme.check(R.id.btnThemeDark)
+            else -> binding.toggleTheme.check(R.id.btnThemeSystem)
+        }
+        binding.toggleTheme.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val mode = when (checkedId) {
+                R.id.btnThemeLight -> "light"
+                R.id.btnThemeDark -> "dark"
+                else -> "system"
+            }
+            AuthManager.themeMode = mode
+            when (mode) {
+                "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+            }
+        }
     }
 
     override fun onResume() {

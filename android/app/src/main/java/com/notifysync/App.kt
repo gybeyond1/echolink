@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import androidx.appcompat.app.AppCompatDelegate
 import com.notifysync.data.AuthManager
 import com.notifysync.data.AppFilterStore
 
@@ -13,7 +14,16 @@ class App : Application() {
         instance = this
         AuthManager.init(this)
         AppFilterStore.init(this)
+        applyThemeMode()
         createNotificationChannels()
+    }
+
+    private fun applyThemeMode() {
+        when (AuthManager.themeMode) {
+            "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        }
     }
 
     private fun createNotificationChannels() {

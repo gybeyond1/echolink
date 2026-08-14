@@ -62,7 +62,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:textSize="13sp"
-            android:textColor="@android:color/darker_gray"
+            android:textColor="@color/on_surface_variant"
             android:maxLines="1"
             android:ellipsize="end" />
     </LinearLayout>
@@ -79,7 +79,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="11sp"
-            android:textColor="@android:color/darker_gray" />
+            android:textColor="@color/on_surface_variant" />
 
         <TextView
             android:id="@+id/tvPending"

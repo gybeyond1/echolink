@@ -140,7 +140,9 @@ class TopicAdapter(
         holder.cbSelect.visibility = if (selectionMode) View.VISIBLE else View.GONE
         holder.cbSelect.isChecked = selected.contains(item.id)
         holder.itemView.setBackgroundColor(
-            if (selected.contains(item.id)) 0xFFE3F2FD.toInt() else 0x00000000
+            if (selected.contains(item.id))
+                holder.itemView.context.getColor(R.color.brand_primary_light)
+            else 0x00000000
         )
 
         holder.itemView.setOnClickListener {

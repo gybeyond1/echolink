@@ -73,7 +73,7 @@
             android:text="还没有话题\n点击底部「+」发现或新建话题"
             android:gravity="center"
             android:padding="48dp"
-            android:textColor="@android:color/darker_gray"
+            android:textColor="@color/on_surface_variant"
             android:textSize="16sp"
             android:visibility="gone" />
     </FrameLayout>
@@ -95,7 +95,7 @@
             android:orientation="horizontal"
             android:padding="8dp"
             android:gravity="center_vertical"
-            android:background="#E3F2FD"
+            android:background="@color/brand_primary_light"
             android:visibility="gone">
 
             <com.google.android.material.button.MaterialButton
@@ -126,7 +126,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="删除"
-                android:backgroundTint="@android:color/holo_red_light"
+                android:backgroundTint="@color/danger"
                 android:textColor="@android:color/white" />
         </LinearLayout>
 
@@ -156,7 +156,7 @@
                 android:text="暂无消息\n发送一条消息开始聊天"
                 android:gravity="center"
                 android:padding="48dp"
-                android:textColor="@android:color/darker_gray"
+                android:textColor="@color/on_surface_variant"
                 android:textSize="16sp"
                 android:visibility="gone" />
         </FrameLayout>
@@ -167,7 +167,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:background="#F7F7F7"
+            android:background="@color/surface_variant"
             android:padding="6dp"
             android:gravity="center_vertical">
 
@@ -209,7 +209,7 @@
                     android:background="@drawable/bg_input"
                     android:text="按住 说话"
                     android:textSize="15sp"
-                    android:textColor="#333333"
+                    android:textColor="?android:attr/textColorPrimary"
                     android:visibility="gone" />
             </FrameLayout>
 
@@ -240,9 +240,9 @@
                 android:layout_height="36dp"
                 android:layout_gravity="center_vertical"
                 android:layout_marginStart="4dp"
-                android:backgroundTint="#07C160"
+                android:backgroundTint="@color/brand_primary"
                 android:text="发送"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnPrimary"
                 android:textSize="14sp"
                 android:visibility="gone" />
         </LinearLayout>
@@ -252,7 +252,7 @@
             android:id="@+id/panelContainer"
             android:layout_width="match_parent"
             android:layout_height="220dp"
-            android:background="#F7F7F7"
+            android:background="@color/surface_variant"
             android:visibility="gone">
 
             <GridView
@@ -301,7 +301,7 @@
                             android:layout_marginTop="6dp"
                             android:text="图片"
                             android:textSize="13sp"
-                            android:textColor="#444444" />
+                            android:textColor="?android:attr/textColorPrimary" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -324,7 +324,7 @@
                             android:layout_marginTop="6dp"
                             android:text="文件"
                             android:textSize="13sp"
-                            android:textColor="#444444" />
+                            android:textColor="?android:attr/textColorPrimary" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -347,7 +347,7 @@
                             android:layout_marginTop="6dp"
                             android:text="加入话题"
                             android:textSize="13sp"
-                            android:textColor="#444444" />
+                            android:textColor="?android:attr/textColorPrimary" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -377,7 +377,7 @@
                             android:layout_marginTop="6dp"
                             android:text="搜索话题"
                             android:textSize="13sp"
-                            android:textColor="#444444" />
+                            android:textColor="?android:attr/textColorPrimary" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -400,7 +400,7 @@
                             android:layout_marginTop="6dp"
                             android:text="创建话题"
                             android:textSize="13sp"
-                            android:textColor="#444444" />
+                            android:textColor="?android:attr/textColorPrimary" />
                     </LinearLayout>
 
                     <View
