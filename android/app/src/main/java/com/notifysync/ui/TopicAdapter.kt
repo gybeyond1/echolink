@@ -1,5 +1,8 @@
 package com.notifysync.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
@@ -9,6 +12,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.notifysync.R
 import com.notifysync.data.AuthManager
@@ -152,6 +156,24 @@ class TopicAdapter(
             onItemLongClick(item)
             true
         }
+
+        // 长按消息文字 → 复制到剪贴板（与 itemView 长按多选互不冲突：TextView 消费长按事件）
+        val copyListener = View.OnLongClickListener {
+            copyText(holder.itemView.context, item)
+            true
+        }
+        holder.tvTitle.setOnLongClickListener(copyListener)
+        holder.tvText.setOnLongClickListener(copyListener)
+    }
+
+    private fun copyText(context: Context, item: TopicMessage) {
+        val text = listOf(item.title, item.text)
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+        if (text.isBlank()) return
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("话题消息", text))
+        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
     }
 
     override fun getItemCount(): Int = items.size

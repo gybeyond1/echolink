@@ -1,7 +1,12 @@
 package com.notifysync.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -64,6 +69,21 @@ class NotificationAdapter(
                 onItemLongClick(item)
                 true
             }
+
+            // 长按通知文字 → 复制到剪贴板（itemView 长按仍是多选，互不冲突）
+            val copyListener = View.OnLongClickListener {
+                val text = listOf(item.title, item.text)
+                    .filter { it.isNotBlank() }
+                    .joinToString("\n")
+                if (text.isNotBlank()) {
+                    val cm = binding.root.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("通知内容", text))
+                    Toast.makeText(binding.root.context, "已复制", Toast.LENGTH_SHORT).show()
+                }
+                true
+            }
+            binding.tvTitle.setOnLongClickListener(copyListener)
+            binding.tvText.setOnLongClickListener(copyListener)
         }
     }
 

@@ -40,6 +40,11 @@ class LoginActivity : AppCompatActivity() {
         // 预填上次保存的服务器地址（便于切换设备后快速登录）
         binding.etServerUrl.setText(AuthManager.serverUrl)
 
+        // 预填设备名：默认"厂商 型号"，可改成"手机""平板"等自定义名字
+        binding.etDeviceName.setText(
+            AuthManager.deviceName ?: "${Build.MANUFACTURER} ${Build.MODEL}"
+        )
+
         binding.btnToggleMode.setOnClickListener {
             isRegisterMode = !isRegisterMode
             updateMode()
@@ -87,8 +92,10 @@ class LoginActivity : AppCompatActivity() {
                     AuthManager.userId = response.userId
                     AuthManager.username = response.username
 
-                    // 注册设备
-                    val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}"
+                    // 注册设备（设备名可自定义，默认厂商+型号）
+                    val deviceName = binding.etDeviceName.text.toString()
+                        .trim()
+                        .ifEmpty { "${Build.MANUFACTURER} ${Build.MODEL}" }
                     val deviceResp = ApiClient.registerDevice(deviceName)
                     AuthManager.deviceId = deviceResp.getLong("device_id")
                     AuthManager.deviceName = deviceName

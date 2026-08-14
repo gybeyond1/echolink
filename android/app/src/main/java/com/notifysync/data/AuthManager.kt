@@ -14,6 +14,7 @@ object AuthManager {
     private const val KEY_DEVICE_UUID = "device_uuid"
     private const val KEY_TOPICS = "subscribed_topics"
     private const val KEY_THEME = "theme_mode"
+    private const val KEY_SMS_CAPTURE = "sms_capture_enabled"
 
     private lateinit var prefs: SharedPreferences
 
@@ -76,6 +77,11 @@ object AuthManager {
     var themeMode: String
         get() = prefs.getString(KEY_THEME, "system") ?: "system"
         set(value) = prefs.edit().putString(KEY_THEME, value).apply()
+
+    // 短信验证码自动提取开关（需 READ_SMS 权限，提取到的验证码自动复制到剪贴板）
+    var smsCaptureEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SMS_CAPTURE, false)
+        set(value) = prefs.edit().putBoolean(KEY_SMS_CAPTURE, value).apply()
 
     fun addTopic(topic: String) {
         val topics = subscribedTopics.toMutableSet()

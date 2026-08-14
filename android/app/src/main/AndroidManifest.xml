@@ -17,6 +17,9 @@
     <!-- 录音（话题语音消息） -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- 读取短信（自动提取验证码复制到剪贴板，需用户在设置页授权） -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+
     <!-- 包可见性：让本应用能枚举设备上已安装的应用（用于"仅同步所选应用"列表）。
          Android 11+ 默认隐藏其它应用，必须声明 <queries> 才能通过 PackageManager 看到它们。 -->
     <queries>

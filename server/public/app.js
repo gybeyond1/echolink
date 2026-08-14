@@ -241,9 +241,24 @@
         <td>${esc(d.device_name)}</td>
         <td>${esc(d.platform || "-")}</td>
         <td>${fmtTime(d.last_seen)}</td>
-        <td style="text-align:right"><button class="btn danger sm" data-del="${d.id}">移除</button></td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn sm" data-rename="${d.id}">重命名</button>
+          <button class="btn danger sm" data-del="${d.id}">移除</button>
+        </td>
       </tr>`).join("")}
     </tbody></table>`;
+    box.querySelectorAll("[data-rename]").forEach(b => {
+      b.onclick = async () => {
+        const old = r.devices.find(d => d.id == b.dataset.rename)?.device_name || "";
+        const name = prompt("输入新的设备名（通知里的设备名会同步更新）:", old);
+        if (!name || !name.trim()) return;
+        try {
+          await api("/api/devices/" + b.dataset.rename + "/name", { method: "PUT", body: { device_name: name.trim() } });
+          toast("已重命名", "ok");
+          renderDevices(main);
+        } catch (e) { toast(e.message, "err"); }
+      };
+    });
     box.querySelectorAll("[data-del]").forEach(b => {
       b.onclick = async () => {
         if (!confirm("确定移除该设备？")) return;

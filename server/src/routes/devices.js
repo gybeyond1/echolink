@@ -46,6 +46,22 @@ router.post("/register", authMiddleware, (req, res) => {
   });
 });
 
+// 重命名设备（通知列表里的设备名随设备表实时 JOIN，改名后历史通知也跟着显示新名字）
+router.put("/:id/name", authMiddleware, (req, res) => {
+  const name = String(req.body.device_name || "").trim().slice(0, 64);
+  if (!name) {
+    return res.status(400).json({ error: "device_name is required" });
+  }
+  const db = getDB();
+  const result = db
+    .prepare("UPDATE devices SET device_name = ? WHERE id = ? AND user_id = ?")
+    .run(name, req.params.id, req.userId);
+  if (result.changes === 0) {
+    return res.status(404).json({ error: "Device not found" });
+  }
+  res.json({ message: "Device renamed", device_name: name });
+});
+
 // 列出设备
 router.get("/", authMiddleware, (req, res) => {
   const db = getDB();

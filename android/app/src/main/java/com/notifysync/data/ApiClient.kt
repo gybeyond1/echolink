@@ -81,6 +81,12 @@ object ApiClient {
         return execute(buildRequest("/api/devices/register", "POST", body))
     }
 
+    // 重命名当前设备（服务器更新 devices 表，通知里的设备名随 JOIN 实时更新）
+    suspend fun renameDevice(deviceId: Long, newName: String): JSONObject {
+        val body = JSONObject().put("device_name", newName)
+        return execute(buildRequest("/api/devices/$deviceId/name", "PUT", body))
+    }
+
     suspend fun getDevices(): List<DeviceInfo> {
         val json = execute(buildRequest("/api/devices", "GET"))
         val arr = json.getJSONArray("devices")

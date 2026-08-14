@@ -66,6 +66,9 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         if (AuthManager.isLoggedIn) {
             WebSocketClient.connect()
         }
+
+        // 短信验证码监听（按开关 + 权限决定是否启动）
+        SmsCodeWatcher.sync(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -83,6 +86,9 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
             Log.i(TAG, "onStartCommand: WS not connected, connecting...")
             WebSocketClient.connect()
         }
+
+        // 设置页改了短信开关后通过 start() 触发到这里，同步启停短信监听
+        SmsCodeWatcher.sync(this)
 
         return START_STICKY
     }
@@ -110,6 +116,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
     override fun onDestroy() {
         isRunning = false
         connectionStatus = "已停止"
+        SmsCodeWatcher.stop(this)
         WebSocketClient.disconnect()
         super.onDestroy()
     }
