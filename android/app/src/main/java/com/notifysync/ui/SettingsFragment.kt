@@ -1,15 +1,20 @@
 package com.notifysync.ui
 
+import android.Manifest
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -29,6 +34,10 @@ class SettingsFragment : Fragment() {
 
     private val filterAdapter = AppFilterAdapter { filter, enabled -> onFilterToggle(filter, enabled) }
     private val selectedPackages = mutableSetOf<String>()
+
+    companion object {
+        private const val REQ_SMS_PERMISSION = 1001
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -63,6 +72,12 @@ class SettingsFragment : Fragment() {
 
         // 通知监听权限状态
         updatePermissionStatus()
+
+        // 自定义设备名
+        setupDeviceRename()
+
+        // 短信验证码自动提取
+        setupSmsCapture()
 
         // 通知监听权限按钮
         binding.btnNotificationPermission.setOnClickListener {
@@ -137,9 +152,111 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    // ===== 自定义设备名 =====
+
+    private fun setupDeviceRename() {
+        binding.llDeviceName.setOnClickListener {
+            val input = EditText(requireContext()).apply {
+                setText(AuthManager.deviceName ?: "")
+                hint = "设备名（通知里会用它标识来源设备）"
+            }
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            input.setPadding(padding, padding, padding, padding)
+            AlertDialog.Builder(requireContext())
+                .setTitle("重命名设备")
+                .setView(input)
+                .setPositiveButton("保存") { _, _ ->
+                    val newName = input.text.toString().trim()
+                    if (newName.isEmpty()) {
+                        Toast.makeText(requireContext(), "设备名不能为空", Toast.LENGTH_SHORT).show()
+                        return@setPositiveButton
+                    }
+                    if (newName.length > 64) {
+                        Toast.makeText(requireContext(), "设备名最多 64 个字符", Toast.LENGTH_SHORT).show()
+                        return@setPositiveButton
+                    }
+                    lifecycleScope.launch {
+                        try {
+                            ApiClient.renameDevice(AuthManager.deviceId, newName)
+                            AuthManager.deviceName = newName
+                            binding.tvDeviceName.text = newName
+                            Toast.makeText(requireContext(), "设备名已更新", Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(requireContext(), "改名失败: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+    }
+
+    // ===== 短信验证码自动提取 =====
+
+    private fun setupSmsCapture() {
+        binding.swSmsCapture.isChecked = AuthManager.smsCaptureEnabled
+        binding.swSmsCapture.setOnCheckedChangeListener { _, isChecked ->
+            AuthManager.smsCaptureEnabled = isChecked
+            if (isChecked && !hasSmsPermission()) {
+                Toast.makeText(requireContext(), "请先授权读取短信", Toast.LENGTH_SHORT).show()
+            }
+            // 让常驻服务按新状态启停短信监听
+            SyncService.start(requireContext())
+        }
+        binding.btnSmsPermission.setOnClickListener {
+            if (hasSmsPermission()) {
+                Toast.makeText(requireContext(), "已拥有读取短信权限", Toast.LENGTH_SHORT).show()
+            } else {
+                requestSmsPermission()
+            }
+        }
+        updateSmsStatus()
+    }
+
+    private fun hasSmsPermission(): Boolean =
+        ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_SMS) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun requestSmsPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            requestPermissions(arrayOf(Manifest.permission.READ_SMS), REQ_SMS_PERMISSION)
+        } else {
+            Toast.makeText(requireContext(), "当前系统版本无需额外授权", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_SMS_PERMISSION) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                AuthManager.smsCaptureEnabled = true
+                binding.swSmsCapture.isChecked = true
+                SyncService.start(requireContext())
+                Toast.makeText(requireContext(), "已授权，验证码将自动复制到剪贴板", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(requireContext(), "未授权读取短信", Toast.LENGTH_SHORT).show()
+            }
+            updateSmsStatus()
+        }
+    }
+
+    private fun updateSmsStatus() {
+        val granted = hasSmsPermission()
+        binding.tvSmsStatus.text = if (granted) "已授权" else "未授权"
+        binding.tvSmsStatus.setTextColor(
+            requireContext().getColor(if (granted) R.color.ok else R.color.danger)
+        )
+    }
+
     override fun onResume() {
         super.onResume()
         updatePermissionStatus()
+        updateSmsStatus()
     }
 
     private fun updatePermissionStatus() {

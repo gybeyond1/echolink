@@ -38,6 +38,11 @@ router.post("/", authMiddleware, (req, res) => {
               VALUES (?, ?, ?, ?, ?, ?, ?)`)
     .run(req.userId, fromDeviceId, package_name, app_name, title || "", text || "", ts);
 
+  // 实时推送也要带设备名（通知显示处会 JOIN 设备表，这里一并查出，接收端无需再查一次）
+  const senderDevice = fromDeviceId
+    ? db.prepare("SELECT device_name FROM devices WHERE id = ?").get(fromDeviceId)
+    : null;
+
   const notification = {
     id: result.lastInsertRowid,
     package_name,
@@ -46,6 +51,7 @@ router.post("/", authMiddleware, (req, res) => {
     text: text || "",
     timestamp: ts,
     device_id: fromDeviceId,
+    device_name: senderDevice?.device_name || null,
   };
 
   // 通过 WebSocket 推送给该用户的其他设备（排除发送者本机，避免自己收到自己的通知）
