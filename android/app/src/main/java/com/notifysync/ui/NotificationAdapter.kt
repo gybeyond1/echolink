@@ -70,16 +70,31 @@ class NotificationAdapter(
                 true
             }
 
-            // 双击文字区域复制；多选模式下不拦截点击，让事件冒泡到 root 执行 toggle
+            // 触摸处理：普通模式文字支持双击复制 + 长按进入多选；
+            // 多选模式文字不再拦截触摸，整条卡片任意位置点击/长按都落到 root（toggle）。
+            // 注意：setOnClickListener(null) 不会恢复 clickable=false，必须显式 isClickable=false，
+            // 否则 TextView 仍会消费触摸事件，导致多选点击/普通长按经常无效。
             if (isSelectionActive) {
                 binding.tvTitle.setOnClickListener(null)
+                binding.tvTitle.setOnLongClickListener(null)
+                binding.tvTitle.isClickable = false
+                binding.tvTitle.isFocusable = false
                 binding.tvText.setOnClickListener(null)
+                binding.tvText.setOnLongClickListener(null)
+                binding.tvText.isClickable = false
+                binding.tvText.isFocusable = false
             } else {
                 val doubleClickListener = object : DoubleClickListener() {
                     override fun onDoubleClick(v: View) { copyText(item) }
                 }
+                val longPressListener = View.OnLongClickListener {
+                    onItemLongClick(item)
+                    true
+                }
                 binding.tvTitle.setOnClickListener(doubleClickListener)
+                binding.tvTitle.setOnLongClickListener(longPressListener)
                 binding.tvText.setOnClickListener(doubleClickListener)
+                binding.tvText.setOnLongClickListener(longPressListener)
             }
         }
 
@@ -109,7 +124,8 @@ class NotificationAdapter(
     fun toggleSelection(id: Long) {
         if (selected.contains(id)) selected.remove(id) else selected.add(id)
         if (selected.isEmpty()) isSelectionActive = false
-        notifyDataSetChanged()
+        val pos = currentList.indexOfFirst { it.id == id }
+        if (pos >= 0) notifyItemChanged(pos) else notifyDataSetChanged()
     }
 
     fun enterSelectionMode() {

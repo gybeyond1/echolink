@@ -25,6 +25,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.GridView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -86,6 +87,8 @@ class TopicFragment : Fragment() {
         }
     }
 
+    private lateinit var backCallback: OnBackPressedCallback
+
     private val listRefreshHandler = Handler(Looper.getMainLooper())
     private val listRefreshRunnable = object : Runnable {
         override fun run() {
@@ -120,7 +123,11 @@ class TopicFragment : Fragment() {
         binding.rvTopics.adapter = listAdapter
 
         chatAdapter = TopicAdapter(
-            onItemLongClick = { msg -> enterSelection(msg) },
+            onItemLongClick = { msg ->
+                // 已处于多选：长按 = 选中/取消该条；否则长按进入多选并选中
+                if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
+                else enterSelection(msg)
+            },
             onItemClick = { msg ->
                 if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
             },
@@ -139,8 +146,17 @@ class TopicFragment : Fragment() {
         })
         touch.attachToRecyclerView(binding.rvTopics)
 
-        // 聊天态：返回
-        binding.btnBack.setOnClickListener { showListMode() }
+        // 系统返回手势/按键：聊天态 → 返回话题列表；多选态 → 先退出多选；列表态 → 交给系统（默认行为）
+        backCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                when {
+                    chatAdapter.selectionMode -> { chatAdapter.clearSelection(); updateSelectionUI() }
+                    binding.chatLayout.visibility == View.VISIBLE -> showListMode()
+                }
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
+
         // 聊天态：待审批
         binding.btnPending.setOnClickListener { showPendingDialog() }
 
@@ -215,7 +231,7 @@ class TopicFragment : Fragment() {
         binding.listLayout.visibility = View.VISIBLE
         binding.chatLayout.visibility = View.GONE
         binding.tvTitleList.visibility = View.VISIBLE
-        binding.btnBack.visibility = View.GONE
+        backCallback.isEnabled = false
         binding.tvChatTitle.visibility = View.GONE
         binding.btnPending.visibility = View.GONE
         binding.fabAddTopic.visibility = View.VISIBLE
@@ -228,7 +244,7 @@ class TopicFragment : Fragment() {
         binding.listLayout.visibility = View.GONE
         binding.chatLayout.visibility = View.VISIBLE
         binding.tvTitleList.visibility = View.GONE
-        binding.btnBack.visibility = View.VISIBLE
+        backCallback.isEnabled = true
         binding.tvChatTitle.visibility = View.VISIBLE
         binding.tvChatTitle.text = topic.name
         binding.fabAddTopic.visibility = View.GONE
