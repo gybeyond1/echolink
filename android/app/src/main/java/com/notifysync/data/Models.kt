@@ -48,6 +48,7 @@ data class TopicMessage(
     val senderName: String,
     val timestamp: Long,
     val deviceId: Long,
+    val deviceName: String? = null,
     val mediaType: String = "text",   // "text" | "voice" | "image" | "file"
     val mediaUrl: String? = null,
     val mediaName: String? = null,
@@ -112,6 +113,7 @@ fun parseTopicMessages(jsonArray: JSONArray): List<TopicMessage> {
                 senderName = obj.optString("sender_name", ""),
                 timestamp = obj.getLong("timestamp"),
                 deviceId = obj.optLong("device_id", -1),
+                deviceName = obj.optString("device_name", null),
                 mediaType = obj.optString("media_type", "text"),
                 mediaUrl = obj.optString("media_url", null),
                 mediaName = obj.optString("media_name", null),
@@ -131,6 +133,7 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
         senderName = json.optString("sender_name", ""),
         timestamp = json.getLong("timestamp"),
         deviceId = json.optLong("device_id", -1),
+        deviceName = json.optString("device_name", null),
         mediaType = json.optString("media_type", "text"),
         mediaUrl = json.optString("media_url", null),
         mediaName = json.optString("media_name", null),

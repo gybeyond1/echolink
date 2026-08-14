@@ -221,6 +221,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         val title = data.optString("title", "")
         val text = data.optString("text", "")
         val sender = data.optString("sender_name", "未知")
+        val deviceName = data.optString("device_name", null)
         val timestamp = data.optLong("timestamp", System.currentTimeMillis())
         val topicName = topic ?: data.optString("topic", "")
 
@@ -235,6 +236,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
             putExtra("title", title)
             putExtra("text", text)
             putExtra("sender_name", sender)
+            putExtra("device_name", deviceName)
             putExtra("timestamp", timestamp)
             putExtra("device_id", fromDeviceId)
         }

@@ -200,7 +200,8 @@ class TopicAdapter(
         val item = items[position]
         holder.item = item
         val isMedia = item.mediaType != "text" && !item.mediaUrl.isNullOrEmpty()
-        holder.tvSender.text = item.senderName.ifEmpty { "unknown" }
+        val sender = item.senderName.ifEmpty { "unknown" }
+        holder.tvSender.text = if (!item.deviceName.isNullOrBlank()) "$sender (${item.deviceName})" else sender
         holder.tvTime.text = timeFormat.format(Date(item.timestamp))
         holder.tvTitle.text = item.title
         holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE

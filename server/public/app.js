@@ -543,7 +543,7 @@
     const msg = document.getElementById("tmsg");
     if (!r.messages.length) { msg.innerHTML = `<div class="empty">还没有消息</div>`; return; }
     msg.innerHTML = r.messages.map(m => `<div class="tmsg-item">
-      <div class="tmsg-sender"><b>${esc(m.sender_name || "未知")}</b><span class="tmsg-time">${fmtTime(m.timestamp)}</span></div>
+      <div class="tmsg-sender"><b>${esc(m.sender_name || "未知")}</b>${m.device_name ? `<span class="tmsg-dev"> (${esc(m.device_name)})</span>` : ""}<span class="tmsg-time">${fmtTime(m.timestamp)}</span></div>
       ${m.title ? `<div style="font-weight:600;margin-top:2px">${esc(m.title)}</div>` : ""}
       <div>${esc(m.text)}</div>
       ${mediaHtml(m)}

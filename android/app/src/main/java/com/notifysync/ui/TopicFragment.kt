@@ -83,7 +83,8 @@ class TopicFragment : Fragment() {
                     text = intent.getStringExtra("text") ?: "",
                     senderName = intent.getStringExtra("sender_name") ?: "",
                     timestamp = intent.getLongExtra("timestamp", System.currentTimeMillis()),
-                    deviceId = intent.getLongExtra("device_id", -1)
+                    deviceId = intent.getLongExtra("device_id", -1),
+                    deviceName = intent.getStringExtra("device_name")
                 )
                 chatAdapter.appendItems(listOf(msg))
                 scrollToBottom()
