@@ -175,13 +175,16 @@
                 android:id="@+id/btnVoiceToggle"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
+                android:layout_gravity="center_vertical"
                 android:background="?attr/selectableItemBackgroundBorderless"
+                android:scaleType="centerInside"
                 android:src="@drawable/ic_mic"
                 android:contentDescription="语音/键盘切换" />
 
             <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="40dp"
+                android:layout_gravity="center_vertical"
                 android:layout_weight="1"
                 android:layout_marginStart="6dp"
                 android:layout_marginEnd="6dp">
@@ -189,8 +192,7 @@
                 <EditText
                     android:id="@+id/etInput"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="40dp"
+                    android:layout_height="match_parent"
                     android:background="@drawable/bg_input"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
@@ -203,7 +205,7 @@
                 <Button
                     android:id="@+id/btnHoldTalk"
                     android:layout_width="match_parent"
-                    android:layout_height="40dp"
+                    android:layout_height="match_parent"
                     android:background="@drawable/bg_input"
                     android:text="按住 说话"
                     android:textSize="15sp"
@@ -215,7 +217,9 @@
                 android:id="@+id/btnEmoji"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
+                android:layout_gravity="center_vertical"
                 android:background="?attr/selectableItemBackgroundBorderless"
+                android:scaleType="centerInside"
                 android:src="@drawable/ic_emoji"
                 android:contentDescription="表情" />
 
@@ -223,8 +227,10 @@
                 android:id="@+id/btnPlus"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
+                android:layout_gravity="center_vertical"
                 android:layout_marginStart="2dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
+                android:scaleType="centerInside"
                 android:src="@drawable/ic_plus"
                 android:contentDescription="更多" />
 
@@ -232,6 +238,7 @@
                 android:id="@+id/btnSend"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
+                android:layout_gravity="center_vertical"
                 android:layout_marginStart="4dp"
                 android:backgroundTint="#07C160"
                 android:text="发送"

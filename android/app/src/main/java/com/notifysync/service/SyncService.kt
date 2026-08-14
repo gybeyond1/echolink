@@ -12,9 +12,14 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.notifysync.App
 import com.notifysync.R
+import com.notifysync.data.ApiClient
 import com.notifysync.data.AuthManager
 import com.notifysync.data.WebSocketClient
 import com.notifysync.ui.MainActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 class SyncService : Service(), WebSocketClient.WsEventListener {
@@ -47,6 +52,8 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
     }
 
     private var notificationIdCounter = SYNCED_NOTIFICATION_START_ID
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
@@ -83,6 +90,31 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         updateForegroundNotification("已连接 - 同步中")
         // 重连成功后重新订阅所有已保存的话题
         AuthManager.subscribedTopics.forEach { WebSocketClient.sendSubscribe(it) }
+        // 补拉离线/断连期间遗漏的通知，保证跨设备实时性
+        pullMissedNotifications()
+    }
+
+    // WebSocket 连接成功后，拉取本机离线期间（自上次收到之后）遗漏的通知并本地提示。
+    // 过滤掉本机自己发出的通知，避免「自己通知自己」。
+    private fun pullMissedNotifications() {
+        scope.launch {
+            try {
+                // 首次（lastNotificationTs=0）只回看最近 2 分钟，避免把历史通知全部刷成提示
+                val since = if (AuthManager.lastNotificationTs > 0) AuthManager.lastNotificationTs
+                else System.currentTimeMillis() - 2 * 60 * 1000
+                val list = ApiClient.getNotificationsSince(since)
+                var maxTs = AuthManager.lastNotificationTs
+                list.forEach { n ->
+                    if (n.timestamp > maxTs) maxTs = n.timestamp
+                    if (n.deviceId == AuthManager.deviceId) return@forEach
+                    val displayTitle = if (n.title.isNotEmpty()) "[${n.appName}] ${n.title}" else "[${n.appName}]"
+                    showLocalNotification(displayTitle, n.text, null)
+                }
+                if (maxTs > AuthManager.lastNotificationTs) AuthManager.lastNotificationTs = maxTs
+            } catch (e: Exception) {
+                Log.w(TAG, "pullMissedNotifications failed: ${e.message}")
+            }
+        }
     }
 
     override fun onMessage(type: String, data: JSONObject?, topic: String?) {

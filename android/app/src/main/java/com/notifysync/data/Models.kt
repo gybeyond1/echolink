@@ -30,7 +30,8 @@ data class NotificationItem(
     val title: String,
     val text: String,
     val timestamp: Long,
-    val deviceName: String?
+    val deviceName: String?,
+    val deviceId: Long = -1
 )
 
 data class AppFilter(
@@ -75,7 +76,8 @@ fun parseNotifications(jsonArray: JSONArray): List<NotificationItem> {
                 title = obj.optString("title", ""),
                 text = obj.optString("text", ""),
                 timestamp = obj.getLong("timestamp"),
-                deviceName = obj.optString("device_name", null)
+                deviceName = obj.optString("device_name", null),
+                deviceId = obj.optLong("device_id", -1)
             )
         )
     }
