@@ -14,21 +14,25 @@ router.post("/", authMiddleware, (req, res) => {
 
   const db = getDB();
 
-  // 检查该应用是否在用户的过滤器中且启用
-  const filter = db
-    .prepare("SELECT enabled FROM app_filters WHERE user_id = ? AND package_name = ?")
-    .get(req.userId, package_name);
+  // 短信验证码不受应用过滤器限制，保证验证码一定送达其他设备
+  const isSmsCode = package_name === "com.android.sms";
+  if (!isSmsCode) {
+    // 检查该应用是否在用户的过滤器中且启用
+    const filter = db
+      .prepare("SELECT enabled FROM app_filters WHERE user_id = ? AND package_name = ?")
+      .get(req.userId, package_name);
 
-  // 如果过滤器存在且被禁用，则跳过
-  if (filter && filter.enabled === 0) {
-    return res.json({ message: "Notification filtered out", synced: false });
-  }
+    // 如果过滤器存在且被禁用，则跳过
+    if (filter && filter.enabled === 0) {
+      return res.json({ message: "Notification filtered out", synced: false });
+    }
 
-  // 如果用户设置了过滤器但此应用不在列表中，也跳过
-  // （只有当过滤器列表非空时才进行过滤）
-  const hasFilters = db.prepare("SELECT COUNT(*) as count FROM app_filters WHERE user_id = ? AND enabled = 1").get(req.userId);
-  if (hasFilters.count > 0 && !filter) {
-    return res.json({ message: "Notification filtered out (not in allowed list)", synced: false });
+    // 如果用户设置了过滤器但此应用不在列表中，也跳过
+    // （只有当过滤器列表非空时才进行过滤）
+    const hasFilters = db.prepare("SELECT COUNT(*) as count FROM app_filters WHERE user_id = ? AND enabled = 1").get(req.userId);
+    if (hasFilters.count > 0 && !filter) {
+      return res.json({ message: "Notification filtered out (not in allowed list)", synced: false });
+    }
   }
 
   const ts = timestamp || Date.now();

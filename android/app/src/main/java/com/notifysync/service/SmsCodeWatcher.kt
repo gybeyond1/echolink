@@ -15,7 +15,12 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.notifysync.App
+import com.notifysync.data.ApiClient
 import com.notifysync.data.AuthManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * 短信验证码自动提取：
@@ -35,6 +40,8 @@ object SmsCodeWatcher {
     private val handledIds = ArrayDeque<Long>()
 
     private var notificationId = 2000
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val isRunning: Boolean
         get() = observer != null
@@ -169,6 +176,24 @@ object SmsCodeWatcher {
         } catch (_: Exception) { /* ignore */ }
 
         Log.i(TAG, "SMS code extracted from $address: $code")
+
+        // 上报到服务器，让其他设备也能收到验证码
+        if (AuthManager.isLoggedIn) {
+            scope.launch {
+                try {
+                    ApiClient.sendNotification(
+                        packageName = "com.android.sms",
+                        appName = "短信验证码",
+                        title = "验证码 $code",
+                        text = "来自 $address",
+                        timestamp = System.currentTimeMillis()
+                    )
+                    Log.i(TAG, "SMS code reported to server for cross-device sync")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to report SMS code: ${e.message}")
+                }
+            }
+        }
     }
 
     // ===== 验证码提取 =====
