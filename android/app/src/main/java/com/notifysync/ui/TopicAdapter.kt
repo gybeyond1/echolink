@@ -85,7 +85,6 @@ class TopicAdapter(
     val selectedCount: Int get() = selected.size
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val cbSelect: android.widget.CheckBox = view.findViewById(R.id.cbSelect)
         val tvSender: TextView = view.findViewById(R.id.tvSender)
         val tvTime: TextView = view.findViewById(R.id.tvTime)
         val tvTitle: TextView = view.findViewById(R.id.tvTitle)
@@ -140,30 +139,42 @@ class TopicAdapter(
             }
         }
 
-        // 多选态视觉
-        holder.cbSelect.visibility = if (selectionMode) View.VISIBLE else View.GONE
-        holder.cbSelect.isChecked = selected.contains(item.id)
+        // 多选态视觉（与通知列表一致：背景色变化，无复选框）
         holder.itemView.setBackgroundColor(
-            if (selected.contains(item.id))
+            if (selectionMode && selected.contains(item.id))
                 holder.itemView.context.getColor(R.color.brand_primary_light)
             else 0x00000000
         )
 
         holder.itemView.setOnClickListener {
-            if (selectionMode) onItemClick(item) else { /* 普通模式单击不处理 */ }
+            if (selectionMode) onItemClick(item)
         }
         holder.itemView.setOnLongClickListener {
             onItemLongClick(item)
             true
         }
 
-        // 长按消息文字 → 复制到剪贴板（与 itemView 长按多选互不冲突：TextView 消费长按事件）
-        val copyListener = View.OnLongClickListener {
-            copyText(holder.itemView.context, item)
-            true
+        // 双击文字区域复制；多选模式下不拦截点击，让事件冒泡到 itemView 执行 toggle
+        if (selectionMode) {
+            holder.tvTitle.setOnClickListener(null)
+            holder.tvText.setOnClickListener(null)
+        } else {
+            val doubleClickListener = object : DoubleClickListener() {
+                override fun onDoubleClick(v: View) { copyText(holder.itemView.context, item) }
+            }
+            holder.tvTitle.setOnClickListener(doubleClickListener)
+            holder.tvText.setOnClickListener(doubleClickListener)
         }
-        holder.tvTitle.setOnLongClickListener(copyListener)
-        holder.tvText.setOnLongClickListener(copyListener)
+    }
+
+    private abstract class DoubleClickListener : View.OnClickListener {
+        private var lastClickTime = 0L
+        override fun onClick(v: View) {
+            val now = System.currentTimeMillis()
+            if (now - lastClickTime < 300) onDoubleClick(v)
+            lastClickTime = now
+        }
+        abstract fun onDoubleClick(v: View)
     }
 
     private fun copyText(context: Context, item: TopicMessage) {

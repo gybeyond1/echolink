@@ -70,21 +70,38 @@ class NotificationAdapter(
                 true
             }
 
-            // 长按通知文字 → 复制到剪贴板（itemView 长按仍是多选，互不冲突）
-            val copyListener = View.OnLongClickListener {
-                val text = listOf(item.title, item.text)
-                    .filter { it.isNotBlank() }
-                    .joinToString("\n")
-                if (text.isNotBlank()) {
-                    val cm = binding.root.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    cm.setPrimaryClip(ClipData.newPlainText("通知内容", text))
-                    Toast.makeText(binding.root.context, "已复制", Toast.LENGTH_SHORT).show()
+            // 双击文字区域复制；多选模式下不拦截点击，让事件冒泡到 root 执行 toggle
+            if (isSelectionActive) {
+                binding.tvTitle.setOnClickListener(null)
+                binding.tvText.setOnClickListener(null)
+            } else {
+                val doubleClickListener = object : DoubleClickListener() {
+                    override fun onDoubleClick(v: View) { copyText(item) }
                 }
-                true
+                binding.tvTitle.setOnClickListener(doubleClickListener)
+                binding.tvText.setOnClickListener(doubleClickListener)
             }
-            binding.tvTitle.setOnLongClickListener(copyListener)
-            binding.tvText.setOnLongClickListener(copyListener)
         }
+
+        private fun copyText(item: NotificationItem) {
+            val text = listOf(item.title, item.text)
+                .filter { it.isNotBlank() }
+                .joinToString("\n")
+            if (text.isBlank()) return
+            val cm = binding.root.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("通知内容", text))
+            Toast.makeText(binding.root.context, "已复制", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private abstract class DoubleClickListener : View.OnClickListener {
+        private var lastClickTime = 0L
+        override fun onClick(v: View) {
+            val now = System.currentTimeMillis()
+            if (now - lastClickTime < 300) onDoubleClick(v)
+            lastClickTime = now
+        }
+        abstract fun onDoubleClick(v: View)
     }
 
     // ===== 多选逻辑 =====
