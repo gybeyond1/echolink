@@ -10,7 +10,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.GestureDetector
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -69,6 +71,7 @@ class TopicAdapter(
         if (item.id > 0) {
             if (selected.contains(item.id)) selected.remove(item.id) else selected.add(item.id)
         }
+        if (selected.isEmpty()) selectionMode = false
         val pos = items.indexOfFirst { it.id == item.id }
         if (pos >= 0) notifyItemChanged(pos) else notifyDataSetChanged()
     }
@@ -158,44 +161,66 @@ class TopicAdapter(
             true
         }
 
-        // 触摸处理：普通模式文字支持双击复制 + 长按进入多选；
-        // 多选模式所有子 View 不再拦截触摸，整条消息任意位置点击/长按都落到 itemView（toggle）。
-        // 注意：setOnClickListener(null) 不会恢复 clickable=false，必须显式 isClickable=false，
-        // 否则 TextView 仍会消费触摸事件，导致多选点击/普通长按经常无效。
+        // 触摸处理：
+        // 普通模式：整条消息（含媒体区）任意位置双击复制、长按进入多选；子 View 不再消费事件，
+        // 统一由 itemView 的 GestureDetector 处理，单击根据落点执行媒体打开等操作。
+        // 多选模式：itemView 响应点击 toggle，所有子 View 不拦截触摸。
+        // 注意：setOnClickListener(null) 不会恢复 clickable=false，必须显式 isClickable=false。
+        clearTouchListeners(holder)
         if (selectionMode) {
-            listOf(holder.tvTitle, holder.tvText).forEach {
-                it.setOnClickListener(null)
-                it.setOnLongClickListener(null)
-                it.isClickable = false
-                it.isFocusable = false
-            }
-            holder.ivMedia.isClickable = false
-            holder.llVoice.isClickable = false
-            holder.llFile.isClickable = false
+            holder.itemView.setOnTouchListener(null)
+            holder.itemView.setOnClickListener { onItemClick(item) }
+            holder.itemView.setOnLongClickListener { onItemLongClick(item); true }
         } else {
-            val doubleClickListener = object : DoubleClickListener() {
-                override fun onDoubleClick(v: View) { copyText(holder.itemView.context, item) }
-            }
-            val longPressListener = View.OnLongClickListener {
-                onItemLongClick(item)
-                true
-            }
-            holder.tvTitle.setOnClickListener(doubleClickListener)
-            holder.tvTitle.setOnLongClickListener(longPressListener)
-            holder.tvText.setOnClickListener(doubleClickListener)
-            holder.tvText.setOnLongClickListener(longPressListener)
+            val gesture = GestureDetector(holder.itemView.context, object : GestureDetector.SimpleOnGestureListener() {
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                    when {
+                        holder.ivMedia.visibility == View.VISIBLE && inViewBounds(holder.ivMedia, e) -> {
+                            if (!item.mediaUrl.isNullOrEmpty()) onImageClick?.invoke(fullUrl(item.mediaUrl))
+                        }
+                        holder.llVoice.visibility == View.VISIBLE && inViewBounds(holder.llVoice, e) -> {
+                            if (!item.mediaUrl.isNullOrEmpty()) playVoice(fullUrl(item.mediaUrl))
+                        }
+                        holder.llFile.visibility == View.VISIBLE && inViewBounds(holder.llFile, e) -> {
+                            if (!item.mediaUrl.isNullOrEmpty()) {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl(item.mediaUrl)))
+                                try { holder.itemView.context.startActivity(intent) } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                    return true
+                }
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    copyText(holder.itemView.context, item)
+                    return true
+                }
+                override fun onLongPress(e: MotionEvent) {
+                    onItemLongClick(item)
+                }
+            })
+            holder.itemView.setOnTouchListener { _, ev -> gesture.onTouchEvent(ev) }
+            holder.itemView.setOnClickListener(null)
+            holder.itemView.setOnLongClickListener(null)
         }
     }
 
-    private abstract class DoubleClickListener : View.OnClickListener {
-        private var lastClickTime = 0L
-        override fun onClick(v: View) {
-            val now = System.currentTimeMillis()
-            if (now - lastClickTime < 300) onDoubleClick(v)
-            lastClickTime = now
+    private fun clearTouchListeners(holder: ViewHolder) {
+        listOf(holder.tvTitle, holder.tvText, holder.ivMedia, holder.llVoice, holder.llFile).forEach {
+            it.setOnClickListener(null)
+            it.setOnLongClickListener(null)
+            it.isClickable = false
+            it.isFocusable = false
         }
-        abstract fun onDoubleClick(v: View)
     }
+
+    private fun inViewBounds(v: View, ev: MotionEvent): Boolean {
+        val rect = android.graphics.Rect()
+        v.getHitRect(rect)
+        return rect.contains(ev.x.toInt(), ev.y.toInt())
+    }
+
+    val isAllSelected: Boolean
+        get() = items.filter { it.id > 0 }.let { it.isNotEmpty() && it.all { selected.contains(it.id) } }
 
     private fun copyText(context: Context, item: TopicMessage) {
         val text = listOf(item.title, item.text)

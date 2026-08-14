@@ -6,7 +6,9 @@ import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.GestureDetector
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
@@ -67,38 +69,42 @@ class NotificationAdapter(
                 else ctx.getColor(R.color.surface)
             )
 
-            binding.root.setOnClickListener { onItemClick(item) }
-            binding.root.setOnLongClickListener {
-                onItemLongClick(item)
-                true
-            }
-
-            // 触摸处理：普通模式文字支持双击复制 + 长按进入多选；
-            // 多选模式文字不再拦截触摸，整条卡片任意位置点击/长按都落到 root（toggle）。
-            // 注意：setOnClickListener(null) 不会恢复 clickable=false，必须显式 isClickable=false，
-            // 否则 TextView 仍会消费触摸事件，导致多选点击/普通长按经常无效。
+            // 触摸处理：
+            // 普通模式：整条卡片任意位置双击复制、长按进入多选；子 View 不再消费事件，
+            // 统一由 root 的 GestureDetector 处理，单击不执行额外操作。
+            // 多选模式：root 响应点击 toggle，所有子 View 不拦截触摸。
+            // 注意：setOnClickListener(null) 不会恢复 clickable=false，必须显式 isClickable=false。
+            clearTouchListeners()
             if (isSelectionActive) {
-                binding.tvTitle.setOnClickListener(null)
-                binding.tvTitle.setOnLongClickListener(null)
-                binding.tvTitle.isClickable = false
-                binding.tvTitle.isFocusable = false
-                binding.tvText.setOnClickListener(null)
-                binding.tvText.setOnLongClickListener(null)
-                binding.tvText.isClickable = false
-                binding.tvText.isFocusable = false
+                binding.root.setOnTouchListener(null)
+                binding.root.setOnClickListener { onItemClick(item) }
+                binding.root.setOnLongClickListener { onItemLongClick(item); true }
             } else {
-                val doubleClickListener = object : DoubleClickListener() {
-                    override fun onDoubleClick(v: View) { copyText(item) }
-                }
-                val longPressListener = View.OnLongClickListener {
-                    onItemLongClick(item)
-                    true
-                }
-                binding.tvTitle.setOnClickListener(doubleClickListener)
-                binding.tvTitle.setOnLongClickListener(longPressListener)
-                binding.tvText.setOnClickListener(doubleClickListener)
-                binding.tvText.setOnLongClickListener(longPressListener)
+                val gesture = GestureDetector(binding.root.context, object : GestureDetector.SimpleOnGestureListener() {
+                    override fun onSingleTapConfirmed(e: MotionEvent): Boolean = true
+                    override fun onDoubleTap(e: MotionEvent): Boolean {
+                        copyText(item)
+                        return true
+                    }
+                    override fun onLongPress(e: MotionEvent) {
+                        onItemLongClick(item)
+                    }
+                })
+                binding.root.setOnTouchListener { _, ev -> gesture.onTouchEvent(ev) }
+                binding.root.setOnClickListener(null)
+                binding.root.setOnLongClickListener(null)
             }
+        }
+
+        private fun clearTouchListeners() {
+            binding.tvTitle.setOnClickListener(null)
+            binding.tvTitle.setOnLongClickListener(null)
+            binding.tvTitle.isClickable = false
+            binding.tvTitle.isFocusable = false
+            binding.tvText.setOnClickListener(null)
+            binding.tvText.setOnLongClickListener(null)
+            binding.tvText.isClickable = false
+            binding.tvText.isFocusable = false
         }
 
         private fun copyText(item: NotificationItem) {
@@ -124,15 +130,8 @@ class NotificationAdapter(
         }
     }
 
-    private abstract class DoubleClickListener : View.OnClickListener {
-        private var lastClickTime = 0L
-        override fun onClick(v: View) {
-            val now = System.currentTimeMillis()
-            if (now - lastClickTime < 300) onDoubleClick(v)
-            lastClickTime = now
-        }
-        abstract fun onDoubleClick(v: View)
-    }
+    val isAllSelected: Boolean
+        get() = currentList.isNotEmpty() && currentList.all { selected.contains(it.id) }
 
     // ===== 多选逻辑 =====
 

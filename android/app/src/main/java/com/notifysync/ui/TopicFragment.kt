@@ -166,7 +166,7 @@ class TopicFragment : Fragment() {
         binding.fabAddTopic.setOnClickListener { showDiscoverDialog() }
 
         // 多选操作栏（右上角：全选 / 删除；退出多选用系统返回手势）
-        binding.btnSelectAll.setOnClickListener { chatAdapter.selectAll(); updateSelectionUI() }
+        binding.btnSelectAll.setOnClickListener { if (chatAdapter.isAllSelected) chatAdapter.clearSelection() else chatAdapter.selectAll(); updateSelectionUI() }
         binding.btnDeleteSel.setOnClickListener { confirmDeleteSelected() }
 
         // 下拉刷新（保留）
@@ -451,6 +451,7 @@ class TopicFragment : Fragment() {
     private fun enterSelection(msg: TopicMessage) { chatAdapter.enterSelection(msg); updateSelectionUI() }
     private fun updateSelectionUI() {
         binding.selectionBar.visibility = if (chatAdapter.selectionMode) View.VISIBLE else View.GONE
+        binding.btnSelectAll.setImageResource(if (chatAdapter.isAllSelected) R.drawable.ic_select_all_filled else R.drawable.ic_select_all)
     }
 
     // 触觉反馈：长按进入多选时短震动一次

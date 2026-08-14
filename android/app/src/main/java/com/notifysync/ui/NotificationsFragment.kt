@@ -47,7 +47,7 @@ class NotificationsFragment : Fragment() {
 
         // 多选操作栏（右上角：全选 / 删除；退出多选用系统返回手势）
         binding.btnSelectAll.setOnClickListener {
-            adapter.selectAll()
+            if (adapter.isAllSelected) adapter.clearSelection() else adapter.selectAll()
             updateSelectionUI()
         }
         binding.btnDeleteSelected.setOnClickListener { deleteSelected() }
@@ -86,6 +86,7 @@ class NotificationsFragment : Fragment() {
     private fun updateSelectionUI() {
         val active = adapter.isSelectionActive
         binding.selectionBar.visibility = if (active) View.VISIBLE else View.GONE
+        binding.btnSelectAll.setImageResource(if (adapter.isAllSelected) R.drawable.ic_select_all_filled else R.drawable.ic_select_all)
         backCallback.isEnabled = active
     }
 
