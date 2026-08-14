@@ -9,6 +9,7 @@ import android.util.Log
 import com.notifysync.data.ApiClient
 import com.notifysync.data.AppFilterStore
 import com.notifysync.data.AuthManager
+import com.notifysync.service.SyncService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +42,11 @@ class NotificationListener : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         AppFilterStore.init(applicationContext)
+        // 通知监听常驻运行：一并拉起 SyncService，确保接收端 WebSocket 常在线，
+        // 这样其他设备发来的通知/话题消息才能实时推送到本机（无需先打开 App）。
+        if (AuthManager.isLoggedIn) {
+            SyncService.start(applicationContext)
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {

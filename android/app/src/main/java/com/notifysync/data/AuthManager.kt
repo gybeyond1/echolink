@@ -44,6 +44,11 @@ object AuthManager {
         get() = prefs.getString(KEY_DEVICE_NAME, null)
         set(value) = prefs.edit().putString(KEY_DEVICE_NAME, value).apply()
 
+    // 上次收到同步通知的时间戳：用于 WebSocket 重连后补拉离线期间遗漏的通知
+    var lastNotificationTs: Long
+        get() = prefs.getLong("last_notification_ts", 0)
+        set(value) = prefs.edit().putLong("last_notification_ts", value).apply()
+
     // 稳定的设备标识：每个安装只生成一次，用于"按设备"持久化（重登录复用同一 deviceId）
     var deviceUuid: String
         get() {

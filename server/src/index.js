@@ -16,6 +16,9 @@ const server = http.createServer(app);
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
+// 反代友好：当部署在 nginx/caddy 等反向代理之后时，正确识别客户端 IP 与协议
+app.set("trust proxy", true);
+
 // 请求日志
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
