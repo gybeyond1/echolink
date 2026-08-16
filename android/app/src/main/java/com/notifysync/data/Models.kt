@@ -3,6 +3,14 @@ package com.notifysync.data
 import org.json.JSONArray
 import org.json.JSONObject
 
+// Android org.json 的坑：JSON 值为 null 时 optString 会返回字面字符串 "null"，
+// 导致 ?: 回退失效。所有可空字符串字段统一走此方法。
+fun JSONObject.optNullable(key: String): String? {
+    if (isNull(key)) return null
+    val v = optString(key, null)
+    return if (v.isNullOrEmpty() || v == "null") null else v
+}
+
 // ===== 请求/响应模型 =====
 
 data class LoginRequest(
@@ -68,8 +76,8 @@ fun parseAuthResponse(json: JSONObject): AuthResponse {
         token = json.getString("token"),
         userId = user.getLong("id"),
         username = user.getString("username"),
-        displayName = user.optString("display_name", null),
-        avatarUrl = user.optString("avatar", null)
+        displayName = user.optNullable("display_name"),
+        avatarUrl = user.optNullable("avatar")
     )
 }
 
@@ -85,7 +93,7 @@ fun parseNotifications(jsonArray: JSONArray): List<NotificationItem> {
                 title = obj.optString("title", ""),
                 text = obj.optString("text", ""),
                 timestamp = obj.getLong("timestamp"),
-                deviceName = obj.optString("device_name", null),
+                deviceName = obj.optNullable("device_name"),
                 deviceId = obj.optLong("device_id", -1)
             )
         )
@@ -121,14 +129,14 @@ fun parseTopicMessages(jsonArray: JSONArray): List<TopicMessage> {
                 senderName = obj.optString("sender_name", ""),
                 timestamp = obj.getLong("timestamp"),
                 deviceId = obj.optLong("device_id", -1),
-                deviceName = obj.optString("device_name", null),
+                deviceName = obj.optNullable("device_name"),
                 mediaType = obj.optString("media_type", "text"),
-                mediaUrl = obj.optString("media_url", null),
-                mediaName = obj.optString("media_name", null),
+                mediaUrl = obj.optNullable("media_url"),
+                mediaName = obj.optNullable("media_name"),
                 mediaSize = obj.optLong("media_size", 0),
                 senderUserId = obj.optLong("user_id", 0),
-                senderAvatar = obj.optString("sender_avatar", null),
-                senderDisplayName = obj.optString("sender_display_name", null)
+                senderAvatar = obj.optNullable("sender_avatar"),
+                senderDisplayName = obj.optNullable("sender_display_name")
             )
         )
     }
@@ -144,14 +152,14 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
         senderName = json.optString("sender_name", ""),
         timestamp = json.getLong("timestamp"),
         deviceId = json.optLong("device_id", -1),
-        deviceName = json.optString("device_name", null),
+        deviceName = json.optNullable("device_name"),
         mediaType = json.optString("media_type", "text"),
-        mediaUrl = json.optString("media_url", null),
-        mediaName = json.optString("media_name", null),
+        mediaUrl = json.optNullable("media_url"),
+        mediaName = json.optNullable("media_name"),
         mediaSize = json.optLong("media_size", 0),
         senderUserId = json.optLong("user_id", 0),
-        senderAvatar = json.optString("sender_avatar", null),
-        senderDisplayName = json.optString("sender_display_name", null)
+        senderAvatar = json.optNullable("sender_avatar"),
+        senderDisplayName = json.optNullable("sender_display_name")
     )
 }
 
@@ -205,10 +213,10 @@ fun parseMyTopics(jsonArray: JSONArray): List<MyTopic> {
                 myRole = obj.optString("my_role", "member"),
                 messageCount = obj.optInt("message_count", 0),
                 pendingRequests = obj.optInt("pending_requests", 0),
-                ownerName = obj.optString("owner_name", null),
-                lastMessage = obj.optString("last_message", null),
+                ownerName = obj.optNullable("owner_name"),
+                lastMessage = obj.optNullable("last_message"),
                 kind = obj.optString("kind", "normal"),
-                displayName = obj.optString("display_name", null)
+                displayName = obj.optNullable("display_name")
             )
         )
     }
@@ -222,7 +230,7 @@ fun parseDiscoverTopics(jsonArray: JSONArray): List<DiscoverTopic> {
         list.add(
             DiscoverTopic(
                 name = obj.getString("name"),
-                ownerName = obj.optString("owner_name", null),
+                ownerName = obj.optNullable("owner_name"),
                 memberCount = obj.optInt("member_count", 0),
                 messageCount = obj.optInt("message_count", 0)
             )
@@ -240,7 +248,7 @@ fun parseTopicMembers(jsonArray: JSONArray): List<TopicMember> {
                 userId = obj.getLong("user_id"),
                 username = obj.optString("username", "?"),
                 role = obj.optString("role", "member"),
-                joinedAt = obj.optString("joined_at", null)
+                joinedAt = obj.optNullable("joined_at")
             )
         )
     }
@@ -257,8 +265,8 @@ fun parseTopicRequests(jsonArray: JSONArray): List<TopicJoinRequest> {
                 userId = obj.getLong("user_id"),
                 username = obj.optString("username", "?"),
                 status = obj.optString("status", "pending"),
-                message = obj.optString("message", null),
-                requestedAt = obj.optString("requested_at", null)
+                message = obj.optNullable("message"),
+                requestedAt = obj.optNullable("requested_at")
             )
         )
     }
@@ -314,9 +322,9 @@ fun parseFriends(jsonArray: JSONArray): List<Friend> {
             Friend(
                 userId = obj.getLong("user_id"),
                 username = obj.optString("username", "?"),
-                createdAt = obj.optString("created_at", null),
-                displayName = obj.optString("display_name", null),
-                avatarUrl = obj.optString("avatar", null)
+                createdAt = obj.optNullable("created_at"),
+                displayName = obj.optNullable("display_name"),
+                avatarUrl = obj.optNullable("avatar")
             )
         )
     }
@@ -332,8 +340,8 @@ fun parseFriendRequests(jsonArray: JSONArray): List<FriendRequest> {
                 id = obj.getLong("id"),
                 username = obj.optString("username", "?"),
                 status = obj.optString("status", "pending"),
-                message = obj.optString("message", null),
-                requestedAt = obj.optString("requested_at", null)
+                message = obj.optNullable("message"),
+                requestedAt = obj.optNullable("requested_at")
             )
         )
     }
@@ -350,8 +358,8 @@ fun parseSearchUsers(jsonArray: JSONArray): List<SearchUser> {
                 username = obj.optString("username", "?"),
                 isFriend = obj.optInt("is_friend", 0) == 1,
                 requested = obj.optInt("requested", 0) == 1,
-                displayName = obj.optString("display_name", null),
-                avatarUrl = obj.optString("avatar", null)
+                displayName = obj.optNullable("display_name"),
+                avatarUrl = obj.optNullable("avatar")
             )
         )
     }
@@ -374,8 +382,8 @@ private fun parseUnifiedTopicRequests(jsonArray: JSONArray): List<UnifiedTopicRe
                 id = obj.getLong("id"),
                 topic = obj.optString("topic", "?"),
                 username = obj.optString("username", "?"),
-                message = obj.optString("message", null),
-                requestedAt = obj.optString("requested_at", null)
+                message = obj.optNullable("message"),
+                requestedAt = obj.optNullable("requested_at")
             )
         )
     }

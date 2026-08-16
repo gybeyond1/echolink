@@ -96,7 +96,7 @@ object ApiClient {
                 id = obj.getLong("id"),
                 deviceName = obj.getString("device_name"),
                 platform = obj.optString("platform", "android"),
-                lastSeen = obj.optString("last_seen", null)
+                lastSeen = obj.optNullable("last_seen")
             )
         }
     }

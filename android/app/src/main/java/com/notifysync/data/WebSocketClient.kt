@@ -104,7 +104,7 @@ object WebSocketClient {
                         }
                         else -> null
                     }
-                    val topic = if (json.has("topic")) json.optString("topic", null) else null
+                    val topic = if (json.has("topic")) json.optNullable("topic") else null
                     listener?.onMessage(type, data, topic)
                 } catch (e: Exception) {
                     Log.e(TAG, "Parse message error", e)
