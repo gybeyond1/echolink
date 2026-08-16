@@ -23,14 +23,6 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <ImageButton
-            android:id="@+id/btnAddFriend"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_plus"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="添加好友"
-            android:scaleType="centerInside" />
     </LinearLayout>
 
     <!-- 新的朋友（好友申请入口，带红点） -->
@@ -97,11 +89,21 @@
             android:id="@+id/tvEmptyFriends"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="还没有好友\n点右上角「+」搜索用户名添加"
+            android:text="还没有好友\n点右下角「+」添加好友或发现话题"
             android:gravity="center"
             android:padding="48dp"
             android:textColor="@color/on_surface_variant"
             android:textSize="16sp"
             android:visibility="gone" />
     </FrameLayout>
+
+    <!-- 底部大「+」：添加好友 / 发现·创建话题（原消息页 FAB + 右上角添加，合并入口） -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabAdd"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_margin="16dp"
+        android:contentDescription="添加"
+        android:src="@android:drawable/ic_input_add" />
 </LinearLayout>
