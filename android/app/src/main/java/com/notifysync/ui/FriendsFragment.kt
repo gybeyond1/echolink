@@ -193,26 +193,28 @@ class FriendsFragment : Fragment() {
     }
 
     private fun showHandleRequestDialog(req: FriendRequest) {
-        val options = arrayOf("同意", "拒绝", "忽略")
         AlertDialog.Builder(requireContext())
             .setTitle("${req.username} 请求加你为好友")
             .setMessage(if (req.message.isNullOrEmpty()) "验证消息：（无）" else "验证消息：${req.message}")
-            .setItems(options) { _, which ->
-                lifecycleScope.launch {
-                    try {
-                        when (which) {
-                            0 -> { ApiClient.acceptFriendRequest(req.id); Toast.makeText(requireContext(), "已同意，你们现在是好友了", Toast.LENGTH_SHORT).show() }
-                            1 -> { ApiClient.rejectFriendRequest(req.id); Toast.makeText(requireContext(), "已拒绝", Toast.LENGTH_SHORT).show() }
-                            2 -> { ApiClient.ignoreFriendRequest(req.id); Toast.makeText(requireContext(), "已忽略", Toast.LENGTH_SHORT).show() }
-                        }
-                        load()
-                    } catch (e: Exception) {
-                        Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-            .setNegativeButton("取消", null)
+            .setPositiveButton("同意") { _, _ -> handleFriendRequest(req, "accept") }
+            .setNegativeButton("拒绝") { _, _ -> handleFriendRequest(req, "reject") }
+            .setNeutralButton("忽略") { _, _ -> handleFriendRequest(req, "ignore") }
             .show()
+    }
+
+    private fun handleFriendRequest(req: FriendRequest, action: String) {
+        lifecycleScope.launch {
+            try {
+                when (action) {
+                    "accept" -> { ApiClient.acceptFriendRequest(req.id); Toast.makeText(requireContext(), "已同意，你们现在是好友了", Toast.LENGTH_SHORT).show() }
+                    "reject" -> { ApiClient.rejectFriendRequest(req.id); Toast.makeText(requireContext(), "已拒绝", Toast.LENGTH_SHORT).show() }
+                    else -> { ApiClient.ignoreFriendRequest(req.id); Toast.makeText(requireContext(), "已忽略", Toast.LENGTH_SHORT).show() }
+                }
+                load()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // ===== 添加好友（搜索用户名） =====
@@ -274,14 +276,26 @@ class FriendsFragment : Fragment() {
     }
 
     private fun sendRequest(user: SearchUser) {
-        lifecycleScope.launch {
-            try {
-                ApiClient.sendFriendRequest(user.username)
-                Toast.makeText(requireContext(), "已发送好友申请", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        val input = layoutInflater.inflate(R.layout.dialog_input_single, null)
+        val et = input.findViewById<TextInputEditText>(R.id.etInput)
+        et.hint = "验证消息（选填）"
+        AlertDialog.Builder(requireContext())
+            .setTitle("添加好友")
+            .setMessage("向 ${user.displayName ?: user.username} 发送好友申请")
+            .setView(input)
+            .setPositiveButton("发送申请") { _, _ ->
+                val message = et.text?.toString()?.trim() ?: ""
+                lifecycleScope.launch {
+                    try {
+                        ApiClient.sendFriendRequest(user.username, message)
+                        Toast.makeText(requireContext(), "已发送好友申请", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
-        }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     // ===== 好友列表 Adapter =====
