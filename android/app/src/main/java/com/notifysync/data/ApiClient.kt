@@ -299,9 +299,69 @@ object ApiClient {
         execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/requests/$requestId/reject", "POST"))
     }
 
+    // 审批忽略（保留申请记录但不处理，列表不再提示）
+    suspend fun ignoreTopicRequest(topic: String, requestId: Long) {
+        execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/requests/$requestId/ignore", "POST"))
+    }
+
     // 退出话题（成员）
     suspend fun leaveTopic(topic: String) {
         execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/leave", "POST"))
+    }
+
+    // ===== 好友（通讯录） =====
+
+    // 搜索用户（加好友用）
+    suspend fun searchUsers(q: String): List<SearchUser> {
+        val json = execute(buildRequest("/api/friends/search?q=${java.net.URLEncoder.encode(q, "UTF-8")}", "GET"))
+        return parseSearchUsers(json.getJSONArray("users"))
+    }
+
+    // 发送好友申请
+    suspend fun sendFriendRequest(username: String, message: String = ""): JSONObject {
+        val body = JSONObject().put("username", username).put("message", message)
+        return execute(buildRequest("/api/friends/requests", "POST", body))
+    }
+
+    // 我收到的好友申请（含全部状态，UI 过滤 pending）
+    suspend fun getFriendRequests(): List<FriendRequest> {
+        val json = execute(buildRequest("/api/friends/requests", "GET"))
+        return parseFriendRequests(json.getJSONArray("incoming"))
+    }
+
+    suspend fun acceptFriendRequest(id: Long) {
+        execute(buildRequest("/api/friends/requests/$id/accept", "POST"))
+    }
+
+    suspend fun rejectFriendRequest(id: Long) {
+        execute(buildRequest("/api/friends/requests/$id/reject", "POST"))
+    }
+
+    suspend fun ignoreFriendRequest(id: Long) {
+        execute(buildRequest("/api/friends/requests/$id/ignore", "POST"))
+    }
+
+    // 好友列表
+    suspend fun getFriends(): List<Friend> {
+        val json = execute(buildRequest("/api/friends", "GET"))
+        return parseFriends(json.getJSONArray("friends"))
+    }
+
+    // 删除好友（双向）
+    suspend fun deleteFriend(username: String) {
+        execute(buildRequest("/api/friends/${java.net.URLEncoder.encode(username, "UTF-8")}", "DELETE"))
+    }
+
+    // 打开/创建与好友的私聊会话，返回 (topic名, 对方用户名)
+    suspend fun openFriendChat(username: String): Pair<String, String> {
+        val json = execute(buildRequest("/api/friends/chat/${java.net.URLEncoder.encode(username, "UTF-8")}", "POST"))
+        return Pair(json.getString("topic"), json.getString("title"))
+    }
+
+    // 统一「新的申请」汇总（好友申请 + 我创建话题的加群申请）
+    suspend fun getAllRequests(): UnifiedRequests {
+        val json = execute(buildRequest("/api/requests", "GET"))
+        return parseUnifiedRequests(json)
     }
 
     // ===== 健康检查 =====

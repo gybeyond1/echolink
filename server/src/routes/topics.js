@@ -18,7 +18,13 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ext);
   },
 });
-const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
+// 上传大小硬限：默认 0 = 不限制（multer 层不设限）。
+// 如需限制（比如反代或磁盘有限），设置环境变量 MAX_UPLOAD_MB=100。
+const MAX_UPLOAD_MB = parseFloat(process.env.MAX_UPLOAD_MB || "0") || 0;
+const upload = multer({
+  storage,
+  ...(MAX_UPLOAD_MB > 0 ? { limits: { fileSize: Math.round(MAX_UPLOAD_MB * 1024 * 1024) } } : {}),
+});
 
 // 安全删除：某些环境（如受限沙箱）会在 unlink 时抛错，这里吞掉异常，
 // 避免"拒绝超大文件"等正常分支意外把整个服务进程搞崩。
@@ -33,14 +39,53 @@ function getMembership(topicId, userId) {
   return getDB().prepare("SELECT * FROM topic_members WHERE topic_id = ? AND user_id = ?").get(topicId, userId);
 }
 
+// 确保同账号「设备会话」存在：u{userId}-devices，kind='devices'。
+// 同一账号所有设备自动进入这个会话；置顶、不可删除、不可退出。
+function ensureDeviceTopic(userId) {
+  const db = getDB();
+  const name = `u${userId}-devices`;
+  let topic = getTopic(name);
+  if (!topic) {
+    db.prepare("INSERT INTO topics (name, owner_id, title, description, kind) VALUES (?, ?, ?, '', 'devices')")
+      .run(name, userId, "我的设备");
+    topic = getTopic(name);
+  }
+  db.prepare("INSERT OR IGNORE INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'member')").run(topic.id, userId);
+  return topic;
+}
+
+// 确保好友私聊话题存在：dm-{minId}-{maxId}，kind='dm'，成员仅两人
+function ensureDmTopic(userA, userB) {
+  const db = getDB();
+  const a = Math.min(userA, userB);
+  const b = Math.max(userA, userB);
+  const name = `dm-${a}-${b}`;
+  let topic = getTopic(name);
+  if (!topic) {
+    db.prepare("INSERT INTO topics (name, owner_id, title, description, kind) VALUES (?, ?, ?, '', 'dm')").run(name, a, "");
+    topic = getTopic(name);
+  }
+  db.prepare("INSERT OR IGNORE INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'member')").run(topic.id, userA);
+  db.prepare("INSERT OR IGNORE INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'member')").run(topic.id, userB);
+  return topic;
+}
+
 // 列出我参与（成员）的话题
 // GET /api/topics
 router.get("/", authMiddleware, (req, res) => {
   const db = getDB();
+  // 每次拉取都确保设备默认会话存在（登录后的兜底，防旧账号缺失）
+  ensureDeviceTopic(req.userId);
   const topics = db
     .prepare(
-      `SELECT t.id, t.name, t.title, t.description, t.owner_id, u.username as owner_name,
+      `SELECT t.id, t.name, t.title, t.description, t.owner_id, t.kind, u.username as owner_name,
               m.role as my_role,
+              CASE t.kind
+                WHEN 'devices' THEN '我的设备'
+                WHEN 'dm' THEN (SELECT u2.username FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id
+                                WHERE m2.topic_id = t.id AND m2.user_id != ? LIMIT 1)
+                ELSE t.name
+              END as display_name,
               (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name) as message_count,
               (SELECT MAX(timestamp) FROM topic_messages tm WHERE tm.topic = t.name) as last_message_at,
               (SELECT text FROM topic_messages tm WHERE tm.topic = t.name ORDER BY id DESC LIMIT 1) as last_message,
@@ -49,9 +94,10 @@ router.get("/", authMiddleware, (req, res) => {
        JOIN topic_members m ON m.topic_id = t.id
        LEFT JOIN users u ON t.owner_id = u.id
        WHERE m.user_id = ?
-       ORDER BY last_message_at DESC, t.created_at DESC LIMIT 100`
+       ORDER BY CASE t.kind WHEN 'devices' THEN 0 WHEN 'dm' THEN 1 ELSE 2 END, last_message_at DESC, t.created_at DESC
+       LIMIT 100`
     )
-    .all(req.userId);
+    .all(req.userId, req.userId);
   res.json({ topics });
 });
 
@@ -64,7 +110,8 @@ router.get("/discover", authMiddleware, (req, res) => {
               (SELECT COUNT(*) FROM topic_members tm WHERE tm.topic_id = t.id) as member_count,
               (SELECT COUNT(*) FROM topic_messages tm2 WHERE tm2.topic = t.name) as message_count
        FROM topics t LEFT JOIN users u ON t.owner_id = u.id
-       WHERE NOT EXISTS (SELECT 1 FROM topic_members m WHERE m.topic_id = t.id AND m.user_id = ?)
+       WHERE (t.kind IS NULL OR t.kind = 'normal')
+       AND NOT EXISTS (SELECT 1 FROM topic_members m WHERE m.topic_id = t.id AND m.user_id = ?)
        ${q ? "AND t.name LIKE ?" : ""}
        ORDER BY t.created_at DESC LIMIT 50`;
   const rows = q ? db.prepare(sql).all(req.userId, "%" + q + "%") : db.prepare(sql).all(req.userId);
@@ -100,6 +147,10 @@ router.post("/:topic/join", authMiddleware, (req, res) => {
   const db = getDB();
   const topic = getTopic(name);
   if (!topic) return res.status(404).json({ error: "Topic not found" });
+  // 设备会话/好友私聊不允许外部申请加入
+  if (topic.kind === "devices" || topic.kind === "dm") {
+    return res.status(403).json({ error: "This topic does not accept join requests" });
+  }
   if (getMembership(topic.id, req.userId)) return res.status(409).json({ error: "You are already a member" });
   const existing = db.prepare("SELECT * FROM topic_join_requests WHERE topic_id = ? AND user_id = ?").get(topic.id, req.userId);
   if (existing && existing.status === "pending") {
@@ -109,7 +160,7 @@ router.post("/:topic/join", authMiddleware, (req, res) => {
     "INSERT OR REPLACE INTO topic_join_requests (topic_id, user_id, status, message, requested_at, handled_at) VALUES (?, ?, 'pending', ?, datetime('now'), NULL)"
   ).run(topic.id, req.userId, String(req.body.message || "").slice(0, 300));
 
-  // 通知话题创建者有人申请加入（写入其通知列表，创建者顶部会看到「待审批」提示）
+  // 通知话题创建者有人申请加入（写入其通知列表 + WS 实时推送，创建者话题页「新的申请」即时出现）
   try {
     db.prepare(
       `INSERT INTO notifications (user_id, device_id, package_name, app_name, title, text, timestamp)
@@ -123,6 +174,13 @@ router.post("/:topic/join", authMiddleware, (req, res) => {
   } catch (e) {
     console.error("[topics] notify owner failed:", e);
   }
+  try {
+    const { broadcastToUser } = require("../websocket");
+    broadcastToUser(topic.owner_id, {
+      type: "topic_request",
+      data: { topic: name, request_id: Number(process.hrtime.bigint()), username: req.username || "某用户" },
+    });
+  } catch (e) { /* WS 推送失败不影响申请 */ }
 
   res.status(201).json({ message: "Join request sent, awaiting owner approval", status: "pending" });
 });
@@ -170,10 +228,11 @@ router.get("/:topic/requests", authMiddleware, (req, res) => {
   res.json({ requests });
 });
 
-// 审批通过 / 拒绝
-// POST /api/topics/:topic/requests/:id/approve | /reject
+// 审批通过 / 拒绝 / 忽略
+// POST /api/topics/:topic/requests/:id/approve | /reject | /ignore
 router.post("/:topic/requests/:id/approve", authMiddleware, (req, res) => handleRequest(req, res, "approved"));
 router.post("/:topic/requests/:id/reject", authMiddleware, (req, res) => handleRequest(req, res, "rejected"));
+router.post("/:topic/requests/:id/ignore", authMiddleware, (req, res) => handleRequest(req, res, "ignored"));
 
 function handleRequest(req, res, status) {
   const name = normalizeTopic(req.params.topic);
@@ -183,7 +242,7 @@ function handleRequest(req, res, status) {
   if (!topic) return res.status(404).json({ error: "Topic not found" });
   const mem = getMembership(topic.id, req.userId);
   if (!(mem && mem.role === "owner") && req.role !== "admin") {
-    return res.status(403).json({ error: "Only the topic owner or admin can handle requests" });
+    return res.status(403).json({ error: "Only the topic owner can handle requests" });
   }
   const reqRow = db.prepare("SELECT * FROM topic_join_requests WHERE id = ? AND topic_id = ?").get(parseInt(req.params.id), topic.id);
   if (!reqRow) return res.status(404).json({ error: "Request not found" });
@@ -191,6 +250,14 @@ function handleRequest(req, res, status) {
   if (status === "approved" && !getMembership(topic.id, reqRow.user_id)) {
     db.prepare("INSERT OR IGNORE INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'member')").run(topic.id, reqRow.user_id);
   }
+  // WS 通知申请人审批结果（客户端用于刷新话题列表）
+  try {
+    const { broadcastToUser } = require("../websocket");
+    broadcastToUser(reqRow.user_id, {
+      type: "topic_request_handled",
+      data: { topic: name, status },
+    });
+  } catch (e) { /* ignore */ }
   res.json({ message: "Request " + status, request: { id: reqRow.id, status } });
 }
 
@@ -202,6 +269,9 @@ router.post("/:topic/leave", authMiddleware, (req, res) => {
   const db = getDB();
   const topic = getTopic(name);
   if (!topic) return res.status(404).json({ error: "Topic not found" });
+  // 设备会话不可退出；好友私聊通过删除好友处理
+  if (topic.kind === "devices") return res.status(400).json({ error: "设备会话不可退出" });
+  if (topic.kind === "dm") return res.status(400).json({ error: "私聊会话不可退出（删除好友即可）" });
   const mem = getMembership(topic.id, req.userId);
   if (!mem) return res.status(404).json({ error: "You are not a member" });
   if (mem.role === "owner") return res.status(400).json({ error: "Owner cannot leave; delete the topic instead" });
@@ -224,7 +294,7 @@ router.post("/:topic/media", authMiddleware, (req, res) => {
       return res.status(400).json({ error: "无效的媒体类型" });
     }
     const limit = getMediaLimitBytes(kind);
-    if (file.size > limit) {
+    if (limit > 0 && file.size > limit) {
       safeUnlink(file.path);
       return res.status(413).json({ error: `文件大小超过上限（${Math.round(limit / 1024 / 1024)}MB）` });
     }
@@ -267,9 +337,21 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
   let topic = getTopic(name);
   // 首次发布且话题不存在：自动创建，发布者成为 owner（保持"输入即建"的易用性）
   if (!topic) {
-    const info = db.prepare("INSERT INTO topics (name, owner_id, title, description) VALUES (?, ?, ?, ?)").run(name, req.userId, name, "");
+    const info = db.prepare("INSERT INTO topics (name, owner_id, title, description, kind) VALUES (?, ?, ?, ?, 'normal')").run(name, req.userId, name, "");
     topic = { id: info.lastInsertRowid, name };
     db.prepare("INSERT INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'owner')").run(topic.id, req.userId);
+  } else if (topic.kind === "devices" || topic.kind === "dm") {
+    // 设备会话：仅同账号；私聊：仅 dm-<a>-<b> 中的两位好友（名字里就能校验）
+    let allowed = false;
+    if (topic.kind === "devices") {
+      allowed = req.userId === topic.owner_id || req.role === "admin";
+    } else {
+      const m = /^dm-(\d+)-(\d+)$/.exec(name);
+      allowed = !!m && (req.userId === parseInt(m[1]) || req.userId === parseInt(m[2]) || req.role === "admin");
+    }
+    if (!allowed) return res.status(403).json({ error: "You are not a member of this topic" });
+    // 兜底补齐成员关系（历史数据可能缺）
+    db.prepare("INSERT OR IGNORE INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'member')").run(topic.id, req.userId);
   } else if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
     return res.status(403).json({ error: "You are not a member of this topic. Request to join first." });
   }
@@ -373,6 +455,9 @@ router.delete("/:topic", authMiddleware, (req, res) => {
   const db = getDB();
   const topic = getTopic(name);
   if (!topic) return res.status(404).json({ error: "Topic not found" });
+  // 设备会话/好友私聊不可删除
+  if (topic.kind === "devices") return res.status(400).json({ error: "设备会话不可删除" });
+  if (topic.kind === "dm") return res.status(400).json({ error: "私聊会话不可删除" });
   const mem = getMembership(topic.id, req.userId);
   if (!(mem && mem.role === "owner") && req.role !== "admin") {
     return res.status(403).json({ error: "Only the topic owner or admin can delete this topic" });
@@ -383,3 +468,5 @@ router.delete("/:topic", authMiddleware, (req, res) => {
 });
 
 module.exports = router;
+module.exports.ensureDmTopic = ensureDmTopic;
+module.exports.ensureDeviceTopic = ensureDeviceTopic;

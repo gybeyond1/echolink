@@ -138,13 +138,40 @@ function initDB() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       topic_id INTEGER NOT NULL,
       user_id INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'approved' | 'rejected'
+      status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'approved' | 'rejected' | 'ignored'
       message TEXT,
       requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       handled_at DATETIME,
       FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       UNIQUE(topic_id, user_id)
+    )
+  `);
+
+  // ===== 好友系统 =====
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS friends (
+      user_id INTEGER NOT NULL,
+      friend_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, friend_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_user INTEGER NOT NULL,
+      to_user INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'accepted' | 'rejected' | 'ignored'
+      message TEXT,
+      requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      handled_at DATETIME,
+      FOREIGN KEY (from_user) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (to_user) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(from_user, to_user)
     )
   `);
 
@@ -183,15 +210,32 @@ function initDB() {
     }
   });
 
+  // 话题类型列：normal=普通群聊 | devices=同账号设备默认会话（置顶不可删）| dm=好友两人私聊
+  const topicCols = db.pragma("table_info(topics)").map((c) => c.name);
+  if (!topicCols.includes("kind")) {
+    db.exec("ALTER TABLE topics ADD COLUMN kind TEXT NOT NULL DEFAULT 'normal'");
+  }
+
+  // 一次性迁移：默认放开媒体大小限制（0 = 不限制）。
+  // 用户之后仍可在 Web 管理后台自行设置具体上限。
+  const marker = db.prepare("SELECT value FROM settings WHERE key = 'migrated_unlimited_media'").get();
+  if (!marker) {
+    ["max_image_size", "max_voice_size", "max_file_size"].forEach((k) => {
+      db.prepare("INSERT INTO settings (key, value) VALUES (?, '0') ON CONFLICT(key) DO UPDATE SET value = '0'").run(k);
+    });
+    db.prepare("INSERT INTO settings (key, value) VALUES ('migrated_unlimited_media', '1') ON CONFLICT(key) DO UPDATE SET value = '1'").run();
+    console.log("[DB] Media size limits reset to 0 (unlimited); adjust in admin WebUI if needed");
+  }
+
   console.log("[DB] SQLite initialized at", dbPath);
   return db;
 }
 
 // ===== 服务器设置（带内存缓存）=====
 const SETTINGS_DEFAULTS = {
-  max_image_size: "10", // MB
-  max_voice_size: "5",  // MB
-  max_file_size: "20",  // MB
+  max_image_size: "0", // MB，0 = 不限制
+  max_voice_size: "0", // MB，0 = 不限制
+  max_file_size: "0",  // MB，0 = 不限制
   max_topic_history: "200",
 };
 
@@ -223,8 +267,11 @@ function getSetting(key) {
 }
 
 // 返回某类媒体的大小上限（字节）；kind: image|voice|file
+// 返回 0 表示不限制
 function getMediaLimitBytes(kind) {
-  const mb = parseFloat(getSetting(`max_${kind}_size`)) || 0;
+  const raw = getSetting(`max_${kind}_size`);
+  const mb = parseFloat(raw) || 0;
+  if (mb <= 0) return 0;
   return Math.round(mb * 1024 * 1024);
 }
 

@@ -76,6 +76,7 @@ app.use("/api/devices", require("./routes/devices"));
 app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/filters", require("./routes/filters"));
 app.use("/api/topics", require("./routes/topics"));
+app.use("/api", require("./routes/friends"));
 app.use("/api/admin", require("./routes/admin"));
 
 // 静态管理界面（WebUI）

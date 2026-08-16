@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         binding.bottomNav.setOnItemSelectedListener { item ->
             val fragment: Fragment = when (item.itemId) {
                 com.notifysync.R.id.nav_notifications -> NotificationsFragment()
+                com.notifysync.R.id.nav_friends -> FriendsFragment()
                 com.notifysync.R.id.nav_topic -> TopicFragment()
                 com.notifysync.R.id.nav_settings -> SettingsFragment()
                 else -> return@setOnItemSelectedListener false
@@ -92,10 +93,13 @@ class MainActivity : AppCompatActivity() {
             .commit()
     }
 
-    /** 打开话题页并定位到指定话题（用于点击状态栏话题通知） */
-    fun openTopic(topic: String) {
+    /** 打开话题页并定位到指定话题（用于点击状态栏话题通知 / 好友私聊入口） */
+    fun openTopic(topic: String, title: String? = null) {
         val frag = TopicFragment()
-        frag.arguments = Bundle().apply { putString("topic", topic) }
+        frag.arguments = Bundle().apply {
+            putString("topic", topic)
+            if (title != null) putString("title", title)
+        }
         switchFragment(frag)
         // 仅高亮底栏，不触发 onItemSelected 以免丢失话题参数
         binding.bottomNav.menu.findItem(com.notifysync.R.id.nav_topic)?.isChecked = true

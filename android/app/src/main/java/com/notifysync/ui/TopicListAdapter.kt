@@ -21,12 +21,10 @@ class TopicListAdapter(
 
     fun setItems(list: List<MyTopic>) {
         items.clear()
-        items.addAll(list.sortedByDescending { it.lastMessageAtOrCount() })
+        // 直接采用服务端排序：devices（置顶）→ dm → normal（按最近消息时间）
+        items.addAll(list)
         notifyDataSetChanged()
     }
-
-    // 排序：有最新消息时间的按时间，否则按消息数
-    private fun MyTopic.lastMessageAtOrCount(): Long = (System.currentTimeMillis())
 
     fun getItem(position: Int): MyTopic = items[position]
     fun getItems(): List<MyTopic> = items
@@ -48,11 +46,12 @@ class TopicListAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
-        holder.tvAvatar.text = item.name.firstOrNull()?.uppercase()?.toString() ?: "#"
-        holder.tvName.text = item.name
+        val display = item.displayName ?: item.name
+        holder.tvAvatar.text = display.firstOrNull()?.uppercase()?.toString() ?: "#"
+        holder.tvName.text = display
 
-        // 角色标签
-        if (item.myRole == "owner") {
+        // 角色标签（设备/私聊会话不显示）
+        if (item.myRole == "owner" && item.kind == "normal") {
             holder.tvRole.visibility = View.VISIBLE
             holder.tvRole.text = "创建者"
         } else {
