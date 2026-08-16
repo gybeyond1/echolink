@@ -19,7 +19,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.textfield.TextInputEditText
 import com.notifysync.R
+import android.widget.ArrayAdapter
 import com.notifysync.data.ApiClient
+import com.notifysync.data.ApiException
+import com.notifysync.data.DiscoverTopic
+import java.util.regex.Pattern
 import com.notifysync.data.Friend
 import com.notifysync.data.FriendRequest
 import com.notifysync.data.SearchUser
@@ -31,7 +35,7 @@ import kotlinx.coroutines.launch
  * - 列表展示好友，点击进入私聊（dm 话题，复用话题聊天全套能力）
  * - 长按好友删除
  * - 「新的朋友」：收到的好友申请，可同意/拒绝/忽略
- * - 右上角「+」：搜索用户名添加好友
+ * - 底部大「+」：添加好友 / 发现·创建话题
  */
 class FriendsFragment : Fragment() {
     private var _binding: FragmentFriendsBinding? = null
@@ -61,7 +65,7 @@ class FriendsFragment : Fragment() {
         binding.rvFriends.layoutManager = LinearLayoutManager(requireContext())
         binding.rvFriends.adapter = friendAdapter
 
-        binding.btnAddFriend.setOnClickListener { showAddFriendDialog() }
+        binding.fabAdd.setOnClickListener { showFabMenu() }
         binding.rowNewFriends.setOnClickListener { showNewFriendsDialog() }
 
         // 全面屏沉浸式：顶部栏避开状态栏
@@ -292,6 +296,90 @@ class FriendsFragment : Fragment() {
                     } catch (e: Exception) {
                         Toast.makeText(requireContext(), "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    // ===== 大「+」菜单：添加好友 / 发现·创建话题 =====
+
+    private fun showFabMenu() {
+        val options = arrayOf("添加好友", "发现 / 创建话题")
+        AlertDialog.Builder(requireContext())
+            .setTitle("添加")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showAddFriendDialog()
+                    1 -> showDiscoverDialog()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showDiscoverDialog() {
+        val layout = requireActivity().layoutInflater.inflate(R.layout.dialog_discover_topic, null)
+        val etName = layout.findViewById<TextInputEditText>(R.id.etJoinName)
+        val listView = layout.findViewById<android.widget.ListView>(R.id.lvDiscover)
+        val empty = layout.findViewById<android.widget.TextView>(R.id.tvDiscoverEmpty)
+        val btnJoin = layout.findViewById<android.widget.Button>(R.id.btnJoinByName)
+        btnJoin.text = "创建/加入"
+
+        val dialog = AlertDialog.Builder(requireContext()).setTitle("发现 / 创建话题").setView(layout).setNegativeButton("关闭", null).create()
+
+        val items = mutableListOf<DiscoverTopic>()
+        val adapterList = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, mutableListOf<String>())
+        listView.adapter = adapterList
+        listView.setOnItemClickListener { _, _, pos, _ -> items.getOrNull(pos)?.let { requestJoin(it.name, dialog) } }
+
+        fun refresh() {
+            lifecycleScope.launch {
+                try {
+                    val list = ApiClient.getDiscoverTopics()
+                    items.clear(); items.addAll(list)
+                    adapterList.clear(); adapterList.addAll(list.map { "#${it.name}  (创建者 ${it.ownerName ?: "-"} · ${it.memberCount}人)" }); adapterList.notifyDataSetChanged()
+                    empty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+                } catch (e: Exception) { Toast.makeText(requireContext(), "加载失败: ${e.message}", Toast.LENGTH_SHORT).show() }
+            }
+        }
+        refresh()
+
+        btnJoin.setOnClickListener {
+            val n = etName.text?.toString()?.trim()?.lowercase() ?: ""
+            if (!Pattern.matches("^[a-z0-9_-]{1,64}$", n)) { Toast.makeText(requireContext(), "话题名不合法", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+            // 先尝试创建：已存在则返回 409 -> 转为申请加入
+            lifecycleScope.launch {
+                try {
+                    ApiClient.createTopic(n, "", "")
+                    Toast.makeText(requireContext(), "话题已创建（你是创建者）", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                    (activity as? MainActivity)?.openTopic(n)
+                } catch (e: Exception) {
+                    if (e is ApiException && e.code == 409) {
+                        requestJoin(n, dialog)
+                    } else {
+                        Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun requestJoin(name: String, dialog: AlertDialog) {
+        val input = layoutInflater.inflate(R.layout.dialog_input_single, null)
+        val et = input.findViewById<TextInputEditText>(R.id.etInput)
+        et.hint = "验证消息（选填）"
+        AlertDialog.Builder(requireContext())
+            .setTitle("申请加入「$name」")
+            .setMessage("填写验证消息发送加群申请")
+            .setView(input)
+            .setPositiveButton("发送申请") { _, _ ->
+                val message = et.text?.toString()?.trim() ?: ""
+                lifecycleScope.launch {
+                    try { ApiClient.requestJoinTopic(name, message); Toast.makeText(requireContext(), "已发送加入申请，等待创建者审批", Toast.LENGTH_SHORT).show(); dialog.dismiss() }
+                    catch (e: Exception) { Toast.makeText(requireContext(), "申请失败: ${e.message}", Toast.LENGTH_SHORT).show() }
                 }
             }
             .setNegativeButton("取消", null)

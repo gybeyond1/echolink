@@ -178,7 +178,7 @@
                 android:id="@+id/tvEmptyTopics"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="还没有话题\n点击底部「+」发现或新建话题"
+                android:text="还没有话题\n到「好友」页点「+」发现或新建话题"
                 android:gravity="center"
                 android:padding="48dp"
                 android:textColor="@color/on_surface_variant"
@@ -370,17 +370,6 @@
 
         </FrameLayout>
     </LinearLayout>
-
-    <!-- 底部「+」新建话题（仅列表态显示） -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabAddTopic"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="end"
-        android:layout_margin="16dp"
-        android:contentDescription="新建话题"
-        android:src="@android:drawable/ic_input_add"
-        android:visibility="gone" />
 
     <ProgressBar
         android:id="@+id/progressBar"
