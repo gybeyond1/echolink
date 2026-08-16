@@ -21,6 +21,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
@@ -100,32 +103,8 @@ class SettingsFragment : Fragment() {
             startActivity(intent)
         }
 
-        // 打赏支持（跳微信付款码）
-        binding.llDonate.setOnClickListener {
-            try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                // 先检查是否有应用能处理 wxp:// scheme
-                val pm = requireContext().packageManager
-                val resolved = intent.resolveActivity(pm)
-                if (resolved != null) {
-                    startActivity(intent)
-                } else {
-                    // 直接指定微信包名尝试启动
-                    intent.setPackage("com.tencent.mm")
-                    try {
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        // 微信未安装或版本不支持，复制链接到剪贴板
-                        val cm = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        cm.setPrimaryClip(android.content.ClipData.newPlainText("打赏链接", DONATE_URL))
-                        Toast.makeText(requireContext(), "微信未安装或版本不支持，打赏链接已复制到剪贴板", Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "无法打开微信，请确认已安装微信", Toast.LENGTH_SHORT).show()
-            }
-        }
+        // 打赏支持（微信收款二维码）
+        binding.llDonate.setOnClickListener { showDonateQrDialog() }
 
         // 外观主题切换
         setupThemeToggle()
@@ -343,6 +322,36 @@ class SettingsFragment : Fragment() {
     }
 
     // ===== 外观主题切换 =====
+
+    private fun showDonateQrDialog() {
+        val ctx = requireContext()
+        val dp = ctx.resources.displayMetrics.density
+        val pad = (20 * dp).toInt()
+
+        val imageView = ImageView(ctx)
+        imageView.setImageResource(R.drawable.donate_qr)
+        imageView.setPadding(pad, pad, pad, pad)
+        imageView.adjustViewBounds = true
+
+        val hint = TextView(ctx)
+        hint.text = "用微信「扫一扫」扫码打赏，感谢支持！"
+        hint.textSize = 14f
+        hint.gravity = android.view.Gravity.CENTER
+        hint.setPadding(0, 0, 0, pad)
+
+        val root = LinearLayout(ctx)
+        root.orientation = LinearLayout.VERTICAL
+        root.addView(imageView, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        root.addView(hint, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        AlertDialog.Builder(ctx)
+            .setTitle("打赏支持")
+            .setView(root)
+            .setPositiveButton("知道了", null)
+            .show()
+    }
 
     private fun setupThemeToggle() {
         when (AuthManager.themeMode) {
