@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- 顶部栏 -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="通讯录"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnAddFriend"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_plus"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="添加好友"
+            android:scaleType="centerInside" />
+    </LinearLayout>
+
+    <!-- 新的朋友（好友申请入口，带红点） -->
+    <LinearLayout
+        android:id="@+id/rowNewFriends"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:background="?attr/selectableItemBackground">
+
+        <TextView
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:gravity="center"
+            android:text="✦"
+            android:textSize="20sp"
+            android:textColor="@android:color/white"
+            android:background="@drawable/bg_circle_avatar" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="新的朋友"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tvNewBadge"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:gravity="center"
+            android:textSize="11sp"
+            android:textColor="@android:color/white"
+            android:background="@drawable/bg_pending_badge"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/on_surface_variant"
+        android:alpha="0.15" />
+
+    <!-- 好友列表 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvFriends"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvEmptyFriends"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="还没有好友\n点右上角「+」搜索用户名添加"
+            android:gravity="center"
+            android:padding="48dp"
+            android:textColor="@color/on_surface_variant"
+            android:textSize="16sp"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

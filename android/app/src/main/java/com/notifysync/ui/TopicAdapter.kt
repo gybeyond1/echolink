@@ -21,6 +21,7 @@ import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.notifysync.R
 import com.notifysync.data.AuthManager
+import com.notifysync.data.P2pManager
 import com.notifysync.data.TopicMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -167,20 +168,59 @@ class TopicAdapter(
 
         // 普通模式单击：按落点打开媒体
         private fun openMediaIfHit(item: TopicMessage, ev: MotionEvent) {
+            val ctx = itemView.context
             when {
                 ivMedia.visibility == View.VISIBLE && inViewBounds(ivMedia, ev) -> {
                     if (!item.mediaUrl.isNullOrEmpty()) onImageClick?.invoke(fullUrl(item.mediaUrl))
                 }
                 llVoice.visibility == View.VISIBLE && inViewBounds(llVoice, ev) -> {
-                    if (!item.mediaUrl.isNullOrEmpty()) playVoice(fullUrl(item.mediaUrl))
-                }
-                llFile.visibility == View.VISIBLE && inViewBounds(llFile, ev) -> {
                     if (!item.mediaUrl.isNullOrEmpty()) {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl(item.mediaUrl)))
-                        try { itemView.context.startActivity(intent) } catch (_: Exception) {}
+                        // P2P 消息：优先播本地落地文件
+                        val local = P2pManager.localP2pFile(ctx, item.mediaUrl)
+                        if (local != null) playVoice(local.absolutePath)
+                        else playVoice(fullUrl(item.mediaUrl))
                     }
                 }
+                llFile.visibility == View.VISIBLE && inViewBounds(llFile, ev) -> {
+                    if (!item.mediaUrl.isNullOrEmpty()) openFile(ctx, item)
+                }
             }
+        }
+
+        // 文件打开：P2P 本地文件走 FileProvider；服务器文件走 URL
+        private fun openFile(ctx: Context, item: TopicMessage) {
+            val local = P2pManager.localP2pFile(ctx, item.mediaUrl!!)
+            if (local != null) {
+                try {
+                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                        ctx, "${ctx.packageName}.fileprovider", local
+                    )
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, guessMime(item.mediaName))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    ctx.startActivity(intent)
+                } catch (e: Exception) {
+                    Toast.makeText(ctx, "没有应用能打开该文件", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl(item.mediaUrl)))
+                try { ctx.startActivity(intent) } catch (_: Exception) {}
+            }
+        }
+
+        private fun guessMime(name: String?): String = when {
+            name == null -> "*/*"
+            name.endsWith(".jpg", true) || name.endsWith(".jpeg", true) -> "image/jpeg"
+            name.endsWith(".png", true) -> "image/png"
+            name.endsWith(".gif", true) -> "image/gif"
+            name.endsWith(".webp", true) -> "image/webp"
+            name.endsWith(".mp4", true) -> "video/mp4"
+            name.endsWith(".mp3", true) -> "audio/mpeg"
+            name.endsWith(".m4a", true) || name.endsWith(".aac", true) -> "audio/mp4"
+            name.endsWith(".pdf", true) -> "application/pdf"
+            name.endsWith(".txt", true) -> "text/plain"
+            else -> "*/*"
         }
 
         private fun inViewBounds(v: View, ev: MotionEvent): Boolean {
@@ -216,14 +256,17 @@ class TopicAdapter(
             when (item.mediaType) {
                 "image" -> {
                     holder.ivMedia.visibility = View.VISIBLE
-                    loadImage(fullUrl(item.mediaUrl!!), holder.ivMedia)
+                    val local = P2pManager.localP2pFile(holder.itemView.context, item.mediaUrl)
+                    if (local != null) loadLocalImage(local, holder.ivMedia)
+                    else loadImage(fullUrl(item.mediaUrl!!), holder.ivMedia)
                 }
                 "voice" -> {
                     holder.llVoice.visibility = View.VISIBLE
                 }
                 "file" -> {
                     holder.llFile.visibility = View.VISIBLE
-                    holder.tvFile.text = "📄 ${item.mediaName ?: "文件"}  (${formatSize(item.mediaSize)})"
+                    val suffix = if (item.mediaUrl?.startsWith("p2p:") == true) " · P2P直传" else ""
+                    holder.tvFile.text = "📄 ${item.mediaName ?: "文件"}  (${formatSize(item.mediaSize)})$suffix"
                 }
             }
         }
@@ -264,8 +307,19 @@ class TopicAdapter(
     override fun getItemCount(): Int = items.size
 
     private fun fullUrl(path: String): String {
+        if (path.startsWith("p2p:")) return path  // P2P 本地文件标识，非 URL
         val base = AuthManager.serverUrl.trimEnd('/')
         return if (path.startsWith("http")) path else "$base$path"
+    }
+
+    private fun loadLocalImage(file: File, iv: ImageView) {
+        iv.setImageBitmap(null)
+        scope.launch {
+            try {
+                val bmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(file.absolutePath) }
+                iv.setImageBitmap(bmp)
+            } catch (_: Exception) {}
+        }
     }
 
     private fun loadImage(url: String, iv: ImageView) {

@@ -78,6 +78,9 @@ dependencies {
     // OkHttp (HTTP + WebSocket)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // WebRTC（P2P 打洞直传文件；Google 官方 google-webrtc 已随 JCenter 下架，用 getstream 维护版）
+    implementation("io.getstream:stream-webrtc-android:1.1.1")
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 

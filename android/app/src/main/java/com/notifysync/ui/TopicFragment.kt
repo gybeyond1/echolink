@@ -42,9 +42,13 @@ import com.notifysync.R
 import com.notifysync.data.ApiClient
 import com.notifysync.data.AuthManager
 import com.notifysync.data.DiscoverTopic
+import com.notifysync.data.FriendRequest
 import com.notifysync.data.MyTopic
+import com.notifysync.data.P2pManager
 import com.notifysync.data.TopicJoinRequest
 import com.notifysync.data.TopicMessage
+import com.notifysync.data.UnifiedRequests
+import com.notifysync.data.UnifiedTopicRequest
 import com.notifysync.data.WebSocketClient
 import com.notifysync.data.parseTopicMessage
 import com.notifysync.databinding.FragmentTopicBinding
@@ -65,6 +69,7 @@ class TopicFragment : Fragment() {
     private val myTopics = mutableListOf<MyTopic>()
     private var currentTopic: String? = null
     private var chatTopic: MyTopic? = null
+    private var unifiedRequests = UnifiedRequests(emptyList(), emptyList())
 
     private var mediaRecorder: MediaRecorder? = null
     private var voiceFile: File? = null
@@ -74,20 +79,36 @@ class TopicFragment : Fragment() {
 
     private val topicReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val topic = intent?.getStringExtra("topic") ?: return
-            if (topic == currentTopic) {
-                val msg = TopicMessage(
-                    id = 0,
-                    topic = topic,
-                    title = intent.getStringExtra("title") ?: "",
-                    text = intent.getStringExtra("text") ?: "",
-                    senderName = intent.getStringExtra("sender_name") ?: "",
-                    timestamp = intent.getLongExtra("timestamp", System.currentTimeMillis()),
-                    deviceId = intent.getLongExtra("device_id", -1),
-                    deviceName = intent.getStringExtra("device_name")
-                )
-                chatAdapter.appendItems(listOf(msg))
-                scrollToBottom()
+            when (intent?.action) {
+                // 新的申请到达（好友申请/加群申请）：刷新置顶入口红点
+                "com.notifysync.REQUESTS_CHANGED" -> {
+                    if (binding.listLayout.visibility == View.VISIBLE) loadRequests()
+                }
+                // 好友关系变化：话题列表可能新增私聊会话
+                "com.notifysync.FRIENDS_CHANGED" -> {
+                    if (binding.listLayout.visibility == View.VISIBLE) loadTopicList()
+                }
+                else -> {
+                    val topic = intent?.getStringExtra("topic") ?: return
+                    if (topic == currentTopic) {
+                        val msg = TopicMessage(
+                            id = 0,
+                            topic = topic,
+                            title = intent.getStringExtra("title") ?: "",
+                            text = intent.getStringExtra("text") ?: "",
+                            senderName = intent.getStringExtra("sender_name") ?: "",
+                            timestamp = intent.getLongExtra("timestamp", System.currentTimeMillis()),
+                            deviceId = intent.getLongExtra("device_id", -1),
+                            deviceName = intent.getStringExtra("device_name"),
+                            mediaType = intent.getStringExtra("media_type") ?: "text",
+                            mediaUrl = intent.getStringExtra("media_url"),
+                            mediaName = intent.getStringExtra("media_name"),
+                            mediaSize = intent.getLongExtra("media_size", 0)
+                        )
+                        chatAdapter.appendItems(listOf(msg))
+                        scrollToBottom()
+                    }
+                }
             }
         }
     }
@@ -168,6 +189,9 @@ class TopicFragment : Fragment() {
         // 列表态：底部「+」= 发现 / 加入 / 创建（含新建）
         binding.fabAddTopic.setOnClickListener { showDiscoverDialog() }
 
+        // 列表态：「新的申请」入口（好友申请 + 加群申请）
+        binding.rowNewRequests.setOnClickListener { showRequestsDialog() }
+
         // 多选操作栏（右上角：全选 / 删除；退出多选用系统返回手势）
         binding.btnSelectAll.setOnClickListener { if (chatAdapter.isAllSelected) chatAdapter.clearSelection() else chatAdapter.selectAll(); updateSelectionUI() }
         binding.btnDeleteSel.setOnClickListener { confirmDeleteSelected() }
@@ -209,11 +233,39 @@ class TopicFragment : Fragment() {
 
         showListMode()
         listRefreshHandler.postDelayed(listRefreshRunnable, 15000)
+
+        // 外部入口定位到指定会话（状态栏通知 / 好友私聊）：列表加载完后直接进聊天态
+        val argTopic = arguments?.getString("topic")
+        if (!argTopic.isNullOrEmpty()) {
+            val argTitle = arguments?.getString("title")
+            lifecycleScope.launch {
+                try {
+                    val t = myTopics.find { it.name == argTopic }
+                        ?: ApiClient.getMyTopics().find { it.name == argTopic }
+                    if (t != null) showChatMode(t)
+                    else if (argTitle != null) {
+                        // 服务器暂无该会话（极少）：用展示名兜底构造
+                        showChatMode(
+                            MyTopic(argTopic, "member", 0, 0, null, null,
+                                kind = if (argTopic.startsWith("dm-")) "dm" else "normal",
+                                displayName = argTitle)
+                        )
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        requireActivity().registerReceiver(topicReceiver, IntentFilter("com.notifysync.TOPIC_MESSAGE_RECEIVED"), Context.RECEIVER_NOT_EXPORTED)
+        requireActivity().registerReceiver(
+            topicReceiver,
+            IntentFilter("com.notifysync.TOPIC_MESSAGE_RECEIVED").apply {
+                addAction("com.notifysync.REQUESTS_CHANGED")
+                addAction("com.notifysync.FRIENDS_CHANGED")
+            },
+            Context.RECEIVER_NOT_EXPORTED
+        )
         currentTopic?.let { WebSocketClient.sendSubscribe(it) }
     }
 
@@ -252,7 +304,7 @@ class TopicFragment : Fragment() {
         binding.tvTitleList.visibility = View.GONE
         backCallback.isEnabled = true
         binding.tvChatTitle.visibility = View.VISIBLE
-        binding.tvChatTitle.text = topic.name
+        binding.tvChatTitle.text = topic.displayName ?: topic.name
         binding.fabAddTopic.visibility = View.GONE
         binding.btnPending.visibility = if (topic.myRole == "owner" && topic.pendingRequests > 0) View.VISIBLE else View.GONE
         WebSocketClient.sendSubscribe(topic.name)
@@ -273,7 +325,100 @@ class TopicFragment : Fragment() {
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "话题列表加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+            loadRequests()
         }
+    }
+
+    // ===== 新的申请（好友申请 + 加群申请） =====
+
+    // 拉取统一申请汇总并更新置顶入口
+    private fun loadRequests() {
+        lifecycleScope.launch {
+            try {
+                unifiedRequests = ApiClient.getAllRequests()
+                val total = unifiedRequests.friendRequests.size + unifiedRequests.topicRequests.size
+                if (total > 0) {
+                    binding.rowNewRequests.visibility = View.VISIBLE
+                    binding.tvReqBadge.text = if (total > 99) "99+" else total.toString()
+                    binding.tvReqPreview.text =
+                        unifiedRequests.friendRequests.firstOrNull()?.let { "${it.username} 请求加你为好友" }
+                        ?: unifiedRequests.topicRequests.firstOrNull()?.let { "${it.username} 申请加入「${it.topic}」" }
+                        ?: ""
+                } else {
+                    binding.rowNewRequests.visibility = View.GONE
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    // 申请列表：好友申请在前，加群申请在后；点开单项可同意/拒绝/忽略
+    private fun showRequestsDialog() {
+        lifecycleScope.launch {
+            try {
+                unifiedRequests = ApiClient.getAllRequests()
+            } catch (_: Exception) {}
+            val fr = unifiedRequests.friendRequests
+            val tr = unifiedRequests.topicRequests
+            if (fr.isEmpty() && tr.isEmpty()) {
+                binding.rowNewRequests.visibility = View.GONE
+                Toast.makeText(requireContext(), "暂无新的申请", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val labels = fr.map { "【好友】${it.username}${if (!it.message.isNullOrEmpty()) "：${it.message}" else ""}" } +
+                tr.map { "【加群】${it.username} → ${it.topic}${if (!it.message.isNullOrEmpty()) "：${it.message}" else ""}" }
+            AlertDialog.Builder(requireContext())
+                .setTitle("新的申请")
+                .setItems(labels.toTypedArray()) { _, which ->
+                    if (which < fr.size) showHandleFriendRequest(fr[which])
+                    else showHandleTopicRequest(tr[which - fr.size])
+                }
+                .setNegativeButton("关闭", null)
+                .show()
+        }
+    }
+
+    private fun showHandleFriendRequest(req: FriendRequest) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("${req.username} 请求加你为好友")
+            .setMessage(if (req.message.isNullOrEmpty()) "验证消息：（无）" else "验证消息：${req.message}")
+            .setItems(arrayOf("同意", "拒绝", "忽略")) { _, which ->
+                lifecycleScope.launch {
+                    try {
+                        when (which) {
+                            0 -> { ApiClient.acceptFriendRequest(req.id); Toast.makeText(requireContext(), "已同意", Toast.LENGTH_SHORT).show() }
+                            1 -> { ApiClient.rejectFriendRequest(req.id); Toast.makeText(requireContext(), "已拒绝", Toast.LENGTH_SHORT).show() }
+                            2 -> { ApiClient.ignoreFriendRequest(req.id); Toast.makeText(requireContext(), "已忽略", Toast.LENGTH_SHORT).show() }
+                        }
+                        loadRequests()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showHandleTopicRequest(req: UnifiedTopicRequest) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("${req.username} 申请加入「${req.topic}」")
+            .setMessage(if (req.message.isNullOrEmpty()) "验证消息：（无）" else "验证消息：${req.message}")
+            .setItems(arrayOf("同意", "拒绝", "忽略")) { _, which ->
+                lifecycleScope.launch {
+                    try {
+                        when (which) {
+                            0 -> { ApiClient.approveTopicRequest(req.topic, req.id); Toast.makeText(requireContext(), "已同意加入", Toast.LENGTH_SHORT).show() }
+                            1 -> { ApiClient.rejectTopicRequest(req.topic, req.id); Toast.makeText(requireContext(), "已拒绝", Toast.LENGTH_SHORT).show() }
+                            2 -> { ApiClient.ignoreTopicRequest(req.topic, req.id); Toast.makeText(requireContext(), "已忽略", Toast.LENGTH_SHORT).show() }
+                        }
+                        loadRequests(); loadTopicList()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     // 只刷新徽标（待审批数），不打断滚动
@@ -285,11 +430,19 @@ class TopicFragment : Fragment() {
                 AuthManager.subscribedTopics = myTopics.map { it.name }.toSet()
                 listAdapter.setItems(myTopics)
             } catch (_: Exception) {}
+            loadRequests()
         }
     }
 
     // 长按菜单：打开 / 删除（从列表移除）/ 关闭（彻底关闭，仅创建者）
     private fun showTopicMenu(topic: MyTopic) {
+        if (topic.kind == "devices" || topic.kind == "dm") {
+            Toast.makeText(requireContext(),
+                if (topic.kind == "devices") "「我的设备」是默认会话，不可删除"
+                else "私聊会话不可删除（删除好友请到「好友」页长按）",
+                Toast.LENGTH_SHORT).show()
+            return
+        }
         val owner = topic.myRole == "owner"
         val options = mutableListOf("打开")
         if (owner) options.add("关闭话题（彻底关闭）") else options.add("删除（从我的列表移除）")
@@ -304,6 +457,11 @@ class TopicFragment : Fragment() {
     }
 
     private fun swipeDelete(topic: MyTopic) {
+        if (topic.kind == "devices" || topic.kind == "dm") {
+            Toast.makeText(requireContext(), "该会话不可删除", Toast.LENGTH_SHORT).show()
+            loadTopicList() // 还原被滑走的列表项
+            return
+        }
         if (topic.myRole == "owner") confirmCloseTopic(topic) else confirmLeaveTopic(topic)
     }
 
@@ -599,22 +757,59 @@ class TopicFragment : Fragment() {
         val mime = try { requireContext().contentResolver.getType(uri) } catch (_: Exception) { null }
         val kind = if (mime?.startsWith("image/") == true) "image" else "file"
         val file = copyUriToFile(uri) ?: return
+        val displayName = queryDisplayName(uri) ?: file.name
+        sendMediaSmart(topic, file, kind, displayName)
+    }
+
+    // 媒体发送统一入口：好友私聊（dm）优先 P2P 直连（不占服务器带宽），
+    // 30 秒打洞不成功自动回退 HTTP 上传（服务器中转兜底）；其他会话直接走 HTTP
+    private fun sendMediaSmart(topic: String, file: File, kind: String, name: String) {
         binding.progressBar.visibility = View.VISIBLE
-        lifecycleScope.launch {
-            try {
-                val json = ApiClient.uploadTopicMedia(topic, file, kind)
-                val url = json.getString("url")
-                val name = json.optString("name", file.name)
-                val size = json.optLong("size", file.length())
-                publish(topic, "", "", kind, url, name, size)
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "上传失败: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                binding.progressBar.visibility = View.GONE
-                try { file.delete() } catch (_: Exception) {}
-            }
+        if (chatTopic?.kind == "dm" && P2pManager.isReady) {
+            P2pManager.sendFileWithFallback(
+                requireContext(), topic, file, kind, name,
+                onFallback = {
+                    Toast.makeText(requireContext(), "P2P 直连未成功，改走服务器中转", Toast.LENGTH_SHORT).show()
+                    lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name) }
+                },
+                onSuccess = { p2pUrl ->
+                    binding.progressBar.visibility = View.GONE
+                    publish(topic, "", "", kind, p2pUrl, name, file.length())
+                    try { file.delete() } catch (_: Exception) {}
+                },
+                onError = { msg ->
+                    binding.progressBar.visibility = View.GONE
+                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                    try { file.delete() } catch (_: Exception) {}
+                }
+            )
+        } else {
+            lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name) }
         }
     }
+
+    // 服务器上传 + 发消息（原路径，P2P 的兜底）
+    private suspend fun httpUploadAndPublish(topic: String, file: File, kind: String, name: String) {
+        try {
+            val json = ApiClient.uploadTopicMedia(topic, file, kind)
+            val url = json.getString("url")
+            val size = json.optLong("size", file.length())
+            publish(topic, "", "", kind, url, name, size)
+        } catch (e: Exception) {
+            Toast.makeText(requireContext(), "上传失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        } finally {
+            binding.progressBar.visibility = View.GONE
+            try { file.delete() } catch (_: Exception) {}
+        }
+    }
+
+    // 取附件原始文件名（显示用）
+    private fun queryDisplayName(uri: Uri): String? = try {
+        requireContext().contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
+        }
+    } catch (_: Exception) { null }
 
     private fun copyUriToFile(uri: Uri): File? {
         return try {
@@ -663,20 +858,7 @@ class TopicFragment : Fragment() {
         releaseRecorder()
         val topic = currentTopic ?: return
         if (file.length() < 500) { file.delete(); Toast.makeText(requireContext(), "录音太短", Toast.LENGTH_SHORT).show(); return }
-        binding.progressBar.visibility = View.VISIBLE
-        lifecycleScope.launch {
-            try {
-                val json = ApiClient.uploadTopicMedia(topic, file, "voice")
-                val url = json.getString("url")
-                val size = json.optLong("size", file.length())
-                publish(topic, "", "", "voice", url, "语音消息", size)
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "语音发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                binding.progressBar.visibility = View.GONE
-                try { file.delete() } catch (_: Exception) {}
-            }
-        }
+        sendMediaSmart(topic, file, "voice", "语音消息")
     }
 
     private fun releaseRecorder() {
@@ -699,7 +881,13 @@ class TopicFragment : Fragment() {
         dialog.show()
         lifecycleScope.launch {
             try {
-                val bmp = downloadBitmap(url)
+                val bmp = if (url.startsWith("p2p:")) {
+                    val local = P2pManager.localP2pFile(requireContext(), url)
+                    if (local == null) {
+                        Toast.makeText(requireContext(), "该图片经 P2P 直连传输，未落地本设备", Toast.LENGTH_SHORT).show()
+                        null
+                    } else withContext(Dispatchers.IO) { android.graphics.BitmapFactory.decodeFile(local.absolutePath) }
+                } else downloadBitmap(url)
                 if (bmp != null) iv.setImageBitmap(bmp)
             } catch (_: Exception) {}
         }

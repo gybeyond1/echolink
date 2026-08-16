@@ -84,6 +84,13 @@ function setupWebSocket(server) {
           handleTopicPublish(ws, data);
           return;
         }
+        // ===== P2P 打洞信令中继（WebRTC offer/answer）=====
+        // 只转发信令本身，文件数据不经过服务器。
+        // 按话题广播：发给订阅该话题的其他连接（排除发送者自己）。
+        if (data.type === "p2p" && data.topic && data.payload) {
+          relayP2pSignal(ws, data);
+          return;
+        }
       } catch (e) {
         // 忽略无法解析的消息
       }
@@ -222,6 +229,31 @@ function cleanupTopicHistory(topic) {
   db.prepare(`DELETE FROM topic_messages WHERE topic = ? AND id NOT IN (
       SELECT id FROM topic_messages WHERE topic = ? ORDER BY id DESC LIMIT ?)
     `).run(topic, topic, maxHistory);
+}
+
+// ===== P2P 信令中继 =====
+// WebRTC offer/answer（含完整 ICE candidate，非 trickle 模式）按话题转发给除发送者外的订阅者。
+// 服务器只搬运几 KB 的 SDP，文件字节流走设备间直连（DataChannel）。
+function relayP2pSignal(senderWs, data) {
+  const name = normalizeTopic(data.topic);
+  if (!name) return;
+  const subs = topicSubscriptions.get(name);
+  if (!subs || subs.size === 0) return;
+  const msg = JSON.stringify({
+    type: "p2p",
+    topic: name,
+    from_user: senderWs.userId,
+    from_device: senderWs.deviceId,
+    payload: data.payload,
+  });
+  let sent = 0;
+  subs.forEach((ws) => {
+    if (ws === senderWs) return;
+    if (ws.readyState !== 1) return;
+    ws.send(msg);
+    sent++;
+  });
+  console.log(`[WS] P2P signal relayed on topic "${name}": ${sent} peer(s)`);
 }
 
 // ===== 用户通知推送 =====

@@ -1,0 +1,322 @@
+package com.notifysync.ui
+
+import android.app.AlertDialog
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
+import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.textfield.TextInputEditText
+import com.notifysync.R
+import com.notifysync.data.ApiClient
+import com.notifysync.data.Friend
+import com.notifysync.data.FriendRequest
+import com.notifysync.data.SearchUser
+import com.notifysync.databinding.FragmentFriendsBinding
+import kotlinx.coroutines.launch
+
+/**
+ * 好友（通讯录）页：微信风格
+ * - 列表展示好友，点击进入私聊（dm 话题，复用话题聊天全套能力）
+ * - 长按好友删除
+ * - 「新的朋友」：收到的好友申请，可同意/拒绝/忽略
+ * - 右上角「+」：搜索用户名添加好友
+ */
+class FriendsFragment : Fragment() {
+    private var _binding: FragmentFriendsBinding? = null
+    private val binding get() = _binding!!
+
+    private lateinit var friendAdapter: FriendAdapter
+
+    // WS 推送（好友申请/通过验证）到达时刷新
+    private val friendsReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (_binding != null) load()
+        }
+    }
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        _binding = FragmentFriendsBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        friendAdapter = FriendAdapter(
+            onItemClick = { openChat(it) },
+            onItemLongClick = { confirmDeleteFriend(it) }
+        )
+        binding.rvFriends.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvFriends.adapter = friendAdapter
+
+        binding.btnAddFriend.setOnClickListener { showAddFriendDialog() }
+        binding.rowNewFriends.setOnClickListener { showNewFriendsDialog() }
+
+        // 全面屏沉浸式：顶部栏避开状态栏
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            binding.topBar.setPadding(binding.topBar.paddingLeft, systemBars.top, binding.topBar.paddingRight, binding.topBar.paddingBottom)
+            insets
+        }
+
+        load()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        requireActivity().registerReceiver(
+            friendsReceiver,
+            IntentFilter("com.notifysync.FRIENDS_CHANGED"),
+            Context.RECEIVER_NOT_EXPORTED
+        )
+        load()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try { requireActivity().unregisterReceiver(friendsReceiver) } catch (_: Exception) {}
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
+    private fun load() {
+        lifecycleScope.launch {
+            try {
+                val friends = ApiClient.getFriends()
+                friendAdapter.setItems(friends)
+                binding.tvEmptyFriends.visibility = if (friends.isEmpty()) View.VISIBLE else View.GONE
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "好友列表加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+            refreshNewBadge()
+        }
+    }
+
+    // 「新的朋友」红点 = 待处理好友申请数
+    private fun refreshNewBadge() {
+        lifecycleScope.launch {
+            try {
+                val pending = ApiClient.getFriendRequests().filter { it.status == "pending" }
+                if (pending.isNotEmpty()) {
+                    binding.tvNewBadge.visibility = View.VISIBLE
+                    binding.tvNewBadge.text = if (pending.size > 99) "99+" else pending.size.toString()
+                } else {
+                    binding.tvNewBadge.visibility = View.GONE
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    // ===== 好友私聊 =====
+
+    private fun openChat(friend: Friend) {
+        lifecycleScope.launch {
+            try {
+                val (topic, title) = ApiClient.openFriendChat(friend.username)
+                (activity as? MainActivity)?.openTopic(topic, title)
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "打开私聊失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun confirmDeleteFriend(friend: Friend) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("删除好友")
+            .setMessage("确定删除好友「${friend.username}」吗？聊天记录将保留，但需重新添加好友才能继续私聊。")
+            .setPositiveButton("删除") { _, _ ->
+                lifecycleScope.launch {
+                    try {
+                        ApiClient.deleteFriend(friend.username)
+                        Toast.makeText(requireContext(), "已删除", Toast.LENGTH_SHORT).show()
+                        load()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "删除失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("取消", null).show()
+    }
+
+    // ===== 新的朋友（好友申请） =====
+
+    private fun showNewFriendsDialog() {
+        lifecycleScope.launch {
+            val requests = try {
+                ApiClient.getFriendRequests()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val pending = requests.filter { it.status == "pending" }
+            val handled = requests.filter { it.status != "pending" }
+            if (requests.isEmpty()) {
+                Toast.makeText(requireContext(), "暂无好友申请", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            // 待处理在前；已处理的显示状态
+            val labels = (pending.map { "【待处理】${it.username}${if (!it.message.isNullOrEmpty()) "：${it.message}" else ""}" } +
+                handled.map { "【${statusLabel(it.status)}】${it.username}" }).toTypedArray()
+            AlertDialog.Builder(requireContext())
+                .setTitle("新的朋友")
+                .setItems(labels) { _, which ->
+                    if (which < pending.size) showHandleRequestDialog(pending[which])
+                }
+                .setNegativeButton("关闭", null)
+                .show()
+        }
+    }
+
+    private fun statusLabel(status: String): String = when (status) {
+        "accepted" -> "已同意"
+        "rejected" -> "已拒绝"
+        "ignored" -> "已忽略"
+        else -> "待处理"
+    }
+
+    private fun showHandleRequestDialog(req: FriendRequest) {
+        val options = arrayOf("同意", "拒绝", "忽略")
+        AlertDialog.Builder(requireContext())
+            .setTitle("${req.username} 请求加你为好友")
+            .setMessage(if (req.message.isNullOrEmpty()) "验证消息：（无）" else "验证消息：${req.message}")
+            .setItems(options) { _, which ->
+                lifecycleScope.launch {
+                    try {
+                        when (which) {
+                            0 -> { ApiClient.acceptFriendRequest(req.id); Toast.makeText(requireContext(), "已同意，你们现在是好友了", Toast.LENGTH_SHORT).show() }
+                            1 -> { ApiClient.rejectFriendRequest(req.id); Toast.makeText(requireContext(), "已拒绝", Toast.LENGTH_SHORT).show() }
+                            2 -> { ApiClient.ignoreFriendRequest(req.id); Toast.makeText(requireContext(), "已忽略", Toast.LENGTH_SHORT).show() }
+                        }
+                        load()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    // ===== 添加好友（搜索用户名） =====
+
+    private fun showAddFriendDialog() {
+        val input = layoutInflater.inflate(R.layout.dialog_input_single, null)
+        val et = input.findViewById<TextInputEditText>(R.id.etInput)
+        AlertDialog.Builder(requireContext())
+            .setTitle("添加好友")
+            .setMessage("输入对方用户名的一部分进行搜索")
+            .setView(input)
+            .setPositiveButton("搜索") { _, _ ->
+                val q = et.text?.toString()?.trim() ?: ""
+                if (q.isEmpty()) {
+                    Toast.makeText(requireContext(), "请输入关键词", Toast.LENGTH_SHORT).show()
+                } else {
+                    doSearch(q)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun doSearch(q: String) {
+        lifecycleScope.launch {
+            val users = try {
+                ApiClient.searchUsers(q)
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "搜索失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            if (users.isEmpty()) {
+                Toast.makeText(requireContext(), "没有找到相关用户", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val labels = users.map {
+                when {
+                    it.isFriend -> "${it.username}（已是好友）"
+                    it.requested -> "${it.username}（已发申请，等待对方处理）"
+                    else -> it.username
+                }
+            }.toTypedArray()
+            AlertDialog.Builder(requireContext())
+                .setTitle("搜索结果")
+                .setItems(labels) { _, which ->
+                    val u = users[which]
+                    if (u.isFriend) {
+                        Toast.makeText(requireContext(), "你们已经是好友了", Toast.LENGTH_SHORT).show()
+                    } else if (u.requested) {
+                        Toast.makeText(requireContext(), "申请已发送，等待对方处理", Toast.LENGTH_SHORT).show()
+                    } else {
+                        sendRequest(u)
+                    }
+                }
+                .setNegativeButton("关闭", null)
+                .show()
+        }
+    }
+
+    private fun sendRequest(user: SearchUser) {
+        lifecycleScope.launch {
+            try {
+                ApiClient.sendFriendRequest(user.username)
+                Toast.makeText(requireContext(), "已发送好友申请", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ===== 好友列表 Adapter =====
+
+    private inner class FriendAdapter(
+        private val onItemClick: (Friend) -> Unit,
+        private val onItemLongClick: (Friend) -> Unit
+    ) : RecyclerView.Adapter<FriendAdapter.ViewHolder>() {
+
+        private val items = mutableListOf<Friend>()
+
+        fun setItems(list: List<Friend>) {
+            items.clear()
+            items.addAll(list)
+            notifyDataSetChanged()
+        }
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val tvAvatar: TextView = view.findViewById(R.id.tvAvatar)
+            val tvName: TextView = view.findViewById(R.id.tvFriendName)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_friend, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val item = items[position]
+            holder.tvAvatar.text = item.username.firstOrNull()?.uppercase()?.toString() ?: "?"
+            holder.tvName.text = item.username
+            holder.itemView.setOnClickListener { onItemClick(item) }
+            holder.itemView.setOnLongClickListener {
+                onItemLongClick(item)
+                true
+            }
+        }
+
+        override fun getItemCount(): Int = items.size
+    }
+}

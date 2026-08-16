@@ -89,7 +89,16 @@ object WebSocketClient {
                     if (type == "pong") {
                         lastPongTime = System.currentTimeMillis()
                     }
-                    val data = if (json.has("data")) json.getJSONObject("data") else null
+                    val data = when {
+                        json.has("data") -> json.getJSONObject("data")
+                        // P2P 信令中继：payload + 发送者信息打包为 data，供 P2pManager 消费
+                        type == "p2p" -> org.json.JSONObject().apply {
+                            put("payload", json.optJSONObject("payload") ?: org.json.JSONObject())
+                            put("from_user", json.optString("from_user", ""))
+                            put("from_device", json.optLong("from_device", -1))
+                        }
+                        else -> null
+                    }
                     val topic = if (json.has("topic")) json.optString("topic", null) else null
                     listener?.onMessage(type, data, topic)
                 } catch (e: Exception) {
@@ -235,6 +244,16 @@ object WebSocketClient {
 
     fun sendUnsubscribe(topic: String) {
         sendJson(org.json.JSONObject().put("type", "unsubscribe").put("topic", topic))
+    }
+
+    // P2P 打洞信令（offer/answer/ice 等），服务器按话题转发给对方设备
+    fun sendP2pSignal(topic: String, payload: org.json.JSONObject) {
+        sendJson(
+            org.json.JSONObject()
+                .put("type", "p2p")
+                .put("topic", topic)
+                .put("payload", payload)
+        )
     }
 
     fun sendPublish(topic: String, title: String, text: String) {

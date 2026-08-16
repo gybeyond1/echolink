@@ -89,6 +89,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- P2P 接收文件的对外分享（FileProvider，仅 filesDir/p2p/） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- 短信到达广播（验证码检测主通道，SMS_RECEIVED 属豁免广播可静态注册） -->
         <receiver
             android:name=".service.SmsReceiver"

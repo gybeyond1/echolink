@@ -65,6 +65,8 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         isRunning = true
         startForeground(FOREGROUND_NOTIFICATION_ID, buildForegroundNotification("正在连接..."))
         WebSocketClient.setListener(this)
+        // P2P 打洞信令接收（好友私聊直传文件；工厂幂等初始化）
+        com.notifysync.data.P2pManager.init(this)
 
         if (AuthManager.isLoggedIn) {
             WebSocketClient.connect()
@@ -178,6 +180,48 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         when (type) {
             "notification" -> handleSyncedNotification(data)
             "topic_message" -> handleTopicMessage(topic, data)
+            // 有人申请加我为好友 → 刷新「新的申请」+ 好友页红点，弹通知提醒
+            "friend_request" -> {
+                val who = data?.optString("username", "有人") ?: "有人"
+                showLocalNotification("新的好友申请", "$who 请求加你为好友", null)
+                sendBroadcast(Intent("com.notifysync.REQUESTS_CHANGED"))
+                sendBroadcast(Intent("com.notifysync.FRIENDS_CHANGED"))
+            }
+            // 我的好友申请被通过 → 刷新好友列表（可能产生新私聊会话）
+            "friend_accepted" -> {
+                val who = data?.optString("username", "对方") ?: "对方"
+                showLocalNotification("好友申请已通过", "$who 已同意你的好友申请", null)
+                sendBroadcast(Intent("com.notifysync.FRIENDS_CHANGED"))
+            }
+            // 有人申请加入我创建的话题 → 刷新「新的申请」红点
+            "topic_request" -> {
+                val who = data?.optString("username", "有人") ?: "有人"
+                val t = topic ?: data?.optString("topic", "") ?: ""
+                showLocalNotification("新的加群申请", "$who 申请加入「$t」", null)
+                sendBroadcast(Intent("com.notifysync.REQUESTS_CHANGED"))
+            }
+            // 我的加群申请被处理 → 刷新话题列表（通过则话题出现在列表）
+            "topic_request_handled" -> {
+                val name = data?.optString("topic", "") ?: ""
+                val status = data?.optString("status", "") ?: ""
+                if (status == "approved") showLocalNotification("加群申请已通过", "你已加入话题「$name」", name)
+                else if (status == "rejected") showLocalNotification("加群申请被拒绝", "「$name」的创建者拒绝了你的申请", null)
+                sendBroadcast(Intent("com.notifysync.REQUESTS_CHANGED"))
+                sendBroadcast(Intent("com.notifysync.FRIENDS_CHANGED"))
+            }
+            // P2P 打洞信令（offer/answer），转交 P2pManager
+            "p2p" -> {
+                val payload = data?.optJSONObject("payload")
+                if (payload != null && topic != null) {
+                    val intent = Intent("com.notifysync.P2P_SIGNAL").apply {
+                        putExtra("topic", topic)
+                        putExtra("payload", payload.toString())
+                        putExtra("from_user", data.optString("from_user", ""))
+                        putExtra("from_device", data.optLong("from_device", -1))
+                    }
+                    sendBroadcast(intent)
+                }
+            }
             "connected" -> {
                 connectionStatus = "已连接"
                 updateForegroundNotification("已连接 - 同步中")
@@ -265,7 +309,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         val displayTitle = if (title.isNotEmpty()) "[#$topicName] $title" else "[#$topicName] $sender"
         showLocalNotification(displayTitle, text, topicName)
 
-        // 广播给 UI（话题页刷新）
+        // 广播给 UI（话题页刷新），含媒体字段（图片/语音/文件实时渲染）
         val broadcastIntent = Intent("com.notifysync.TOPIC_MESSAGE_RECEIVED").apply {
             putExtra("topic", topicName)
             putExtra("title", title)
@@ -274,6 +318,10 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
             putExtra("device_name", deviceName)
             putExtra("timestamp", timestamp)
             putExtra("device_id", fromDeviceId)
+            putExtra("media_type", data.optString("media_type", "text"))
+            if (!data.isNull("media_url")) putExtra("media_url", data.optString("media_url", null))
+            if (!data.isNull("media_name")) putExtra("media_name", data.optString("media_name", null))
+            putExtra("media_size", data.optLong("media_size", 0))
         }
         sendBroadcast(broadcastIntent)
     }

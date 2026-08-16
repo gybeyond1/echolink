@@ -32,6 +32,11 @@ router.post("/register", (req, res) => {
   const passwordHash = bcrypt.hashSync(password, 10);
   const result = db.prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)").run(username, passwordHash);
 
+  // 新用户自动拥有「我的设备」默认会话（置顶、不可删）
+  try { require("./topics").ensureDeviceTopic(result.lastInsertRowid); } catch (e) {
+    console.error("[auth] ensureDeviceTopic failed:", e);
+  }
+
   const token = jwt.sign(
     { userId: result.lastInsertRowid, username, role: "user" },
     process.env.JWT_SECRET || "default-secret",
@@ -60,6 +65,11 @@ router.post("/login", (req, res) => {
 
   if (!bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: "Invalid username or password" });
+  }
+
+  // 登录即确保「我的设备」默认会话存在（老账号兜底）
+  try { require("./topics").ensureDeviceTopic(user.id); } catch (e) {
+    console.error("[auth] ensureDeviceTopic failed:", e);
   }
 
   const token = jwt.sign(

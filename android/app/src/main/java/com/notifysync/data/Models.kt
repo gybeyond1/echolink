@@ -150,7 +150,9 @@ data class MyTopic(
     val messageCount: Int,
     val pendingRequests: Int,   // 仅创建者可见：待审批数量
     val ownerName: String?,
-    val lastMessage: String? = null
+    val lastMessage: String? = null,
+    val kind: String = "normal",        // "normal" | "devices"（我的设备）| "dm"（好友私聊）
+    val displayName: String? = null     // 展示名：设备会话=我的设备，私聊=对方用户名，普通=话题名
 )
 
 // 可发现（非成员）的话题
@@ -190,7 +192,9 @@ fun parseMyTopics(jsonArray: JSONArray): List<MyTopic> {
                 messageCount = obj.optInt("message_count", 0),
                 pendingRequests = obj.optInt("pending_requests", 0),
                 ownerName = obj.optString("owner_name", null),
-                lastMessage = obj.optString("last_message", null)
+                lastMessage = obj.optString("last_message", null),
+                kind = obj.optString("kind", "normal"),
+                displayName = obj.optString("display_name", null)
             )
         )
     }
@@ -239,6 +243,115 @@ fun parseTopicRequests(jsonArray: JSONArray): List<TopicJoinRequest> {
                 userId = obj.getLong("user_id"),
                 username = obj.optString("username", "?"),
                 status = obj.optString("status", "pending"),
+                message = obj.optString("message", null),
+                requestedAt = obj.optString("requested_at", null)
+            )
+        )
+    }
+    return list
+}
+
+// ===== 好友（通讯录）模型 =====
+
+data class Friend(
+    val userId: Long,
+    val username: String,
+    val createdAt: String?
+)
+
+data class FriendRequest(
+    val id: Long,
+    val username: String,
+    val status: String,        // "pending" | "accepted" | "rejected" | "ignored"
+    val message: String?,
+    val requestedAt: String?
+)
+
+data class SearchUser(
+    val id: Long,
+    val username: String,
+    val isFriend: Boolean,
+    val requested: Boolean     // 我已向对方发过申请（pending）
+)
+
+// 统一「新的申请」：好友申请 + 我创建话题的加群申请
+data class UnifiedRequests(
+    val friendRequests: List<FriendRequest>,
+    val topicRequests: List<UnifiedTopicRequest>
+)
+
+data class UnifiedTopicRequest(
+    val id: Long,
+    val topic: String,
+    val username: String,
+    val message: String?,
+    val requestedAt: String?
+)
+
+fun parseFriends(jsonArray: JSONArray): List<Friend> {
+    val list = mutableListOf<Friend>()
+    for (i in 0 until jsonArray.length()) {
+        val obj = jsonArray.getJSONObject(i)
+        list.add(
+            Friend(
+                userId = obj.getLong("user_id"),
+                username = obj.optString("username", "?"),
+                createdAt = obj.optString("created_at", null)
+            )
+        )
+    }
+    return list
+}
+
+fun parseFriendRequests(jsonArray: JSONArray): List<FriendRequest> {
+    val list = mutableListOf<FriendRequest>()
+    for (i in 0 until jsonArray.length()) {
+        val obj = jsonArray.getJSONObject(i)
+        list.add(
+            FriendRequest(
+                id = obj.getLong("id"),
+                username = obj.optString("username", "?"),
+                status = obj.optString("status", "pending"),
+                message = obj.optString("message", null),
+                requestedAt = obj.optString("requested_at", null)
+            )
+        )
+    }
+    return list
+}
+
+fun parseSearchUsers(jsonArray: JSONArray): List<SearchUser> {
+    val list = mutableListOf<SearchUser>()
+    for (i in 0 until jsonArray.length()) {
+        val obj = jsonArray.getJSONObject(i)
+        list.add(
+            SearchUser(
+                id = obj.getLong("id"),
+                username = obj.optString("username", "?"),
+                isFriend = obj.optInt("is_friend", 0) == 1,
+                requested = obj.optInt("requested", 0) == 1
+            )
+        )
+    }
+    return list
+}
+
+fun parseUnifiedRequests(json: JSONObject): UnifiedRequests {
+    return UnifiedRequests(
+        friendRequests = parseFriendRequests(json.getJSONArray("friend_requests")),
+        topicRequests = parseUnifiedTopicRequests(json.getJSONArray("topic_requests"))
+    )
+}
+
+private fun parseUnifiedTopicRequests(jsonArray: JSONArray): List<UnifiedTopicRequest> {
+    val list = mutableListOf<UnifiedTopicRequest>()
+    for (i in 0 until jsonArray.length()) {
+        val obj = jsonArray.getJSONObject(i)
+        list.add(
+            UnifiedTopicRequest(
+                id = obj.getLong("id"),
+                topic = obj.optString("topic", "?"),
+                username = obj.optString("username", "?"),
                 message = obj.optString("message", null),
                 requestedAt = obj.optString("requested_at", null)
             )
