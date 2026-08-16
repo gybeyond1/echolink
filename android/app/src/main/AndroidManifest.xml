@@ -17,8 +17,9 @@
     <!-- 录音（话题语音消息） -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- 读取短信（自动提取验证码复制到剪贴板，需用户在设置页授权） -->
+    <!-- 读取/接收短信（自动提取验证码复制到剪贴板，需用户在设置页授权） -->
     <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
     <!-- 触觉反馈（长按进入多选 / 双击复制时震动） -->
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -85,6 +86,17 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 短信到达广播（验证码检测主通道，SMS_RECEIVED 属豁免广播可静态注册） -->
+        <receiver
+            android:name=".service.SmsReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
 

@@ -142,9 +142,14 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
     private fun pullMissedNotifications() {
         scope.launch {
             try {
-                // 首次（lastNotificationTs=0）只回看最近 2 分钟，避免把历史通知全部刷成提示
-                val since = if (AuthManager.lastNotificationTs > 0) AuthManager.lastNotificationTs
-                else System.currentTimeMillis() - 2 * 60 * 1000
+                // 补拉窗口最多回看 10 分钟：离线太久只提示最近的消息（其余去通知页看），
+                // 避免「一窝蜂」式弹出一大堆过期通知
+                val tenMinAgo = System.currentTimeMillis() - 10 * 60 * 1000
+                val since = when {
+                    AuthManager.lastNotificationTs <= 0 -> System.currentTimeMillis() - 2 * 60 * 1000
+                    AuthManager.lastNotificationTs < tenMinAgo -> tenMinAgo
+                    else -> AuthManager.lastNotificationTs
+                }
                 val list = ApiClient.getNotificationsSince(since)
                 var maxTs = AuthManager.lastNotificationTs
                 list.forEach { n ->
@@ -206,6 +211,12 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         // 双保险：服务器已排除本机，这里再过滤一次自己设备发出的通知
         val fromDeviceId = data.optLong("device_id", -1)
         if (fromDeviceId == AuthManager.deviceId) return
+
+        // 实时收到的通知推进 lastNotificationTs，
+        // 防止 WS 断连重连后 pullMissedNotifications 把已收过的再拉一遍（重复弹通知）
+        if (timestamp > AuthManager.lastNotificationTs) {
+            AuthManager.lastNotificationTs = timestamp
+        }
 
         Log.i(TAG, "Received synced notification: $appName - $title")
 
