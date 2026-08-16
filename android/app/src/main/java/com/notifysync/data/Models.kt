@@ -13,7 +13,9 @@ data class LoginRequest(
 data class AuthResponse(
     val token: String,
     val userId: Long,
-    val username: String
+    val username: String,
+    val displayName: String? = null,
+    val avatarUrl: String? = null
 )
 
 data class DeviceInfo(
@@ -58,10 +60,13 @@ data class TopicMessage(
 // ===== JSON 解析扩展 =====
 
 fun parseAuthResponse(json: JSONObject): AuthResponse {
+    val user = json.getJSONObject("user")
     return AuthResponse(
         token = json.getString("token"),
-        userId = json.getJSONObject("user").getLong("id"),
-        username = json.getJSONObject("user").getString("username")
+        userId = user.getLong("id"),
+        username = user.getString("username"),
+        displayName = user.optString("display_name", null),
+        avatarUrl = user.optString("avatar", null)
     )
 }
 
