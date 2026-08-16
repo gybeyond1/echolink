@@ -116,7 +116,7 @@ class TopicAdapter(
         val tvFile: TextView = view.findViewById(R.id.tvFile)
         var item: TopicMessage? = null
         private var selectionTapHandled = false
-        private var lastMine: Boolean? = null
+        var lastMine: Boolean? = null
 
         init {
             val ctx = view.context
