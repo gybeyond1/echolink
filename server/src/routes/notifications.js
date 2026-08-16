@@ -95,12 +95,13 @@ router.get("/", authMiddleware, (req, res) => {
       .prepare(`SELECT n.*, d.device_name FROM notifications n
                 LEFT JOIN devices d ON n.device_id = d.id
                 WHERE n.user_id = ?
+                  AND (n.device_id != ? OR n.device_id IS NULL)
                   AND NOT EXISTS (
                     SELECT 1 FROM notification_deletes nd
                     WHERE nd.user_id = n.user_id AND nd.device_id = ? AND nd.notification_id = n.id
                   )
                 ORDER BY n.timestamp DESC LIMIT ? OFFSET ?`)
-      .all(req.userId, deviceId, limit, offset);
+      .all(req.userId, deviceId, deviceId, limit, offset);
   } else {
     // WebUI 管理后台（不带 device_id）查看该账号全部通知
     notifications = db
@@ -118,13 +119,25 @@ router.get("/", authMiddleware, (req, res) => {
 router.get("/since/:timestamp", authMiddleware, (req, res) => {
   const db = getDB();
   const since = parseInt(req.params.timestamp) || 0;
+  const deviceId = req.query.device_id ? parseInt(req.query.device_id) : null;
 
-  const notifications = db
-    .prepare(`SELECT n.*, d.device_name FROM notifications n
-              LEFT JOIN devices d ON n.device_id = d.id
-              WHERE n.user_id = ? AND n.timestamp > ?
-              ORDER BY n.timestamp ASC`)
-    .all(req.userId, since);
+  let notifications;
+  if (deviceId) {
+    notifications = db
+      .prepare(`SELECT n.*, d.device_name FROM notifications n
+                LEFT JOIN devices d ON n.device_id = d.id
+                WHERE n.user_id = ? AND n.timestamp > ?
+                  AND (n.device_id != ? OR n.device_id IS NULL)
+                ORDER BY n.timestamp ASC`)
+      .all(req.userId, since, deviceId);
+  } else {
+    notifications = db
+      .prepare(`SELECT n.*, d.device_name FROM notifications n
+                LEFT JOIN devices d ON n.device_id = d.id
+                WHERE n.user_id = ? AND n.timestamp > ?
+                ORDER BY n.timestamp ASC`)
+      .all(req.userId, since);
+  }
 
   res.json({ notifications });
 });
