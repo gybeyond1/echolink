@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自己发出的消息气泡底色（微信式靠右消息），亮暗主题自动取对应 brand_primary_light -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/brand_primary_light" />
+    <corners android:radius="12dp" />
+</shape>

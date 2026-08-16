@@ -55,11 +55,15 @@ class NotificationsFragment : Fragment() {
         }
         binding.btnDeleteSelected.setOnClickListener { deleteSelected() }
 
-        // 系统返回：多选态 → 先退出多选（不再直接退到桌面）；非多选态不拦截
-        backCallback = object : OnBackPressedCallback(false) {
+        // 系统返回：多选态 → 先退出多选；非多选态 → 返回话题列表（通知页已合并进话题页）
+        backCallback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                adapter.clearSelection()
-                updateSelectionUI()
+                if (adapter.isSelectionActive) {
+                    adapter.clearSelection()
+                    updateSelectionUI()
+                } else {
+                    (activity as? MainActivity)?.backToTopics()
+                }
             }
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)

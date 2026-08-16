@@ -196,6 +196,9 @@ class TopicFragment : Fragment() {
         // 列表态：「新的申请」入口（好友申请 + 加群申请）
         binding.rowNewRequests.setOnClickListener { showRequestsDialog() }
 
+        // 置顶「通知」条目 → 通知详情页
+        binding.rowNotifications.setOnClickListener { (activity as? MainActivity)?.openNotifications() }
+
         // 多选操作栏（右上角：全选 / 删除；退出多选用系统返回手势）
         binding.btnSelectAll.setOnClickListener { if (chatAdapter.isAllSelected) chatAdapter.clearSelection() else chatAdapter.selectAll(); updateSelectionUI() }
         binding.btnDeleteSel.setOnClickListener { confirmDeleteSelected() }

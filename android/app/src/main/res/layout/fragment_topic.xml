@@ -56,6 +56,53 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
+        <!-- 通知（置顶消息条，点进去看通知详情；原通知页合并至此） -->
+        <LinearLayout
+            android:id="@+id/rowNotifications"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:gravity="center"
+                android:text="🔔"
+                android:textSize="20sp"
+                android:background="@drawable/bg_circle_avatar" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="通知"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="所有设备的同步通知"
+                    android:textSize="13sp"
+                    android:textColor="@color/on_surface_variant"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- 新的申请（好友申请 + 加群申请，置顶入口，与群组会话同级） -->
         <LinearLayout
             android:id="@+id/rowNewRequests"

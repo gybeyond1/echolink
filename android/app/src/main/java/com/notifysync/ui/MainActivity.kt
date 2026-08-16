@@ -68,14 +68,14 @@ class MainActivity : AppCompatActivity() {
         if (!topic.isNullOrEmpty()) {
             openTopic(topic)
         } else if (supportFragmentManager.fragments.isEmpty()) {
-            switchFragment(NotificationsFragment())
+            switchFragment(TopicFragment())
+            binding.bottomNav.menu.findItem(com.notifysync.R.id.nav_topic)?.isChecked = true
         }
     }
 
     private fun setupBottomNav() {
         binding.bottomNav.setOnItemSelectedListener { item ->
             val fragment: Fragment = when (item.itemId) {
-                com.notifysync.R.id.nav_notifications -> NotificationsFragment()
                 com.notifysync.R.id.nav_friends -> FriendsFragment()
                 com.notifysync.R.id.nav_topic -> TopicFragment()
                 com.notifysync.R.id.nav_settings -> SettingsFragment()
@@ -91,6 +91,18 @@ class MainActivity : AppCompatActivity() {
             .beginTransaction()
             .replace(binding.fragmentContainer.id, fragment)
             .commit()
+    }
+
+    /** 话题列表顶部「通知」置顶条目 → 打开通知详情页（底栏仍高亮话题） */
+    fun openNotifications() {
+        switchFragment(NotificationsFragment())
+        binding.bottomNav.menu.findItem(com.notifysync.R.id.nav_topic)?.isChecked = true
+    }
+
+    /** 通知详情页返回 → 回话题列表 */
+    fun backToTopics() {
+        switchFragment(TopicFragment())
+        binding.bottomNav.menu.findItem(com.notifysync.R.id.nav_topic)?.isChecked = true
     }
 
     /** 打开话题页并定位到指定话题（用于点击状态栏话题通知 / 好友私聊入口） */
