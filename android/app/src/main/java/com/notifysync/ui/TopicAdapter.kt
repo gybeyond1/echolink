@@ -18,6 +18,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.GestureDetector
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
@@ -103,7 +104,8 @@ class TopicAdapter(
 
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val ivAvatar: ImageView = view.findViewById(R.id.ivAvatar)
-        val llSenderInfo: View = view.findViewById(R.id.llSenderInfo)
+        val llContent: View = view.findViewById(R.id.llContent)
+        val llSenderInfo: android.widget.LinearLayout = view.findViewById(R.id.llSenderInfo)
         val tvSender: TextView = view.findViewById(R.id.tvSender)
         val tvTime: TextView = view.findViewById(R.id.tvTime)
         val tvTitle: TextView = view.findViewById(R.id.tvTitle)
@@ -114,6 +116,7 @@ class TopicAdapter(
         val tvFile: TextView = view.findViewById(R.id.tvFile)
         var item: TopicMessage? = null
         private var selectionTapHandled = false
+        private var lastMine: Boolean? = null
 
         init {
             val ctx = view.context
@@ -240,6 +243,10 @@ class TopicAdapter(
         val item = items[position]
         holder.item = item
 
+        // 本机（同账号）发出的消息靠右（微信式），覆盖所有会话：我的设备/群聊/私聊
+        val isMine = item.senderUserId > 0 && item.senderUserId == AuthManager.userId
+        applyOwnStyle(holder, isMine)
+
         // ===== Telegram-style consecutive message grouping =====
         // Show avatar + sender name only for the first message in a group.
         // Consecutive messages from the same sender hide avatar (INVISIBLE to keep spacing)
@@ -306,6 +313,41 @@ class TopicAdapter(
                 holder.itemView.context.getColor(R.color.brand_primary_light)
             else 0x00000000
         )
+    }
+
+    /**
+     * 微信式左右分栏：自己的消息头像在右、内容右对齐、淡品牌色气泡；
+     * 他人消息头像在左、内容左对齐、无底色。只在归属变化时重排，避免复用抖动。
+     */
+    private fun applyOwnStyle(holder: ViewHolder, isMine: Boolean) {
+        if (holder.lastMine == isMine) return
+        holder.lastMine = isMine
+        val root = holder.itemView as android.widget.LinearLayout
+        val avatarIdx = root.indexOfChild(holder.ivAvatar)
+        if (isMine && avatarIdx == 0) {
+            root.removeView(holder.ivAvatar)
+            root.addView(holder.ivAvatar)
+        } else if (!isMine && avatarIdx == root.childCount - 1 && root.childCount > 1) {
+            root.removeView(holder.ivAvatar)
+            root.addView(holder.ivAvatar, 0)
+        }
+        val g = if (isMine) Gravity.END else Gravity.START
+        holder.llSenderInfo.gravity = g
+        holder.tvTitle.gravity = g
+        holder.tvText.gravity = g
+        (holder.ivMedia.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
+        (holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
+        (holder.llFile.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
+        if (isMine) {
+            holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
+            val dp = holder.itemView.resources.displayMetrics.density
+            val padH = (10 * dp).toInt()
+            val padV = (4 * dp).toInt()
+            holder.llContent.setPadding(padH, padV, padH, padV)
+        } else {
+            holder.llContent.setBackgroundResource(0)
+            holder.llContent.setPadding(0, 0, 0, 0)
+        }
     }
 
     /**
@@ -385,12 +427,15 @@ class TopicAdapter(
 
     private fun loadAvatar(item: TopicMessage, iv: ImageView) {
         val avatarPath = item.senderAvatar
+        val base = AuthManager.serverUrl.trimEnd('/')
         val fullAvatarUrl = if (avatarPath.isNullOrBlank()) {
             null
         } else if (avatarPath.startsWith("http")) {
             avatarPath
+        } else if (avatarPath.startsWith("/")) {
+            base + avatarPath
         } else {
-            "${AuthManager.serverUrl.trimEnd('/')}/$avatarPath"
+            "$base/$avatarPath"
         }
 
         if (fullAvatarUrl.isNullOrBlank()) {

@@ -4,6 +4,24 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- 标题栏（作为通知详情页打开时显示） -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="通知"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <!-- 多选操作栏（默认隐藏）：与话题页一致——右上角两个等大图标（全选 / 删除）；
          退出多选用系统返回手势，不再显示取消按钮/已选计数 -->
     <LinearLayout
