@@ -86,8 +86,12 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
             return START_NOT_STICKY
         }
 
-        // WS 断了就重连（覆盖：进程被杀重启、静默断连、onCreate 里 connect 失败等场景）
-        if (!WebSocketClient.isConnected) {
+        // 账号隔离：连接若还挂在旧账号 token 上（切换账号后未重建）→ 强制用当前账号重连
+        if (WebSocketClient.isStaleAccount()) {
+            Log.w(TAG, "onStartCommand: WS belongs to another account, reconnecting")
+            WebSocketClient.forceReconnect()
+        } else if (!WebSocketClient.isConnected) {
+            // WS 断了就重连（覆盖：进程被杀重启、静默断连、onCreate 里 connect 失败等场景）
             Log.i(TAG, "onStartCommand: WS not connected, connecting...")
             WebSocketClient.connect()
         }
@@ -177,6 +181,12 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
     }
 
     override fun onMessage(type: String, data: JSONObject?, topic: String?) {
+        // 账号隔离：连接若还挂在旧账号的 token 上，其推送一律丢弃并切回当前账号重连
+        if (type != "connected" && type != "subscribed" && type != "pong" && WebSocketClient.isStaleAccount()) {
+            Log.w(TAG, "WS push belongs to another account, dropping and reconnecting")
+            WebSocketClient.forceReconnect()
+            return
+        }
         when (type) {
             "notification" -> handleSyncedNotification(data)
             "topic_message" -> handleTopicMessage(topic, data)

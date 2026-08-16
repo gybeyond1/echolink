@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
+        android:id="@+id/nav_topic"
+        android:icon="@drawable/ic_chat"
+        android:title="消息" />
+    <item
         android:id="@+id/nav_friends"
         android:icon="@drawable/ic_contacts"
         android:title="好友" />
-    <item
-        android:id="@+id/nav_topic"
-        android:icon="@android:drawable/ic_menu_send"
-        android:title="话题" />
     <item
         android:id="@+id/nav_settings"
         android:icon="@android:drawable/ic_menu_preferences"

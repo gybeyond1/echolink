@@ -36,6 +36,10 @@ object WebSocketClient {
     @Volatile
     private var lastPongTime: Long = 0L
 
+    // 当前 WS 连接使用的 token（账号隔离：切换账号后旧连接不再属于当前账号）
+    @Volatile
+    private var connectedToken: String? = null
+
     interface WsEventListener {
         fun onConnected()
         fun onMessage(type: String, data: org.json.JSONObject?, topic: String?)
@@ -60,6 +64,7 @@ object WebSocketClient {
         if (isConnecting || webSocket != null) return
         if (!AuthManager.isLoggedIn) return
 
+        connectedToken = AuthManager.token
         shouldReconnect = true
         isConnecting = true
 
@@ -202,6 +207,13 @@ object WebSocketClient {
         mainHandler.removeCallbacks(watchdogRunnable)
         mainHandler.postDelayed(watchdogRunnable, WATCHDOG_INTERVAL_MS)
     }
+
+    /**
+     * 账号隔离：当前连接是否仍挂在旧账号的 token 上（切换账号后连接未重建）。
+     * 此时服务器推送的都是旧账号的消息，必须丢弃并以当前账号重连。
+     */
+    fun isStaleAccount(): Boolean =
+        webSocket != null && connectedToken != null && connectedToken != AuthManager.token
 
     /**
      * 强制断开并重连（看门狗检出死连接 / 外部调用）

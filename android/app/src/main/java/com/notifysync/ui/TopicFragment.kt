@@ -388,44 +388,62 @@ class TopicFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle("${req.username} 请求加你为好友")
             .setMessage(if (req.message.isNullOrEmpty()) "验证消息：（无）" else "验证消息：${req.message}")
-            .setItems(arrayOf("同意", "拒绝", "忽略")) { _, which ->
-                lifecycleScope.launch {
-                    try {
-                        when (which) {
-                            0 -> { ApiClient.acceptFriendRequest(req.id); Toast.makeText(requireContext(), "已同意", Toast.LENGTH_SHORT).show() }
-                            1 -> { ApiClient.rejectFriendRequest(req.id); Toast.makeText(requireContext(), "已拒绝", Toast.LENGTH_SHORT).show() }
-                            2 -> { ApiClient.ignoreFriendRequest(req.id); Toast.makeText(requireContext(), "已忽略", Toast.LENGTH_SHORT).show() }
-                        }
-                        loadRequests()
-                    } catch (e: Exception) {
-                        Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-            .setNegativeButton("取消", null)
+            .setPositiveButton("同意") { _, _ -> handleFriendRequest(req, "accept") }
+            .setNegativeButton("拒绝") { _, _ -> handleFriendRequest(req, "reject") }
+            .setNeutralButton("忽略") { _, _ -> handleFriendRequest(req, "ignore") }
             .show()
+    }
+
+    private fun handleFriendRequest(req: FriendRequest, action: String) {
+        lifecycleScope.launch {
+            try {
+                when (action) {
+                    "accept" -> { ApiClient.acceptFriendRequest(req.id); Toast.makeText(requireContext(), "已同意", Toast.LENGTH_SHORT).show() }
+                    "reject" -> { ApiClient.rejectFriendRequest(req.id); Toast.makeText(requireContext(), "已拒绝", Toast.LENGTH_SHORT).show() }
+                    else -> { ApiClient.ignoreFriendRequest(req.id); Toast.makeText(requireContext(), "已忽略", Toast.LENGTH_SHORT).show() }
+                }
+                loadRequests()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun showHandleTopicRequest(req: UnifiedTopicRequest) {
         AlertDialog.Builder(requireContext())
             .setTitle("${req.username} 申请加入「${req.topic}」")
             .setMessage(if (req.message.isNullOrEmpty()) "验证消息：（无）" else "验证消息：${req.message}")
-            .setItems(arrayOf("同意", "拒绝", "忽略")) { _, which ->
+            .setPositiveButton("同意") { _, _ -> handleTopicRequest(req, true) }
+            .setNegativeButton("拒绝") { _, _ -> handleTopicRequest(req, false) }
+            .setNeutralButton("忽略") { _, _ ->
                 lifecycleScope.launch {
                     try {
-                        when (which) {
-                            0 -> { ApiClient.approveTopicRequest(req.topic, req.id); Toast.makeText(requireContext(), "已同意加入", Toast.LENGTH_SHORT).show() }
-                            1 -> { ApiClient.rejectTopicRequest(req.topic, req.id); Toast.makeText(requireContext(), "已拒绝", Toast.LENGTH_SHORT).show() }
-                            2 -> { ApiClient.ignoreTopicRequest(req.topic, req.id); Toast.makeText(requireContext(), "已忽略", Toast.LENGTH_SHORT).show() }
-                        }
+                        ApiClient.ignoreTopicRequest(req.topic, req.id)
+                        Toast.makeText(requireContext(), "已忽略", Toast.LENGTH_SHORT).show()
                         loadRequests(); loadTopicList()
                     } catch (e: Exception) {
                         Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
-            .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun handleTopicRequest(req: UnifiedTopicRequest, approve: Boolean) {
+        lifecycleScope.launch {
+            try {
+                if (approve) {
+                    ApiClient.approveTopicRequest(req.topic, req.id)
+                    Toast.makeText(requireContext(), "已同意加入", Toast.LENGTH_SHORT).show()
+                } else {
+                    ApiClient.rejectTopicRequest(req.topic, req.id)
+                    Toast.makeText(requireContext(), "已拒绝", Toast.LENGTH_SHORT).show()
+                }
+                loadRequests(); loadTopicList()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // 只刷新徽标（待审批数），不打断滚动
@@ -651,14 +669,19 @@ class TopicFragment : Fragment() {
                         Toast.makeText(requireContext(), "已发送好友申请，等待对方处理", Toast.LENGTH_SHORT).show()
                     }
                     else -> {
-                        // 不是好友 → 询问是否添加
+                        // 不是好友 → 填写验证消息后发送申请
+                        val input = requireActivity().layoutInflater.inflate(R.layout.dialog_input_single, null)
+                        val etMsg = input.findViewById<TextInputEditText>(R.id.etInput)
+                        etMsg.hint = "验证消息（选填）"
                         AlertDialog.Builder(requireContext())
                             .setTitle("添加好友")
-                            .setMessage("向 $displayName 发送好友申请？")
+                            .setMessage("向 $displayName 发送好友申请")
+                            .setView(input)
                             .setPositiveButton("发送申请") { _, _ ->
+                                val message = etMsg.text?.toString()?.trim() ?: ""
                                 lifecycleScope.launch {
                                     try {
-                                        ApiClient.sendFriendRequest(target.username)
+                                        ApiClient.sendFriendRequest(target.username, message)
                                         Toast.makeText(requireContext(), "已发送好友申请", Toast.LENGTH_SHORT).show()
                                     } catch (e: Exception) {
                                         Toast.makeText(requireContext(), "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -777,10 +800,22 @@ class TopicFragment : Fragment() {
     }
 
     private fun requestJoin(name: String, dialog: AlertDialog) {
-        lifecycleScope.launch {
-            try { ApiClient.requestJoinTopic(name, ""); Toast.makeText(requireContext(), "已发送加入申请，等待创建者审批", Toast.LENGTH_SHORT).show(); dialog.dismiss() }
-            catch (e: Exception) { Toast.makeText(requireContext(), "申请失败: ${e.message}", Toast.LENGTH_SHORT).show() }
-        }
+        val input = requireActivity().layoutInflater.inflate(R.layout.dialog_input_single, null)
+        val et = input.findViewById<TextInputEditText>(R.id.etInput)
+        et.hint = "验证消息（选填）"
+        AlertDialog.Builder(requireContext())
+            .setTitle("申请加入「$name」")
+            .setMessage("填写验证消息发送加群申请")
+            .setView(input)
+            .setPositiveButton("发送申请") { _, _ ->
+                val message = et.text?.toString()?.trim() ?: ""
+                lifecycleScope.launch {
+                    try { ApiClient.requestJoinTopic(name, message); Toast.makeText(requireContext(), "已发送加入申请，等待创建者审批", Toast.LENGTH_SHORT).show(); dialog.dismiss() }
+                    catch (e: Exception) { Toast.makeText(requireContext(), "申请失败: ${e.message}", Toast.LENGTH_SHORT).show() }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     // ===== 待审批（创建者） =====
@@ -791,7 +826,7 @@ class TopicFragment : Fragment() {
             try {
                 val list = ApiClient.getTopicRequests(topic).filter { it.status == "pending" }
                 if (list.isEmpty()) { Toast.makeText(requireContext(), "暂无待审批申请", Toast.LENGTH_SHORT).show(); return@launch }
-                val names = list.map { "${it.username} 申请加入" }.toTypedArray()
+                val names = list.map { r -> if (r.message.isNullOrEmpty()) "${r.username} 申请加入" else "${r.username} 申请加入：${r.message}" }.toTypedArray()
                 val checked = BooleanArray(list.size) { true }
                 AlertDialog.Builder(requireContext()).setTitle("待审批申请")
                     .setMultiChoiceItems(names, checked) { _, which, isChecked -> checked[which] = isChecked }
