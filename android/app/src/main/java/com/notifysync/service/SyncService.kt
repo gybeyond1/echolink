@@ -330,6 +330,9 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
             if (!data.isNull("media_url")) putExtra("media_url", data.optString("media_url", null))
             if (!data.isNull("media_name")) putExtra("media_name", data.optString("media_name", null))
             putExtra("media_size", data.optLong("media_size", 0))
+            putExtra("sender_user_id", data.optLong("user_id", 0))
+            if (!data.isNull("sender_avatar")) putExtra("sender_avatar", data.optString("sender_avatar", null))
+            if (!data.isNull("sender_display_name")) putExtra("sender_display_name", data.optString("sender_display_name", null))
         }
         sendBroadcast(broadcastIntent)
     }

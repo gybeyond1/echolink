@@ -34,7 +34,7 @@
                 android:gravity="center_vertical"
                 android:padding="16dp">
 
-                <!-- 左侧：昵称 + 用户名 + 设备名 -->
+                <!-- 左侧：昵称 + 设备名 + 用户名 -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -62,25 +62,7 @@
                             android:text="—"
                             android:textSize="18sp"
                             android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="✎"
-                            android:textSize="14sp"
-                            android:textColor="?attr/colorPrimary" />
                     </LinearLayout>
-
-                    <!-- 用户名（不可改，小字） -->
-                    <TextView
-                        android:id="@+id/tvUsername"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="—"
-                        android:textSize="13sp"
-                        android:textColor="@color/on_surface_variant"
-                        android:layout_marginTop="2dp"
-                        android:layout_marginBottom="6dp" />
 
                     <!-- 设备名（可点击修改） -->
                     <LinearLayout
@@ -93,7 +75,8 @@
                         android:focusable="true"
                         android:background="?attr/selectableItemBackground"
                         android:paddingTop="2dp"
-                        android:paddingBottom="2dp">
+                        android:paddingBottom="2dp"
+                        android:layout_marginTop="4dp">
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -109,14 +92,17 @@
                             android:layout_weight="1"
                             android:text="—"
                             android:textSize="14sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="✎"
-                            android:textSize="12sp"
-                            android:textColor="?attr/colorPrimary" />
                     </LinearLayout>
+
+                    <!-- 用户名（不可改，uid 格式） -->
+                    <TextView
+                        android:id="@+id/tvUsername"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="—"
+                        android:textSize="12sp"
+                        android:textColor="@color/on_surface_variant"
+                        android:layout_marginTop="4dp" />
                 </LinearLayout>
 
                 <!-- 右侧：圆形头像（可点击上传） -->
@@ -226,7 +212,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="赞赏支持"
+                        android:text="打赏支持"
                         android:textSize="15sp" />
 
                     <TextView

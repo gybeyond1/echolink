@@ -380,6 +380,9 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
       ts
     );
 
+  // 查询发送者的头像和昵称（用于客户端聊天页头像渲染）
+  const userRow = db.prepare("SELECT avatar, display_name FROM users WHERE id = ?").get(req.userId);
+
   const message = {
     id: result.lastInsertRowid,
     topic: name,
@@ -390,6 +393,9 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
     media_name: hasMedia ? (media_name || "") : null,
     media_size: hasMedia ? (parseInt(media_size) || 0) : 0,
     sender_name: sender,
+    sender_display_name: userRow?.display_name || null,
+    sender_avatar: userRow?.avatar || null,
+    user_id: req.userId,
     timestamp: ts,
     device_id: deviceId,
     device_name: deviceName || null,
@@ -423,8 +429,8 @@ router.get("/:topic/messages", authMiddleware, (req, res) => {
 
   const messages =
     since > 0
-      ? db.prepare(`SELECT * FROM topic_messages WHERE topic = ? AND timestamp > ? ORDER BY id ASC LIMIT ?`).all(name, since, limit)
-      : db.prepare(`SELECT * FROM topic_messages WHERE topic = ? ORDER BY id DESC LIMIT ?`).all(name, limit).reverse();
+      ? db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? AND tm.timestamp > ? ORDER BY tm.id ASC LIMIT ?`).all(name, since, limit)
+      : db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? ORDER BY tm.id DESC LIMIT ?`).all(name, limit).reverse();
 
   res.json({ topic: name, messages });
 });
