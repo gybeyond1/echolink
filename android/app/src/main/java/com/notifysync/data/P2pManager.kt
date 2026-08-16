@@ -114,10 +114,7 @@ object P2pManager {
 
     private fun newConnection(observer: PeerConnection.Observer): PeerConnection? {
         val f = factory ?: return null
-        val config = PeerConnection.RtcConfiguration(iceServers).apply {
-            // 打洞优先：不要求中继，直连失败也算超时回退
-            iceTransportsType = PeerConnection.IceTransportsType.ALL
-        }
+        val config = PeerConnection.RTCConfiguration(iceServers)
         return f.createPeerConnection(config, observer)
     }
 
@@ -173,7 +170,6 @@ object P2pManager {
             if (!session.channelOpened) finishFallback("打洞超时（30s）")
         }, HOLE_PUNCH_TIMEOUT_MS)
 
-        session.onFallback = ::finishFallback
         session.onSuccess = { url -> mainHandler.post { onSuccess(url) } }
         session.onError = { msg -> mainHandler.post { onError(msg) } }
 
@@ -526,7 +522,6 @@ object P2pManager {
         @Volatile var dc: DataChannel? = null
         @Volatile var channelOpened = false
         @Volatile var sentDone = false
-        @Volatile var onFallback: (() -> Unit)? = null
         var onSuccess: ((String) -> Unit)? = null
         var onError: ((String) -> Unit)? = null
 
