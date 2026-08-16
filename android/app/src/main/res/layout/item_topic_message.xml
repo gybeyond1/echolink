@@ -1,94 +1,122 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Telegram-style chat message: avatar on left, content on right.
+     Consecutive messages from same sender: avatar INVISIBLE, sender row GONE. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="12dp">
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="2dp">
 
+    <!-- Avatar (36dp circle) -->
+    <ImageView
+        android:id="@+id/ivAvatar"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_default_avatar"
+        android:background="@drawable/bg_circle_avatar"
+        android:clipToOutline="true"
+        android:outlineProvider="background" />
+
+    <!-- Content area -->
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Sender + time row (GONE for consecutive messages) -->
+        <LinearLayout
+            android:id="@+id/llSenderInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvSender"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/purple_500"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textColor="@color/on_surface_variant"
+                android:textSize="11sp" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/tvSender"
-            android:layout_width="wrap_content"
+            android:id="@+id/tvTitle"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="@color/purple_500"
-            android:textSize="13sp"
+            android:layout_marginTop="2dp"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/tvTime"
-            android:layout_width="wrap_content"
+            android:id="@+id/tvText"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:textColor="@color/on_surface_variant"
-            android:textSize="12sp" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/tvTitle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textSize="15sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/tvText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textSize="14sp" />
-
-    <!-- 媒体区（默认隐藏，按类型显示其一） -->
-    <ImageView
-        android:id="@+id/ivMedia"
-        android:layout_width="180dp"
-        android:layout_height="180dp"
-        android:layout_marginTop="6dp"
-        android:scaleType="centerCrop"
-        android:visibility="gone" />
-
-    <LinearLayout
-        android:id="@+id/llVoice"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="@drawable/bg_role_badge"
-        android:padding="8dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/tvVoice"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🔊 语音消息"
-            android:textColor="@android:color/white"
+            android:layout_marginTop="2dp"
             android:textSize="14sp" />
-    </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/llFile"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="@drawable/bg_role_badge"
-        android:padding="8dp"
-        android:visibility="gone">
+        <!-- Media area (default hidden, shown by type) -->
+        <ImageView
+            android:id="@+id/ivMedia"
+            android:layout_width="180dp"
+            android:layout_height="180dp"
+            android:layout_marginTop="6dp"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/tvFile"
+        <LinearLayout
+            android:id="@+id/llVoice"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📄 文件"
-            android:textColor="@android:color/white"
-            android:textSize="14sp" />
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_role_badge"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvVoice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔊 语音消息"
+                android:textColor="@android:color/white"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/llFile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_role_badge"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvFile"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📄 文件"
+                android:textColor="@android:color/white"
+                android:textSize="14sp" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

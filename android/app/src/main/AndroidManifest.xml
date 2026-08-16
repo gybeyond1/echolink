@@ -31,6 +31,13 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- 微信 wxp:// 付款码scheme（打赏支持） -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="wxp" />
+        </intent>
+        <!-- 微信包名直接查询 -->
+        <package android:name="com.tencent.mm" />
     </queries>
 
     <application

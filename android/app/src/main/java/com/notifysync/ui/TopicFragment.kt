@@ -103,7 +103,10 @@ class TopicFragment : Fragment() {
                             mediaType = intent.getStringExtra("media_type") ?: "text",
                             mediaUrl = intent.getStringExtra("media_url"),
                             mediaName = intent.getStringExtra("media_name"),
-                            mediaSize = intent.getLongExtra("media_size", 0)
+                            mediaSize = intent.getLongExtra("media_size", 0),
+                            senderUserId = intent.getLongExtra("sender_user_id", 0),
+                            senderAvatar = intent.getStringExtra("sender_avatar"),
+                            senderDisplayName = intent.getStringExtra("sender_display_name")
                         )
                         chatAdapter.appendItems(listOf(msg))
                         scrollToBottom()
@@ -157,7 +160,8 @@ class TopicFragment : Fragment() {
             onItemClick = { msg ->
                 if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
             },
-            onImageClick = { url -> showImageFullscreen(url) }
+            onImageClick = { url -> showImageFullscreen(url) },
+            onAvatarClick = { msg -> handleAvatarClick(msg) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = chatAdapter
@@ -607,6 +611,66 @@ class TopicFragment : Fragment() {
     }
 
     private fun pickImage() { getContent.launch("image/*") }
+
+    // ===== 头像点击（群聊中加好友/发起私聊） =====
+
+    private fun handleAvatarClick(msg: TopicMessage) {
+        val topic = chatTopic ?: return
+        // 仅群聊（normal）支持头像交互；设备会话/私聊不处理
+        if (topic.kind != "normal") return
+
+        val senderUserId = msg.senderUserId
+        val senderUsername = msg.senderName
+
+        // 自己的头像 → 不处理
+        if (senderUserId > 0 && senderUserId == AuthManager.userId) return
+        if (senderUsername == AuthManager.username) return
+
+        val displayName = msg.senderDisplayName?.takeIf { it.isNotBlank() } ?: senderUsername
+
+        lifecycleScope.launch {
+            try {
+                // 搜索用户判断好友关系
+                val users = ApiClient.searchUsers(senderUsername)
+                val target = users.find { it.username == senderUsername }
+                if (target == null) {
+                    Toast.makeText(requireContext(), "未找到用户", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                when {
+                    target.isFriend -> {
+                        // 已是好友 → 发起私聊
+                        val (dmTopic, title) = ApiClient.openFriendChat(target.username)
+                        val displayTitle = target.displayName ?: title
+                        (activity as? MainActivity)?.openTopic(dmTopic, displayTitle)
+                    }
+                    target.requested -> {
+                        Toast.makeText(requireContext(), "已发送好友申请，等待对方处理", Toast.LENGTH_SHORT).show()
+                    }
+                    else -> {
+                        // 不是好友 → 询问是否添加
+                        AlertDialog.Builder(requireContext())
+                            .setTitle("添加好友")
+                            .setMessage("向 $displayName 发送好友申请？")
+                            .setPositiveButton("发送申请") { _, _ ->
+                                lifecycleScope.launch {
+                                    try {
+                                        ApiClient.sendFriendRequest(target.username)
+                                        Toast.makeText(requireContext(), "已发送好友申请", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(requireContext(), "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                            .setNegativeButton("取消", null)
+                            .show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     // ===== 多选删除消息 =====
 

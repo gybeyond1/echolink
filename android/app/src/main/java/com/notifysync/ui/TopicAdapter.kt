@@ -4,7 +4,14 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
+import android.graphics.RectF
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
@@ -38,7 +45,8 @@ import java.util.Locale
 class TopicAdapter(
     private val onItemLongClick: (TopicMessage) -> Unit,
     private val onItemClick: (TopicMessage) -> Unit,
-    private val onImageClick: ((String) -> Unit)? = null
+    private val onImageClick: ((String) -> Unit)? = null,
+    private val onAvatarClick: ((TopicMessage) -> Unit)? = null
 ) : RecyclerView.Adapter<TopicAdapter.ViewHolder>() {
 
     private val items = mutableListOf<TopicMessage>()
@@ -94,36 +102,27 @@ class TopicAdapter(
     val selectedCount: Int get() = selected.size
 
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val ivAvatar: ImageView = view.findViewById(R.id.ivAvatar)
+        val llSenderInfo: View = view.findViewById(R.id.llSenderInfo)
         val tvSender: TextView = view.findViewById(R.id.tvSender)
         val tvTime: TextView = view.findViewById(R.id.tvTime)
         val tvTitle: TextView = view.findViewById(R.id.tvTitle)
         val tvText: TextView = view.findViewById(R.id.tvText)
         val ivMedia: ImageView = view.findViewById(R.id.ivMedia)
-        val llVoice: android.view.View = view.findViewById(R.id.llVoice)
-        val llFile: android.view.View = view.findViewById(R.id.llFile)
+        val llVoice: View = view.findViewById(R.id.llVoice)
+        val llFile: View = view.findViewById(R.id.llFile)
         val tvFile: TextView = view.findViewById(R.id.tvFile)
         var item: TopicMessage? = null
-        private var selectionTapHandled = false  // 本次点击已在多选模式处理（onSingleTapConfirmed 不再当普通单击）
+        private var selectionTapHandled = false
 
         init {
-            // 行业通用做法：ViewHolder 构造时一次性建立手势处理，onBindViewHolder 只更新数据，
-            // 不再重建任何 listener。这样 RecyclerView 复用池 / notifyDataSetChanged 全量刷新
-            // 都不会打断或重置手势状态，从根本上杜绝"点不动 / 要点好几下才选中"。
-            // 关键配置：
-            //  1. onDown 必须返回 true，事件序列才会持续交给 GestureDetector；
-            //  2. 必须 setOnDoubleTapListener，否则 onDoubleTap / onSingleTapConfirmed 永不回调
-            //     （上一轮 GestureDetector "失灵"很可能就是漏了这一步）；
-            //  3. 普通模式单击走 onSingleTapConfirmed（等双击判定，避免双击时误开媒体）；
-            //  4. 多选模式单击走 onSingleTapUp（立即 toggle，没有双击等待延迟）；
-            //  5. 长按触发后 GestureDetector 不会再回调单击，天然避免"长按进多选后误 toggle"。
             val ctx = view.context
             val gestureListener = object : GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(e: MotionEvent): Boolean {
-                    selectionTapHandled = false  // 每次按下重置，防止 ViewHolder 复用时残留标记
+                    selectionTapHandled = false
                     return true
                 }
 
-                // 单击：多选模式立即 toggle；普通模式忽略（等 onSingleTapConfirmed 判定非双击）
                 override fun onSingleTapUp(e: MotionEvent): Boolean {
                     val it = item ?: return false
                     if (selectionMode) {
@@ -134,40 +133,42 @@ class TopicAdapter(
                     return false
                 }
 
-                // 单击确认（非双击）：普通模式按落点打开媒体（图片/语音/文件）。
-                // 若本次点击已在多选模式处理过（如取消最后一项退出多选），不再当普通单击。
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                     val it = item ?: return false
                     if (selectionTapHandled) {
                         selectionTapHandled = false
                         return true
                     }
-                    if (!selectionMode) openMediaIfHit(it, e)
+                    if (!selectionMode) {
+                        // Check avatar click first
+                        if (ivAvatar.visibility == View.VISIBLE && inViewBounds(ivAvatar, e)) {
+                            onAvatarClick?.invoke(it)
+                            return true
+                        }
+                        openMediaIfHit(it, e)
+                    }
                     return true
                 }
 
-                // 双击：复制 + 震动（仅普通模式；多选模式吞掉，避免误复制）
                 override fun onDoubleTap(e: MotionEvent): Boolean {
                     val it = item ?: return false
                     if (!selectionMode) copyText(view.context, it)
                     return true
                 }
 
-                // 长按：多选 → toggle；普通 → 进入多选
                 override fun onLongPress(e: MotionEvent) {
                     val it = item ?: return
                     if (selectionMode) onItemClick(it) else onItemLongClick(it)
                 }
             }
             val detector = GestureDetector(ctx, gestureListener)
-            detector.setOnDoubleTapListener(gestureListener)  // 关键：不设置则双击/单击确认永不回调
+            detector.setOnDoubleTapListener(gestureListener)
             view.setOnTouchListener { _, ev ->
                 detector.onTouchEvent(ev)
                 true
             }
         }
 
-        // 普通模式单击：按落点打开媒体
         private fun openMediaIfHit(item: TopicMessage, ev: MotionEvent) {
             val ctx = itemView.context
             when {
@@ -176,7 +177,6 @@ class TopicAdapter(
                 }
                 llVoice.visibility == View.VISIBLE && inViewBounds(llVoice, ev) -> {
                     if (!item.mediaUrl.isNullOrEmpty()) {
-                        // P2P 消息：优先播本地落地文件
                         val local = P2pManager.localP2pFile(ctx, item.mediaUrl)
                         if (local != null) playVoice(local.absolutePath)
                         else playVoice(fullUrl(item.mediaUrl))
@@ -188,7 +188,6 @@ class TopicAdapter(
             }
         }
 
-        // 文件打开：P2P 本地文件走 FileProvider；服务器文件走 URL
         private fun openFile(ctx: Context, item: TopicMessage) {
             val local = P2pManager.localP2pFile(ctx, item.mediaUrl!!)
             if (local != null) {
@@ -240,16 +239,40 @@ class TopicAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
         holder.item = item
-        val isMedia = item.mediaType != "text" && !item.mediaUrl.isNullOrEmpty()
-        val sender = item.senderName.ifEmpty { "unknown" }
-        holder.tvSender.text = if (!item.deviceName.isNullOrBlank()) "$sender (${item.deviceName})" else sender
+
+        // ===== Telegram-style consecutive message grouping =====
+        // Show avatar + sender name only for the first message in a group.
+        // Consecutive messages from the same sender hide avatar (INVISIBLE to keep spacing)
+        // and sender info row (GONE).
+        val prevItem = if (position > 0) items[position - 1] else null
+        val isSameSenderAsPrev = prevItem != null && isSameSender(prevItem!!, item)
+
+        if (isSameSenderAsPrev) {
+            holder.ivAvatar.visibility = View.INVISIBLE
+            holder.llSenderInfo.visibility = View.GONE
+        } else {
+            holder.ivAvatar.visibility = View.VISIBLE
+            holder.llSenderInfo.visibility = View.VISIBLE
+        }
+
+        // Sender display name: prefer display_name, fallback to sender_name (username)
+        val displayName = item.senderDisplayName?.takeIf { it.isNotBlank() }
+            ?: item.senderName.ifEmpty { "unknown" }
+        holder.tvSender.text = if (!item.deviceName.isNullOrBlank()) {
+            "$displayName (${item.deviceName})"
+        } else {
+            displayName
+        }
         holder.tvTime.text = timeFormat.format(Date(item.timestamp))
+
+        // Title and text
         holder.tvTitle.text = item.title
         holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
         holder.tvText.text = item.text
         holder.tvText.visibility = if (item.text.isNotEmpty()) View.VISIBLE else View.GONE
 
-        // 媒体渲染（点击打开媒体统一由 ViewHolder 的手势单击按落点分发，不再给子 View 设 listener）
+        // Media rendering
+        val isMedia = item.mediaType != "text" && !item.mediaUrl.isNullOrEmpty()
         holder.ivMedia.visibility = View.GONE
         holder.llVoice.visibility = View.GONE
         holder.llFile.visibility = View.GONE
@@ -267,17 +290,33 @@ class TopicAdapter(
                 "file" -> {
                     holder.llFile.visibility = View.VISIBLE
                     val suffix = if (item.mediaUrl?.startsWith("p2p:") == true) " · P2P直传" else ""
-                    holder.tvFile.text = "📄 ${item.mediaName ?: "文件"}  (${formatSize(item.mediaSize)})$suffix"
+                    holder.tvFile.text = "\uD83D\uDCC4 ${item.mediaName ?: "文件"}  (${formatSize(item.mediaSize)})$suffix"
                 }
             }
         }
 
-        // 多选态视觉（与通知列表一致：背景色变化，无复选框）
+        // Avatar loading (only for first message in group to save bandwidth)
+        if (!isSameSenderAsPrev) {
+            loadAvatar(item, holder.ivAvatar)
+        }
+
+        // Selection visual
         holder.itemView.setBackgroundColor(
             if (selectionMode && selected.contains(item.id))
                 holder.itemView.context.getColor(R.color.brand_primary_light)
             else 0x00000000
         )
+    }
+
+    /**
+     * Two messages are from the same sender if they share the same user_id (> 0),
+     * or if user_id is 0 (legacy/WS) fall back to senderName comparison.
+     */
+    private fun isSameSender(a: TopicMessage, b: TopicMessage): Boolean {
+        if (a.senderUserId > 0 && b.senderUserId > 0) {
+            return a.senderUserId == b.senderUserId
+        }
+        return a.senderName == b.senderName
     }
 
     val isAllSelected: Boolean
@@ -290,7 +329,7 @@ class TopicAdapter(
         if (text.isBlank()) return
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("话题消息", text))
-        vibrate(context)  // 双击复制震动反馈
+        vibrate(context)
         Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
     }
 
@@ -308,7 +347,7 @@ class TopicAdapter(
     override fun getItemCount(): Int = items.size
 
     private fun fullUrl(path: String): String {
-        if (path.startsWith("p2p:")) return path  // P2P 本地文件标识，非 URL
+        if (path.startsWith("p2p:")) return path
         val base = AuthManager.serverUrl.trimEnd('/')
         return if (path.startsWith("http")) path else "$base$path"
     }
@@ -340,6 +379,61 @@ class TopicAdapter(
                 // ignore
             }
         }
+    }
+
+    // ===== Avatar loading =====
+
+    private fun loadAvatar(item: TopicMessage, iv: ImageView) {
+        val avatarPath = item.senderAvatar
+        val fullAvatarUrl = if (avatarPath.isNullOrBlank()) {
+            null
+        } else if (avatarPath.startsWith("http")) {
+            avatarPath
+        } else {
+            "${AuthManager.serverUrl.trimEnd('/')}/$avatarPath"
+        }
+
+        if (fullAvatarUrl.isNullOrBlank()) {
+            iv.setImageResource(R.drawable.ic_default_avatar)
+            return
+        }
+
+        iv.setImageResource(R.drawable.ic_default_avatar)
+        scope.launch {
+            try {
+                val bmp = withContext(Dispatchers.IO) { downloadBitmap(fullAvatarUrl) }
+                if (bmp != null) {
+                    iv.setImageBitmap(cropCircle(bmp))
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun downloadBitmap(urlStr: String): Bitmap? {
+        return try {
+            val conn = URL(urlStr).openConnection() as HttpURLConnection
+            conn.connectTimeout = 8_000
+            conn.readTimeout = 8_000
+            conn.connect()
+            BitmapFactory.decodeStream(conn.inputStream)
+        } catch (e: Exception) { null }
+    }
+
+    private fun cropCircle(src: Bitmap): Bitmap {
+        val size = minOf(src.width, src.height)
+        val x = (src.width - size) / 2
+        val y = (src.height - size) / 2
+        val squared = Bitmap.createBitmap(src, x, y, size, size)
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val rect = Rect(0, 0, size, size)
+        val rectF = RectF(rect)
+        canvas.drawOval(rectF, paint)
+        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(squared, rect, rect, paint)
+        if (squared != src) squared.recycle()
+        return output
     }
 
     private fun playVoice(url: String) {

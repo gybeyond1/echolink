@@ -81,7 +81,7 @@ class SettingsFragment : Fragment() {
     private fun setupUI() {
         // 账号资料
         loadProfile()
-        binding.tvUsername.text = "@${AuthManager.username ?: "未知"}"
+        binding.tvUsername.text = "uid:${AuthManager.username ?: "未知"}"
         binding.tvDeviceName.text = AuthManager.deviceName ?: "未知"
         binding.etServerUrl.setText(AuthManager.serverUrl)
 
@@ -100,13 +100,28 @@ class SettingsFragment : Fragment() {
             startActivity(intent)
         }
 
-        // 赞赏支持
+        // 打赏支持（跳微信付款码）
         binding.llDonate.setOnClickListener {
             try {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL))
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                startActivity(intent)
-                Toast.makeText(requireContext(), "正在打开微信赞赏…", Toast.LENGTH_SHORT).show()
+                // 先检查是否有应用能处理 wxp:// scheme
+                val pm = requireContext().packageManager
+                val resolved = intent.resolveActivity(pm)
+                if (resolved != null) {
+                    startActivity(intent)
+                } else {
+                    // 直接指定微信包名尝试启动
+                    intent.setPackage("com.tencent.mm")
+                    try {
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        // 微信未安装或版本不支持，复制链接到剪贴板
+                        val cm = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("打赏链接", DONATE_URL))
+                        Toast.makeText(requireContext(), "微信未安装或版本不支持，打赏链接已复制到剪贴板", Toast.LENGTH_LONG).show()
+                    }
+                }
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "无法打开微信，请确认已安装微信", Toast.LENGTH_SHORT).show()
             }

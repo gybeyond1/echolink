@@ -54,7 +54,10 @@ data class TopicMessage(
     val mediaType: String = "text",   // "text" | "voice" | "image" | "file"
     val mediaUrl: String? = null,
     val mediaName: String? = null,
-    val mediaSize: Long = 0
+    val mediaSize: Long = 0,
+    val senderUserId: Long = 0,
+    val senderAvatar: String? = null,
+    val senderDisplayName: String? = null
 )
 
 // ===== JSON 解析扩展 =====
@@ -122,7 +125,10 @@ fun parseTopicMessages(jsonArray: JSONArray): List<TopicMessage> {
                 mediaType = obj.optString("media_type", "text"),
                 mediaUrl = obj.optString("media_url", null),
                 mediaName = obj.optString("media_name", null),
-                mediaSize = obj.optLong("media_size", 0)
+                mediaSize = obj.optLong("media_size", 0),
+                senderUserId = obj.optLong("user_id", 0),
+                senderAvatar = obj.optString("sender_avatar", null),
+                senderDisplayName = obj.optString("sender_display_name", null)
             )
         )
     }
@@ -142,7 +148,10 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
         mediaType = json.optString("media_type", "text"),
         mediaUrl = json.optString("media_url", null),
         mediaName = json.optString("media_name", null),
-        mediaSize = json.optLong("media_size", 0)
+        mediaSize = json.optLong("media_size", 0),
+        senderUserId = json.optLong("user_id", 0),
+        senderAvatar = json.optString("sender_avatar", null),
+        senderDisplayName = json.optString("sender_display_name", null)
     )
 }
 
