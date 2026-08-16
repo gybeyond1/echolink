@@ -222,6 +222,14 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
                     sendBroadcast(intent)
                 }
             }
+            // 用户资料更新（昵称/头像在另一台设备修改）→ 刷新本地缓存 + 广播
+            "profile_updated" -> {
+                val displayName = data?.optString("display_name", null)
+                val avatar = data?.optString("avatar", null)
+                if (displayName != null) AuthManager.displayName = displayName
+                if (avatar != null) AuthManager.avatarUrl = avatar
+                sendBroadcast(Intent("com.notifysync.PROFILE_CHANGED"))
+            }
             "connected" -> {
                 connectionStatus = "已连接"
                 updateForegroundNotification("已连接 - 同步中")

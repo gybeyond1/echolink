@@ -45,7 +45,7 @@ router.post("/register", (req, res) => {
 
   res.status(201).json({
     token,
-    user: { id: result.lastInsertRowid, username, role: "user" },
+    user: { id: result.lastInsertRowid, username, role: "user", display_name: username, avatar: null },
   });
 });
 
@@ -80,13 +80,29 @@ router.post("/login", (req, res) => {
 
   res.json({
     token,
-    user: { id: user.id, username: user.username, role: user.role || "user" },
+    user: {
+      id: user.id,
+      username: user.username,
+      role: user.role || "user",
+      display_name: user.display_name || user.username,
+      avatar: user.avatar || null,
+    },
   });
 });
 
 // 验证 token 有效性
 router.get("/me", authMiddleware, (req, res) => {
-  res.json({ user: { id: req.userId, username: req.username, role: req.role } });
+  const db = getDB();
+  const u = db.prepare("SELECT display_name, avatar FROM users WHERE id = ?").get(req.userId);
+  res.json({
+    user: {
+      id: req.userId,
+      username: req.username,
+      role: req.role,
+      display_name: u ? (u.display_name || req.username) : req.username,
+      avatar: u ? u.avatar : null,
+    },
+  });
 });
 
 // 修改密码

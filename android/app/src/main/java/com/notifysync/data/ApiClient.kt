@@ -352,16 +352,61 @@ object ApiClient {
         execute(buildRequest("/api/friends/${java.net.URLEncoder.encode(username, "UTF-8")}", "DELETE"))
     }
 
-    // 打开/创建与好友的私聊会话，返回 (topic名, 对方用户名)
+    // 打开/创建与好友的私聊会话，返回 (topic名, 对方展示名)
     suspend fun openFriendChat(username: String): Pair<String, String> {
         val json = execute(buildRequest("/api/friends/chat/${java.net.URLEncoder.encode(username, "UTF-8")}", "POST"))
-        return Pair(json.getString("topic"), json.getString("title"))
+        return Pair(json.getString("topic"), json.optString("display_name", json.getString("title")))
     }
 
     // 统一「新的申请」汇总（好友申请 + 我创建话题的加群申请）
     suspend fun getAllRequests(): UnifiedRequests {
         val json = execute(buildRequest("/api/requests", "GET"))
         return parseUnifiedRequests(json)
+    }
+
+    // ===== 用户资料 =====
+
+    // 获取当前用户资料（昵称 + 头像）
+    suspend fun getProfile(): JSONObject {
+        return execute(buildRequest("/api/user/profile", "GET"))
+    }
+
+    // 修改昵称（全账号同步）
+    suspend fun updateNickname(name: String): JSONObject {
+        val body = JSONObject().put("display_name", name)
+        return execute(buildRequest("/api/user/nickname", "PUT", body))
+    }
+
+    // 上传头像（multipart file）
+    suspend fun uploadAvatar(file: java.io.File): JSONObject {
+        val url = "${AuthManager.serverUrl}/api/user/avatar"
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "file",
+                file.name,
+                file.asRequestBody("image/*".toMediaType())
+            )
+            .build()
+        val request = Request.Builder().url(url)
+            .addHeader("Authorization", "Bearer ${AuthManager.token}")
+            .post(body)
+            .build()
+        return withContext(Dispatchers.IO) {
+            client.newCall(request).execute().use { response ->
+                val json = JSONObject(response.body?.string() ?: "{}")
+                if (!response.isSuccessful) {
+                    throw ApiException(response.code, json.optString("error", "upload failed"))
+                }
+                json
+            }
+        }
+    }
+
+    // 构建头像完整 URL（服务器路径 -> 完整 URL）
+    fun fullAvatarUrl(path: String?): String? {
+        if (path.isNullOrBlank()) return null
+        if (path.startsWith("http")) return path
+        return "${AuthManager.serverUrl}$path"
     }
 
     // ===== 健康检查 =====

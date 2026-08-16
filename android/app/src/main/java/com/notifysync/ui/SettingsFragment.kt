@@ -5,6 +5,15 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
+import android.graphics.RectF
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -26,7 +35,13 @@ import com.notifysync.data.AuthManager
 import com.notifysync.databinding.FragmentSettingsBinding
 import com.notifysync.service.NotificationListener
 import com.notifysync.service.SyncService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
@@ -37,6 +52,9 @@ class SettingsFragment : Fragment() {
 
     companion object {
         private const val REQ_SMS_PERMISSION = 1001
+        private const val REQ_PICK_AVATAR = 1002
+        private const val PROJECT_URL = "https://github.com/gybeyond1/notify-sync"
+        private const val DONATE_URL = "wxp://f2f0gpIJomgrTKj2sOG8gc64wSBei7Z5YVgXgYNcDSZTzZpfpK3RX9ZC8fn2SW5LNCeT"
     }
 
     override fun onCreateView(
@@ -53,7 +71,6 @@ class SettingsFragment : Fragment() {
         try {
             setupUI()
         } catch (e: Exception) {
-            // 兜底：任何异常都不要在打开设置时直接闪退，给出可阅读的错误提示
             android.util.Log.e("SettingsFragment", "onViewCreated error", e)
             try {
                 Toast.makeText(requireContext(), "设置页出错: ${e.message}", Toast.LENGTH_LONG).show()
@@ -62,19 +79,44 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupUI() {
-        // 显示当前信息
-        binding.tvUsername.text = AuthManager.username ?: "未知"
+        // 账号资料
+        loadProfile()
+        binding.tvUsername.text = "@${AuthManager.username ?: "未知"}"
         binding.tvDeviceName.text = AuthManager.deviceName ?: "未知"
         binding.etServerUrl.setText(AuthManager.serverUrl)
 
-        // 外观主题切换（跟随系统 / 浅色 / 深色）
+        // 昵称点击编辑
+        binding.llNickname.setOnClickListener { showNicknameDialog() }
+
+        // 设备名点击编辑
+        binding.llDeviceName.setOnClickListener { showDeviceRenameDialog() }
+
+        // 头像点击上传
+        binding.flAvatar.setOnClickListener { pickAvatarImage() }
+
+        // 项目地址
+        binding.llProjectUrl.setOnClickListener {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(PROJECT_URL))
+            startActivity(intent)
+        }
+
+        // 赞赏支持
+        binding.llDonate.setOnClickListener {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL))
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                Toast.makeText(requireContext(), "正在打开微信赞赏…", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "无法打开微信，请确认已安装微信", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // 外观主题切换
         setupThemeToggle()
 
         // 通知监听权限状态
         updatePermissionStatus()
-
-        // 自定义设备名
-        setupDeviceRename()
 
         // 短信验证码自动提取
         setupSmsCapture()
@@ -91,7 +133,6 @@ class SettingsFragment : Fragment() {
             if (url.isNotEmpty()) {
                 AuthManager.serverUrl = url
                 Toast.makeText(requireContext(), "服务器地址已保存", Toast.LENGTH_SHORT).show()
-                // 重启同步服务
                 SyncService.stop(requireContext())
                 SyncService.start(requireContext())
             }
@@ -127,10 +168,168 @@ class SettingsFragment : Fragment() {
         setupAppFilter()
     }
 
+    // ===== 用户资料（昵称 + 头像） =====
+
+    private fun loadProfile() {
+        // 先用本地缓存显示
+        binding.tvDisplayName.text = AuthManager.displayName ?: AuthManager.username ?: "—"
+        loadAvatar(AuthManager.avatarUrl)
+
+        // 从服务器刷新
+        lifecycleScope.launch {
+            try {
+                val json = ApiClient.getProfile()
+                val name = json.optString("display_name", AuthManager.username)
+                val avatar = json.optString("avatar", null)
+                AuthManager.displayName = name
+                AuthManager.avatarUrl = avatar
+                binding.tvDisplayName.text = name
+                loadAvatar(avatar)
+            } catch (e: Exception) {
+                // 静默失败，用本地缓存
+            }
+        }
+    }
+
+    private fun loadAvatar(avatarPath: String?) {
+        val fullUrl = ApiClient.fullAvatarUrl(avatarPath)
+        if (fullUrl.isNullOrBlank()) {
+            binding.ivAvatar.setImageResource(R.drawable.ic_default_avatar)
+            return
+        }
+        lifecycleScope.launch {
+            try {
+                val bmp = withContext(Dispatchers.IO) { downloadBitmap(fullUrl) }
+                if (bmp != null) {
+                    binding.ivAvatar.setImageBitmap(cropCircle(bmp))
+                } else {
+                    binding.ivAvatar.setImageResource(R.drawable.ic_default_avatar)
+                }
+            } catch (e: Exception) {
+                binding.ivAvatar.setImageResource(R.drawable.ic_default_avatar)
+            }
+        }
+    }
+
+    private fun downloadBitmap(urlStr: String): Bitmap? {
+        return try {
+            val conn = URL(urlStr).openConnection() as HttpURLConnection
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 10_000
+            conn.connect()
+            BitmapFactory.decodeStream(conn.inputStream)
+        } catch (e: Exception) { null }
+    }
+
+    private fun cropCircle(src: Bitmap): Bitmap {
+        val size = minOf(src.width, src.height)
+        val x = (src.width - size) / 2
+        val y = (src.height - size) / 2
+        val squared = Bitmap.createBitmap(src, x, y, size, size)
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val rect = Rect(0, 0, size, size)
+        val rectF = RectF(rect)
+        canvas.drawOval(rectF, paint)
+        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(squared, rect, rect, paint)
+        if (squared != src) squared.recycle()
+        return output
+    }
+
+    private fun showNicknameDialog() {
+        val input = EditText(requireContext()).apply {
+            setText(AuthManager.displayName ?: AuthManager.username ?: "")
+            hint = "输入昵称"
+        }
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        input.setPadding(padding, padding, padding, padding)
+        AlertDialog.Builder(requireContext())
+            .setTitle("修改昵称")
+            .setMessage("昵称会同步到所有设备")
+            .setView(input)
+            .setPositiveButton("保存") { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isEmpty()) {
+                    Toast.makeText(requireContext(), "昵称不能为空", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                if (newName.length > 32) {
+                    Toast.makeText(requireContext(), "昵称最多 32 个字符", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                lifecycleScope.launch {
+                    try {
+                        ApiClient.updateNickname(newName)
+                        AuthManager.displayName = newName
+                        binding.tvDisplayName.text = newName
+                        Toast.makeText(requireContext(), "昵称已更新", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "修改失败: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun pickAvatarImage() {
+        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "image/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+        startActivityForResult(intent, REQ_PICK_AVATAR)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_PICK_AVATAR && resultCode == android.app.Activity.RESULT_OK) {
+            val uri = data?.data
+            if (uri != null) {
+                uploadAvatarFromUri(uri)
+            }
+        }
+    }
+
+    private fun uploadAvatarFromUri(uri: Uri) {
+        lifecycleScope.launch {
+            try {
+                // 把 uri 内容拷贝到临时文件
+                val tmpFile = File(requireContext().cacheDir, "avatar_upload_${System.currentTimeMillis()}.png")
+                withContext(Dispatchers.IO) {
+                    requireContext().contentResolver.openInputStream(uri)?.use { input ->
+                        FileOutputStream(tmpFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    } ?: throw Exception("无法读取图片")
+                }
+
+                // 先在 UI 上预览（圆形裁剪）
+                val bmp = withContext(Dispatchers.IO) {
+                    BitmapFactory.decodeFile(tmpFile.absolutePath)
+                }
+                if (bmp != null) {
+                    binding.ivAvatar.setImageBitmap(cropCircle(bmp))
+                }
+
+                // 上传到服务器
+                val json = ApiClient.uploadAvatar(tmpFile)
+                val avatarPath = json.optString("avatar", null)
+                if (!avatarPath.isNullOrBlank()) {
+                    AuthManager.avatarUrl = avatarPath
+                    Toast.makeText(requireContext(), "头像已更新", Toast.LENGTH_SHORT).show()
+                }
+                tmpFile.delete()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "上传头像失败: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     // ===== 外观主题切换 =====
 
     private fun setupThemeToggle() {
-        // 初始化选中态
         when (AuthManager.themeMode) {
             "light" -> binding.toggleTheme.check(R.id.btnThemeLight)
             "dark" -> binding.toggleTheme.check(R.id.btnThemeDark)
@@ -152,43 +351,41 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    // ===== 自定义设备名 =====
+    // ===== 设备改名 =====
 
-    private fun setupDeviceRename() {
-        binding.llDeviceName.setOnClickListener {
-            val input = EditText(requireContext()).apply {
-                setText(AuthManager.deviceName ?: "")
-                hint = "设备名（通知里会用它标识来源设备）"
-            }
-            val padding = (16 * resources.displayMetrics.density).toInt()
-            input.setPadding(padding, padding, padding, padding)
-            AlertDialog.Builder(requireContext())
-                .setTitle("重命名设备")
-                .setView(input)
-                .setPositiveButton("保存") { _, _ ->
-                    val newName = input.text.toString().trim()
-                    if (newName.isEmpty()) {
-                        Toast.makeText(requireContext(), "设备名不能为空", Toast.LENGTH_SHORT).show()
-                        return@setPositiveButton
-                    }
-                    if (newName.length > 64) {
-                        Toast.makeText(requireContext(), "设备名最多 64 个字符", Toast.LENGTH_SHORT).show()
-                        return@setPositiveButton
-                    }
-                    lifecycleScope.launch {
-                        try {
-                            ApiClient.renameDevice(AuthManager.deviceId, newName)
-                            AuthManager.deviceName = newName
-                            binding.tvDeviceName.text = newName
-                            Toast.makeText(requireContext(), "设备名已更新", Toast.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            Toast.makeText(requireContext(), "改名失败: ${e.message}", Toast.LENGTH_LONG).show()
-                        }
+    private fun showDeviceRenameDialog() {
+        val input = EditText(requireContext()).apply {
+            setText(AuthManager.deviceName ?: "")
+            hint = "设备名（通知里会用它标识来源设备）"
+        }
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        input.setPadding(padding, padding, padding, padding)
+        AlertDialog.Builder(requireContext())
+            .setTitle("重命名设备")
+            .setView(input)
+            .setPositiveButton("保存") { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isEmpty()) {
+                    Toast.makeText(requireContext(), "设备名不能为空", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                if (newName.length > 64) {
+                    Toast.makeText(requireContext(), "设备名最多 64 个字符", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                lifecycleScope.launch {
+                    try {
+                        ApiClient.renameDevice(AuthManager.deviceId, newName)
+                        AuthManager.deviceName = newName
+                        binding.tvDeviceName.text = newName
+                        Toast.makeText(requireContext(), "设备名已更新", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "改名失败: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
-                .setNegativeButton("取消", null)
-                .show()
-        }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     // ===== 短信验证码自动提取 =====
@@ -200,7 +397,6 @@ class SettingsFragment : Fragment() {
             if (isChecked && !hasSmsPermission()) {
                 Toast.makeText(requireContext(), "请先授权读取短信", Toast.LENGTH_SHORT).show()
             }
-            // 让常驻服务按新状态启停短信监听
             SyncService.start(requireContext())
         }
         binding.btnSmsPermission.setOnClickListener {
@@ -237,7 +433,6 @@ class SettingsFragment : Fragment() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_SMS_PERMISSION) {
-            // 两个权限都通过才算授权成功（RECEIVE_SMS 收广播，READ_SMS 兜底扫收件箱）
             val granted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
             if (granted) {
                 AuthManager.smsCaptureEnabled = true
@@ -275,7 +470,7 @@ class SettingsFragment : Fragment() {
         )
     }
 
-    // ===== 应用过滤（选择哪些应用的通知会被读取并上传） =====
+    // ===== 应用过滤 =====
 
     private fun setupAppFilter() {
         binding.rvAppFilter.layoutManager = LinearLayoutManager(requireContext())
@@ -283,12 +478,10 @@ class SettingsFragment : Fragment() {
 
         binding.swFilterEnabled.isChecked = AppFilterStore.isFilterEnabled
         binding.swFilterEnabled.setOnCheckedChangeListener { _, isChecked ->
-            // 实时更新本地过滤（监听器立即生效），保存按钮再同步到服务器
             AppFilterStore.setFilter(requireContext(), isChecked, selectedPackages.toSet())
         }
 
         binding.btnSaveFilters.setOnClickListener { saveAppFilters() }
-
         loadAppFilters()
     }
 
@@ -302,7 +495,7 @@ class SettingsFragment : Fragment() {
 
                 val pm = requireContext().packageManager
                 val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                    .filter { (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 } // 只显示非系统应用
+                    .filter { (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 }
                     .map {
                         val packageName = it.packageName
                         val existing = serverFilters[packageName]
@@ -331,13 +524,11 @@ class SettingsFragment : Fragment() {
     private fun onFilterToggle(filter: AppFilter, enabled: Boolean) {
         filter.enabled = enabled
         if (enabled) selectedPackages.add(filter.packageName) else selectedPackages.remove(filter.packageName)
-        // 本地立即生效，服务器在「保存」时同步
         AppFilterStore.setFilter(requireContext(), binding.swFilterEnabled.isChecked, selectedPackages.toSet())
     }
 
     private fun saveAppFilters() {
         val isOn = binding.swFilterEnabled.isChecked
-        // 启用时只把勾选的应用提交到服务器；关闭时提交空列表（= 同步所有）
         val enabledItems = if (isOn) filterAdapter.currentList.filter { it.enabled } else emptyList()
 
         binding.progressBarFilters.visibility = View.VISIBLE

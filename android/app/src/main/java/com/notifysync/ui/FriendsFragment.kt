@@ -128,7 +128,9 @@ class FriendsFragment : Fragment() {
         lifecycleScope.launch {
             try {
                 val (topic, title) = ApiClient.openFriendChat(friend.username)
-                (activity as? MainActivity)?.openTopic(topic, title)
+                // 优先用好友的昵称作为展示名
+                val displayTitle = friend.displayName ?: title
+                (activity as? MainActivity)?.openTopic(topic, displayTitle)
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "打开私聊失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
@@ -136,9 +138,10 @@ class FriendsFragment : Fragment() {
     }
 
     private fun confirmDeleteFriend(friend: Friend) {
+        val showName = friend.displayName ?: friend.username
         AlertDialog.Builder(requireContext())
             .setTitle("删除好友")
-            .setMessage("确定删除好友「${friend.username}」吗？聊天记录将保留，但需重新添加好友才能继续私聊。")
+            .setMessage("确定删除好友「$showName」吗？聊天记录将保留，但需重新添加好友才能继续私聊。")
             .setPositiveButton("删除") { _, _ ->
                 lifecycleScope.launch {
                     try {
@@ -246,10 +249,11 @@ class FriendsFragment : Fragment() {
                 return@launch
             }
             val labels = users.map {
+                val name = it.displayName ?: it.username
                 when {
-                    it.isFriend -> "${it.username}（已是好友）"
-                    it.requested -> "${it.username}（已发申请，等待对方处理）"
-                    else -> it.username
+                    it.isFriend -> "$name（已是好友）"
+                    it.requested -> "$name（已发申请，等待对方处理）"
+                    else -> name
                 }
             }.toTypedArray()
             AlertDialog.Builder(requireContext())
@@ -308,8 +312,9 @@ class FriendsFragment : Fragment() {
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
-            holder.tvAvatar.text = item.username.firstOrNull()?.uppercase()?.toString() ?: "?"
-            holder.tvName.text = item.username
+            val showName = item.displayName ?: item.username
+            holder.tvAvatar.text = showName.firstOrNull()?.uppercase()?.toString() ?: "?"
+            holder.tvName.text = showName
             holder.itemView.setOnClickListener { onItemClick(item) }
             holder.itemView.setOnLongClickListener {
                 onItemLongClick(item)

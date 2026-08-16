@@ -82,7 +82,7 @@ router.get("/", authMiddleware, (req, res) => {
               m.role as my_role,
               CASE t.kind
                 WHEN 'devices' THEN '我的设备'
-                WHEN 'dm' THEN (SELECT u2.username FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id
+                WHEN 'dm' THEN (SELECT COALESCE(u2.display_name, u2.username) FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id
                                 WHERE m2.topic_id = t.id AND m2.user_id != ? LIMIT 1)
                 ELSE t.name
               END as display_name,

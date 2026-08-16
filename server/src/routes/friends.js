@@ -10,7 +10,7 @@ function getFriend(userId, friendId) {
   return getDB().prepare("SELECT * FROM friends WHERE user_id = ? AND friend_id = ?").get(userId, friendId);
 }
 function getUserByName(username) {
-  return getDB().prepare("SELECT id, username FROM users WHERE username = ?").get(username);
+  return getDB().prepare("SELECT id, username, display_name, avatar FROM users WHERE username = ?").get(username);
 }
 
 // 搜索用户（加好友用）
@@ -21,7 +21,7 @@ router.get("/friends/search", authMiddleware, (req, res) => {
   const db = getDB();
   const users = db
     .prepare(
-      `SELECT u.id, u.username,
+      `SELECT u.id, u.username, u.display_name, u.avatar,
               CASE WHEN EXISTS (SELECT 1 FROM friends f WHERE f.user_id = ? AND f.friend_id = u.id) THEN 1 ELSE 0 END as is_friend,
               CASE WHEN EXISTS (SELECT 1 FROM friend_requests r WHERE r.from_user = ? AND r.to_user = u.id AND r.status = 'pending') THEN 1 ELSE 0 END as requested
        FROM users u
@@ -120,7 +120,7 @@ router.get("/friends", authMiddleware, (req, res) => {
   const db = getDB();
   const friends = db
     .prepare(
-      `SELECT u.id as user_id, u.username, f.created_at
+      `SELECT u.id as user_id, u.username, u.display_name, u.avatar, f.created_at
        FROM friends f LEFT JOIN users u ON f.friend_id = u.id
        WHERE f.user_id = ? ORDER BY u.username LIMIT 500`
     )
@@ -147,7 +147,7 @@ router.post("/friends/chat/:username", authMiddleware, (req, res) => {
   if (!target) return res.status(404).json({ error: "用户不存在" });
   if (!getFriend(req.userId, target.id)) return res.status(403).json({ error: "你们不是好友" });
   const topic = ensureDmTopic(req.userId, target.id);
-  res.json({ topic: topic.name, title: target.username });
+  res.json({ topic: topic.name, title: target.username, display_name: target.display_name || target.username });
 });
 
 // 统一的「新的申请」汇总（好友申请 + 我创建话题的加群申请，pending）

@@ -91,6 +91,8 @@ class LoginActivity : AppCompatActivity() {
                     AuthManager.token = response.token
                     AuthManager.userId = response.userId
                     AuthManager.username = response.username
+                    AuthManager.displayName = response.displayName
+                    AuthManager.avatarUrl = response.avatarUrl
 
                     // 注册设备（设备名可自定义，默认厂商+型号）
                     val deviceName = binding.etDeviceName.text.toString()
