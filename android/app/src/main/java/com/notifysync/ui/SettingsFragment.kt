@@ -215,11 +215,16 @@ class SettingsFragment : Fragment() {
 
     private fun hasSmsPermission(): Boolean =
         ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_SMS) ==
+            PackageManager.PERMISSION_GRANTED &&
+        ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECEIVE_SMS) ==
             PackageManager.PERMISSION_GRANTED
 
     private fun requestSmsPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            requestPermissions(arrayOf(Manifest.permission.READ_SMS), REQ_SMS_PERMISSION)
+            requestPermissions(
+                arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS),
+                REQ_SMS_PERMISSION
+            )
         } else {
             Toast.makeText(requireContext(), "当前系统版本无需额外授权", Toast.LENGTH_SHORT).show()
         }
@@ -232,7 +237,8 @@ class SettingsFragment : Fragment() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_SMS_PERMISSION) {
-            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            // 两个权限都通过才算授权成功（RECEIVE_SMS 收广播，READ_SMS 兜底扫收件箱）
+            val granted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
             if (granted) {
                 AuthManager.smsCaptureEnabled = true
                 binding.swSmsCapture.isChecked = true

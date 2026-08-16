@@ -23,9 +23,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * 短信验证码自动提取：
- * 监听系统收件箱（content://sms/inbox）变化，新短信到达后提取验证码并复制到剪贴板，
- * 同时弹系统通知提示。开关与权限均在设置页控制（AuthManager.smsCaptureEnabled + READ_SMS）。
+ * 短信验证码自动提取（双通道）：
+ * 主通道 = SmsReceiver 广播（SMS_RECEIVED，各版本行为一致，最可靠）；
+ * 兜底 = 监听系统收件箱（content://sms/inbox）变化。
+ * 提取验证码后：复制到剪贴板 + 弹系统通知 + 上报服务器（跨设备同步）。
+ * 开关与权限均在设置页控制（AuthManager.smsCaptureEnabled + READ_SMS/RECEIVE_SMS）。
+ * 两通道通过「60s 内同验证码去重」避免重复处理。
  */
 object SmsCodeWatcher {
     private const val TAG = "SmsCodeWatcher"
@@ -101,9 +104,38 @@ object SmsCodeWatcher {
 
     private fun hasPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_SMS) ==
+            PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECEIVE_SMS) ==
             PackageManager.PERMISSION_GRANTED
 
     // ===== 收件箱检查 =====
+
+    // 防重复处理：广播与收件箱观察者可能对同一条短信各触发一次（60s 内同验证码只处理一次）
+    private var lastCode: String? = null
+    private var lastCodeTime: Long = 0L
+
+    private fun isDuplicate(code: String): Boolean {
+        synchronized(this) {
+            val now = System.currentTimeMillis()
+            if (code == lastCode && now - lastCodeTime < 60_000L) return true
+            lastCode = code
+            lastCodeTime = now
+            return false
+        }
+    }
+
+    /**
+     * 处理收到的一条短信（由 SmsReceiver 广播调用，主检测通道）：
+     * 判定开关 + 权限 → 提取验证码 → 复制 + 本地通知 + 上报服务器。
+     */
+    fun processReceivedSms(context: Context, body: String, address: String) {
+        if (!AuthManager.smsCaptureEnabled) return
+        if (!hasPermission(context)) return
+
+        val code = extractCode(body) ?: return  // 不是验证码短信，忽略
+        if (isDuplicate(code)) return
+        copyCode(context, code, address)
+    }
 
     private fun checkNewSms(context: Context) {
         try {
@@ -134,7 +166,7 @@ object SmsCodeWatcher {
                 }
 
                 remember(id)
-                copyCode(context, code, address)
+                if (!isDuplicate(code)) copyCode(context, code, address)
             }
         } catch (e: Exception) {
             Log.w(TAG, "checkNewSms failed: ${e.message}")

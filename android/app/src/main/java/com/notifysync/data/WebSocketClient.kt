@@ -11,7 +11,12 @@ object WebSocketClient {
     private const val TAG = "WebSocketClient"
 
     private const val RECONNECT_DELAY_MS = 5000L
-    private const val WATCHDOG_INTERVAL_MS = 30000L
+    // 应用层心跳间隔：15s 发一次 ping（JSON 消息走数据通道，反代一定能转发）
+    private const val HEARTBEAT_INTERVAL_MS = 15000L
+    // 看门狗间隔：15s 检查一次连接活性
+    private const val WATCHDOG_INTERVAL_MS = 15000L
+    // 超过 45s 没收到 pong 判定连接已死，强制重连
+    private const val PONG_TIMEOUT_MS = 45000L
 
     // 主线程 Handler：只要进程活着就能回调，不受 Doze 后台线程挂起影响
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -27,6 +32,10 @@ object WebSocketClient {
     @Volatile
     private var shouldReconnect = true
 
+    // 最后一次收到 pong 的时间（应用层心跳响应），0 表示尚未收到过
+    @Volatile
+    private var lastPongTime: Long = 0L
+
     interface WsEventListener {
         fun onConnected()
         fun onMessage(type: String, data: org.json.JSONObject?, topic: String?)
@@ -39,7 +48,13 @@ object WebSocketClient {
     }
 
     val isConnected: Boolean
-        get() = webSocket != null && !isConnecting
+        get() = webSocket != null && !isConnecting && isConnectionAlive()
+
+    // 连接活性判定：从未收到过 pong（刚连上）视为活；否则 45s 内有 pong 才算活
+    private fun isConnectionAlive(): Boolean {
+        if (lastPongTime == 0L) return true
+        return System.currentTimeMillis() - lastPongTime < PONG_TIMEOUT_MS
+    }
 
     fun connect() {
         if (isConnecting || webSocket != null) return
@@ -50,7 +65,7 @@ object WebSocketClient {
 
         if (client == null) {
             client = OkHttpClient.Builder()
-                .pingInterval(15, TimeUnit.SECONDS)  // 15s：更快检测死连接
+                .pingInterval(15, TimeUnit.SECONDS)  // 协议层 ping：更快检测死连接
                 .build()
         }
 
@@ -62,6 +77,7 @@ object WebSocketClient {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.i(TAG, "WebSocket connected")
                 isConnecting = false
+                lastPongTime = System.currentTimeMillis()
                 listener?.onConnected()
             }
 
@@ -69,6 +85,10 @@ object WebSocketClient {
                 try {
                     val json = org.json.JSONObject(text)
                     val type = json.optString("type", "")
+                    // 应用层心跳：收到 pong 更新活性时间戳
+                    if (type == "pong") {
+                        lastPongTime = System.currentTimeMillis()
+                    }
                     val data = if (json.has("data")) json.getJSONObject("data") else null
                     val topic = if (json.has("topic")) json.optString("topic", null) else null
                     listener?.onMessage(type, data, topic)
@@ -101,7 +121,8 @@ object WebSocketClient {
             }
         })
 
-        // 启动看门狗（仅启动一次，重复调用不会叠加）
+        // 启动心跳与看门狗（重复调用先 removeCallbacks，不会叠加）
+        startHeartbeat()
         startWatchdog()
     }
 
@@ -127,11 +148,31 @@ object WebSocketClient {
         mainHandler.postDelayed(reconnectRunnable, RECONNECT_DELAY_MS)
     }
 
+    // ===== 应用层心跳 =====
+    //
+    // 每 15s 发一次 {"type":"ping"}，服务器回 {"type":"pong"} 更新 lastPongTime。
+    // 协议层 ping/pong 帧部分反代会丢弃，应用层 JSON 消息走正常数据通道一定能到达。
+    // 这是「通知一窝蜂」问题的根治手段：连接静默死亡后 45s 内必被检出并重连。
+    //
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            if (shouldReconnect && webSocket != null) {
+                sendPing()
+            }
+            mainHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
+        }
+    }
+
+    private fun startHeartbeat() {
+        mainHandler.removeCallbacks(heartbeatRunnable)
+        mainHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS)
+    }
+
     // ===== 看门狗 =====
     //
-    // 每 30s 检查一次 WS 是否还活着：
-    //   - 如果 webSocket == null（已断开），主动重连
-    //   - 如果长时间没有 onFailure/onClosed 回调（静默断连），也能恢复
+    // 每 15s 检查一次 WS 是否还活着：
+    //   - webSocket == null（已断开）→ 主动重连
+    //   - 连接对象存在但 45s 没收到 pong（静默死亡，onFailure 未触发）→ 强制断开重连
     //
     private val watchdogRunnable = object : Runnable {
         override fun run() {
@@ -139,6 +180,9 @@ object WebSocketClient {
                 if (webSocket == null && !isConnecting) {
                     Log.w(TAG, "Watchdog: WS disconnected, forcing reconnect")
                     connect()
+                } else if (webSocket != null && !isConnectionAlive()) {
+                    Log.w(TAG, "Watchdog: pong timeout (${System.currentTimeMillis() - lastPongTime}ms), forcing reconnect")
+                    forceReconnect()
                 }
             }
             mainHandler.postDelayed(this, WATCHDOG_INTERVAL_MS)
@@ -151,13 +195,16 @@ object WebSocketClient {
     }
 
     /**
-     * 强制断开并重连（外部调用，如 SyncService.onStartCommand 发现 WS 不可用时）
+     * 强制断开并重连（看门狗检出死连接 / 外部调用）
      */
     fun forceReconnect() {
         Log.i(TAG, "Force reconnect requested")
-        webSocket?.close(1000, "Force reconnect")
+        try {
+            webSocket?.cancel()  // cancel 立即断开，不等待 close 握手（死连接握不了手）
+        } catch (_: Exception) { /* ignore */ }
         webSocket = null
         isConnecting = false
+        lastPongTime = 0L
         mainHandler.removeCallbacks(reconnectRunnable)
         connect()
     }
@@ -166,6 +213,7 @@ object WebSocketClient {
         shouldReconnect = false
         mainHandler.removeCallbacks(reconnectRunnable)
         mainHandler.removeCallbacks(watchdogRunnable)
+        mainHandler.removeCallbacks(heartbeatRunnable)
         webSocket?.close(1000, "Client disconnect")
         cleanup()
     }
