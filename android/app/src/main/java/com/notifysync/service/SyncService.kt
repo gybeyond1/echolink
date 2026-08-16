@@ -1,5 +1,7 @@
 package com.notifysync.service
 
+import com.notifysync.data.optNullable
+
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationManager
@@ -234,8 +236,8 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
             }
             // 用户资料更新（昵称/头像在另一台设备修改）→ 刷新本地缓存 + 广播
             "profile_updated" -> {
-                val displayName = data?.optString("display_name", null)
-                val avatar = data?.optString("avatar", null)
+                val displayName = data?.optNullable("display_name")
+                val avatar = data?.optNullable("avatar")
                 if (displayName != null) AuthManager.displayName = displayName
                 if (avatar != null) AuthManager.avatarUrl = avatar
                 sendBroadcast(Intent("com.notifysync.PROFILE_CHANGED"))
@@ -318,7 +320,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         val title = data.optString("title", "")
         val text = data.optString("text", "")
         val sender = data.optString("sender_name", "未知")
-        val deviceName = data.optString("device_name", null)
+        val deviceName = data.optNullable("device_name")
         val timestamp = data.optLong("timestamp", System.currentTimeMillis())
         val topicName = topic ?: data.optString("topic", "")
 
@@ -337,12 +339,12 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
             putExtra("timestamp", timestamp)
             putExtra("device_id", fromDeviceId)
             putExtra("media_type", data.optString("media_type", "text"))
-            if (!data.isNull("media_url")) putExtra("media_url", data.optString("media_url", null))
-            if (!data.isNull("media_name")) putExtra("media_name", data.optString("media_name", null))
+            if (!data.isNull("media_url")) putExtra("media_url", data.optNullable("media_url"))
+            if (!data.isNull("media_name")) putExtra("media_name", data.optNullable("media_name"))
             putExtra("media_size", data.optLong("media_size", 0))
             putExtra("sender_user_id", data.optLong("user_id", 0))
-            if (!data.isNull("sender_avatar")) putExtra("sender_avatar", data.optString("sender_avatar", null))
-            if (!data.isNull("sender_display_name")) putExtra("sender_display_name", data.optString("sender_display_name", null))
+            if (!data.isNull("sender_avatar")) putExtra("sender_avatar", data.optNullable("sender_avatar"))
+            if (!data.isNull("sender_display_name")) putExtra("sender_display_name", data.optNullable("sender_display_name"))
         }
         sendBroadcast(broadcastIntent)
     }

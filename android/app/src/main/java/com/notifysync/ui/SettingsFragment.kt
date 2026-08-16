@@ -1,5 +1,7 @@
 package com.notifysync.ui
 
+import com.notifysync.data.optNullable
+
 import android.Manifest
 import android.app.AlertDialog
 import android.content.Intent
@@ -174,7 +176,7 @@ class SettingsFragment : Fragment() {
             try {
                 val json = ApiClient.getProfile()
                 val name = json.optString("display_name", AuthManager.username)
-                val avatar = json.optString("avatar", null)
+                val avatar = json.optNullable("avatar")
                 AuthManager.displayName = name
                 AuthManager.avatarUrl = avatar
                 binding.tvDisplayName.text = name
@@ -309,7 +311,7 @@ class SettingsFragment : Fragment() {
 
                 // 上传到服务器
                 val json = ApiClient.uploadAvatar(tmpFile)
-                val avatarPath = json.optString("avatar", null)
+                val avatarPath = json.optNullable("avatar")
                 if (!avatarPath.isNullOrBlank()) {
                     AuthManager.avatarUrl = avatarPath
                     Toast.makeText(requireContext(), "头像已更新", Toast.LENGTH_SHORT).show()
