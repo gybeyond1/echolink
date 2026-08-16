@@ -15,6 +15,8 @@ object AuthManager {
     private const val KEY_TOPICS = "subscribed_topics"
     private const val KEY_THEME = "theme_mode"
     private const val KEY_SMS_CAPTURE = "sms_capture_enabled"
+    private const val KEY_DISPLAY_NAME = "display_name"
+    private const val KEY_AVATAR_URL = "avatar_url"
 
     private lateinit var prefs: SharedPreferences
 
@@ -83,6 +85,16 @@ object AuthManager {
         get() = prefs.getBoolean(KEY_SMS_CAPTURE, false)
         set(value) = prefs.edit().putBoolean(KEY_SMS_CAPTURE, value).apply()
 
+    // 昵称（跟用户名走，全账号同步）
+    var displayName: String?
+        get() = prefs.getString(KEY_DISPLAY_NAME, null)
+        set(value) = prefs.edit().putString(KEY_DISPLAY_NAME, value).apply()
+
+    // 头像 URL（服务器路径，如 /uploads/avatars/avatar_1_xxx.png）
+    var avatarUrl: String?
+        get() = prefs.getString(KEY_AVATAR_URL, null)
+        set(value) = prefs.edit().putString(KEY_AVATAR_URL, value).apply()
+
     fun addTopic(topic: String) {
         val topics = subscribedTopics.toMutableSet()
         topics.add(topic.trim().lowercase())
@@ -105,6 +117,8 @@ object AuthManager {
             .remove(KEY_USERNAME)
             .remove(KEY_DEVICE_ID)
             .remove(KEY_TOPICS)
+            .remove(KEY_DISPLAY_NAME)
+            .remove(KEY_AVATAR_URL)
             .apply()
     }
 

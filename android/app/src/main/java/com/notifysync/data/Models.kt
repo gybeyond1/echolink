@@ -256,7 +256,9 @@ fun parseTopicRequests(jsonArray: JSONArray): List<TopicJoinRequest> {
 data class Friend(
     val userId: Long,
     val username: String,
-    val createdAt: String?
+    val createdAt: String?,
+    val displayName: String? = null,
+    val avatarUrl: String? = null
 )
 
 data class FriendRequest(
@@ -271,7 +273,9 @@ data class SearchUser(
     val id: Long,
     val username: String,
     val isFriend: Boolean,
-    val requested: Boolean     // 我已向对方发过申请（pending）
+    val requested: Boolean,    // 我已向对方发过申请（pending）
+    val displayName: String? = null,
+    val avatarUrl: String? = null
 )
 
 // 统一「新的申请」：好友申请 + 我创建话题的加群申请
@@ -296,7 +300,9 @@ fun parseFriends(jsonArray: JSONArray): List<Friend> {
             Friend(
                 userId = obj.getLong("user_id"),
                 username = obj.optString("username", "?"),
-                createdAt = obj.optString("created_at", null)
+                createdAt = obj.optString("created_at", null),
+                displayName = obj.optString("display_name", null),
+                avatarUrl = obj.optString("avatar", null)
             )
         )
     }
@@ -329,7 +335,9 @@ fun parseSearchUsers(jsonArray: JSONArray): List<SearchUser> {
                 id = obj.getLong("id"),
                 username = obj.optString("username", "?"),
                 isFriend = obj.optInt("is_friend", 0) == 1,
-                requested = obj.optInt("requested", 0) == 1
+                requested = obj.optInt("requested", 0) == 1,
+                displayName = obj.optString("display_name", null),
+                avatarUrl = obj.optString("avatar", null)
             )
         )
     }

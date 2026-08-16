@@ -216,6 +216,15 @@ function initDB() {
     db.exec("ALTER TABLE topics ADD COLUMN kind TEXT NOT NULL DEFAULT 'normal'");
   }
 
+  // 用户资料列：display_name(昵称) + avatar(头像文件路径)
+  // 昵称跟用户名走（全账号同步），设备名各自独立
+  if (!userCols.includes("display_name")) {
+    db.exec("ALTER TABLE users ADD COLUMN display_name TEXT");
+  }
+  if (!userCols.includes("avatar")) {
+    db.exec("ALTER TABLE users ADD COLUMN avatar TEXT");
+  }
+
   // 一次性迁移：默认放开媒体大小限制（0 = 不限制）。
   // 用户之后仍可在 Web 管理后台自行设置具体上限。
   const marker = db.prepare("SELECT value FROM settings WHERE key = 'migrated_unlimited_media'").get();
