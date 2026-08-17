@@ -1,7 +1,7 @@
 {
-  "name": "notify-sync-server",
+  "name": "echolink-server",
   "version": "1.0.0",
-  "description": "Cross-device notification sync server",
+  "description": "EchoLink — cross-device messaging & notification hub",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

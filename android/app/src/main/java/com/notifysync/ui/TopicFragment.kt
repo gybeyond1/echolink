@@ -964,7 +964,7 @@ class TopicFragment : Fragment() {
 
     /** 保存到相册（IO 线程执行，主线程 Toast 结果） */
     private fun saveImageToGallery(ctx: Context, bmp: android.graphics.Bitmap) {
-        val name = "notifysync_${System.currentTimeMillis()}.jpg"
+        val name = "echolink_${System.currentTimeMillis()}.jpg"
         lifecycleScope.launch {
             val ok = withContext(Dispatchers.IO) {
                 try {
@@ -973,7 +973,7 @@ class TopicFragment : Fragment() {
                         val values = android.content.ContentValues().apply {
                             put(MediaStore.Images.Media.DISPLAY_NAME, name)
                             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/NotifySync")
+                            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/EchoLink")
                             put(MediaStore.Images.Media.IS_PENDING, 1)
                         }
                         val resolver = ctx.contentResolver
@@ -987,10 +987,10 @@ class TopicFragment : Fragment() {
                         }, null, null)
                         true
                     } else {
-                        // API ≤28：写入公共 Pictures/NotifySync 并广播扫描，让相册立即可见
+                        // API ≤28：写入公共 Pictures/EchoLink 并广播扫描，让相册立即可见
                         @Suppress("DEPRECATION")
                         val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                        val file = java.io.File(dir, "NotifySync/$name")
+                        val file = java.io.File(dir, "EchoLink/$name")
                         file.parentFile?.mkdirs()
                         file.outputStream().use { out ->
                             bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)

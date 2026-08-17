@@ -27,18 +27,18 @@ async fn show_notification(app: AppHandle, title: String, body: String) -> Resul
 #[tauri::command]
 async fn set_unread_count(app: AppHandle, count: u32) -> Result<(), String> {
     let tip = if count > 0 {
-        format!("NotifySync · {} 条未读", count)
+        format!("EchoLink · {} 条未读", count)
     } else {
-        "NotifySync".to_string()
+        "EchoLink".to_string()
     };
     if let Some(tray) = app.tray_by_id("main-tray") {
         tray.set_tooltip(Some(&tip)).map_err(|e| e.to_string())?;
     }
     if let Some(win) = app.get_webview_window("main") {
         let title = if count > 0 {
-            format!("NotifySync ({} 未读)", count)
+            format!("EchoLink ({} 未读)", count)
         } else {
-            "NotifySync".to_string()
+            "EchoLink".to_string()
         };
         win.set_title(&title).ok();
     }
@@ -177,5 +177,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running NotifySync desktop");
+        .expect("error while running EchoLink desktop");
 }

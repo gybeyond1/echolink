@@ -2,7 +2,7 @@
   "name": "notifysync-desktop",
   "private": true,
   "version": "0.1.0",
-  "description": "NotifySync Windows 桌面客户端（Tauri 2 壳）",
+  "description": "EchoLink Windows 桌面客户端（Tauri 2 壳）",
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",

@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NotifySync"
+rootProject.name = "EchoLink"
 include(":app")

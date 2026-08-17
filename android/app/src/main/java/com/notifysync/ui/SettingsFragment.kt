@@ -58,7 +58,7 @@ class SettingsFragment : Fragment() {
     companion object {
         private const val REQ_SMS_PERMISSION = 1001
         private const val REQ_PICK_AVATAR = 1002
-        private const val PROJECT_URL = "https://github.com/gybeyond1/notify-sync"
+        private const val PROJECT_URL = "https://github.com/gybeyond1/echolink"
         private const val DONATE_URL = "wxp://f2f0gpIJomgrTKj2sOG8gc64wSBei7Z5YVgXgYNcDSZTzZpfpK3RX9ZC8fn2SW5LNCeT"
     }
 

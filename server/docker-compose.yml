@@ -1,4 +1,4 @@
-# NotifySync 一键部署
+# EchoLink 一键部署
 #
 # 使用方法：
 #   1. 修改下方 JWT_SECRET（或设置环境变量）
@@ -8,9 +8,9 @@
 # 数据保存在 ./data 目录（SQLite 数据库）
 
 services:
-  notifysync:
+  echolink:
     build: .
-    container_name: notifysync
+    container_name: echolink
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"

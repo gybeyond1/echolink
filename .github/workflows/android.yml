@@ -51,23 +51,23 @@ jobs:
       - name: Prepare APK for release
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/*.apk dist/NotifySync_Android_v1.0.0.apk
+          cp android/app/build/outputs/apk/release/*.apk dist/EchoLink_Android_v1.0.0.apk
           ls -lh dist/
 
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: dist/NotifySync_Android_v1.0.0.apk
+          path: dist/EchoLink_Android_v1.0.0.apk
 
       - name: Upload APK to unified Release
         if: always()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0
-          name: NotifySync v1.0.0
+          name: EchoLink v1.0.0
           overwrite: true
           allowUpdates: true
-          files: dist/NotifySync_Android_v1.0.0.apk
+          files: dist/EchoLink_Android_v1.0.0.apk
         env:
           GITHUB_TOKEN=***REDACTED*** secrets.GITHUB_TOKEN }}

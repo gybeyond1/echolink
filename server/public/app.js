@@ -1,4 +1,4 @@
-/* NotifySync Web —— 对齐手机 App 的 messenger 布局 + 管理后台，纯前端调用同域 REST API */
+/* EchoLink Web —— 对齐手机 App 的 messenger 布局 + 管理后台，纯前端调用同域 REST API */
 (function () {
   "use strict";
 
@@ -189,9 +189,10 @@
       <div class="auth-wrap">
         <div class="auth-card">
           <div class="brand">
-            <div class="logo">N</div>
-            <h1>NotifySync</h1>
-            <p>跨设备通知同步 · 消息与好友</p>
+            <div class="logo">E</div>
+            <h1>EchoLink</h1>
+            <p>跨设备消息互联 · 通知同步 · 好友</p>
+            <p style="font-size:12px;opacity:.7;margin-top:4px"><a href="https://github.com/gybeyond1/echolink" target="_blank" style="color:inherit;text-decoration:underline">github.com/gybeyond1/echolink</a></p>
           </div>
           <div id="auth-form">
             <label>用户名</label>
@@ -260,7 +261,7 @@
     app.innerHTML = `
       <div class="layout">
         <aside class="sidebar">
-          <div class="brand"><div class="logo">N</div><h1>NotifySync</h1></div>
+          <div class="brand"><div class="logo">E</div><h1>EchoLink</h1></div>
           ${navItems().map(n => `<button class="nav-item ${state.tab === n.id ? "active" : ""}" data-tab="${n.id}"><span class="ic">${n.ic}</span>${n.label}${n.id === "messages" && unread > 0 ? `<span class="nav-badge">${unread > 99 ? "99+" : unread}</span>` : ""}</button>`).join("")}
           <div class="spacer"></div>
           <div class="user-box">
