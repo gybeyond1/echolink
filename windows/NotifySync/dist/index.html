@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>NotifySync</title>
+  <style>
+    body { margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(135deg, #2AABEE 0%, #3390EC 100%); color: #fff; }
+    .box { text-align: center; }
+    .logo { width: 64px; height: 64px; margin: 0 auto 16px;
+      background: rgba(255,255,255,.22); border-radius: 16px; font-size: 38px; font-weight: 800;
+      line-height: 64px; }
+    p { margin: 6px 0 18px; opacity: .92; }
+    a { color: #fff; text-decoration: underline; }
+  </style>
+  <script>
+    // 默认跳到 NOTIFYSYNC_SERVER 编译期注入值；运行时由 Tauri 命令 app_info 校正。
+    (function () {
+      try {
+        if (window.__TAURI__ && window.__TAURI__.core) {
+          window.__TAURI__.core.invoke('app_info', { serverUrl: '' })
+            .then(info => { window.location.replace(info.server_url); })
+            .catch(() => window.location.replace('https://ntfy.225600.xyz:1314/'));
+        } else {
+          window.location.replace('https://ntfy.225600.xyz:1314/');
+        }
+      } catch (e) {
+        window.location.replace('https://ntfy.225600.xyz:1314/');
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">N</div>
+    <h2 style="margin:0 0 6px">NotifySync</h2>
+    <p>正在跳转到消息页…</p>
+  </div>
+</body>
+</html>

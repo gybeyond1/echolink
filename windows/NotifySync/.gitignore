@@ -1,0 +1,11 @@
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/Cargo.lock
+# Node
+node_modules/
+package-lock.json
+# 构建产物
+out/
+*.exe
+*.msi
