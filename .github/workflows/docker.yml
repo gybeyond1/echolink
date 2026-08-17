@@ -40,9 +40,10 @@ jobs:
         if: always()
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: NotifySync 最新版
+          tag_name: v1.0.0
+          name: NotifySync v1.0.0
           overwrite: true
+          allowUpdates: true
           files: notifysync-server-image.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
