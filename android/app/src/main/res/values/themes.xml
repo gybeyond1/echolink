@@ -32,13 +32,15 @@
 
     <!-- 所有 AlertDialog 统一：与聊天页面背景同色 + 品牌蓝强调 + 0.5 半透明遮罩区分层级 -->
     <style name="Theme.NotifySync.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+        <!-- Material AlertDialog 背景由 colorSurface 决定，必须设为 chat_bg，不能只改 windowBackground -->
+        <item name="colorSurface">@color/chat_bg</item>
+        <item name="colorSurfaceVariant">@color/chat_bg</item>
+        <item name="colorOnSurface">@color/on_surface</item>
         <item name="android:windowBackground">@color/chat_bg</item>
         <item name="android:background">@color/chat_bg</item>
         <item name="android:colorBackground">@color/chat_bg</item>
         <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorOnPrimary">@color/on_primary</item>
-        <item name="colorSurface">@color/surface</item>
-        <item name="colorOnSurface">@color/on_surface</item>
         <item name="android:textColorPrimary">@color/on_surface</item>
         <item name="android:textColor">@color/on_surface</item>
         <item name="android:windowIsFloating">true</item>
