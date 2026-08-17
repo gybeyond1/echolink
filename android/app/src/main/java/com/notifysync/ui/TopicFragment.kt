@@ -27,6 +27,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.GridView
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -277,6 +278,15 @@ class TopicFragment : Fragment() {
         showListMode()
         listRefreshHandler.postDelayed(listRefreshRunnable, 15000)
 
+        // 平板双栏：左侧列表固定宽度（≈360dp），右侧聊天占剩余空间
+        if (isWide) {
+            val lp = binding.listLayout.layoutParams as LinearLayout.LayoutParams
+            lp.width = (360 * resources.displayMetrics.density).toInt()
+            lp.weight = 0f
+            binding.listLayout.layoutParams = lp
+            binding.tvTitleList.text = "消息"
+        }
+
         // 外部入口定位到指定会话（状态栏通知 / 好友私聊）：列表加载完后直接进聊天态
         val argTopic = arguments?.getString("topic")
         if (!argTopic.isNullOrEmpty()) {
@@ -326,6 +336,10 @@ class TopicFragment : Fragment() {
 
     // ===== 模式切换 =====
 
+    /** 平板判定：最小宽度 ≥600dp（sw600dp 资源限定符对应值） */
+    private val isWide: Boolean
+        get() = resources.configuration.smallestScreenWidthDp >= 600
+
     private fun showListMode() {
         currentTopic = null
         chatTopic = null
@@ -343,15 +357,26 @@ class TopicFragment : Fragment() {
     private fun showChatMode(topic: MyTopic) {
         chatTopic = topic
         currentTopic = topic.name
-        binding.listLayout.visibility = View.GONE
-        binding.chatLayout.visibility = View.VISIBLE
-        binding.tvTitleList.visibility = View.GONE
-        backCallback.isEnabled = true
-        binding.tvChatTitle.visibility = View.VISIBLE
         binding.tvChatTitle.text = topic.displayName ?: topic.name
         binding.btnPending.visibility = if (topic.myRole == "owner" && topic.pendingRequests > 0) View.VISIBLE else View.GONE
-        binding.btnSettings.visibility = View.GONE
-        binding.fabAddTopic.visibility = View.GONE
+        if (isWide) {
+            // 平板双栏（平行视界）：左侧列表保持显示，聊天在右侧打开
+            binding.listLayout.visibility = View.VISIBLE
+            binding.chatLayout.visibility = View.VISIBLE
+            binding.tvTitleList.visibility = View.VISIBLE
+            binding.tvChatTitle.visibility = View.VISIBLE
+            binding.btnSettings.visibility = View.GONE
+            binding.fabAddTopic.visibility = View.VISIBLE
+        } else {
+            // 手机：列表/聊天全屏切换
+            binding.listLayout.visibility = View.GONE
+            binding.chatLayout.visibility = View.VISIBLE
+            binding.tvTitleList.visibility = View.GONE
+            binding.tvChatTitle.visibility = View.VISIBLE
+            binding.btnSettings.visibility = View.GONE
+            binding.fabAddTopic.visibility = View.GONE
+        }
+        backCallback.isEnabled = true
         WebSocketClient.sendSubscribe(topic.name)
         loadMessages()
     }
