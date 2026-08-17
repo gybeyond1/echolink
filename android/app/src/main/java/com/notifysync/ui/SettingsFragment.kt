@@ -243,7 +243,7 @@ class SettingsFragment : Fragment() {
         }
         val padding = (16 * resources.displayMetrics.density).toInt()
         input.setPadding(padding, padding, padding, padding)
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("修改昵称")
             .setMessage("昵称会同步到所有设备")
             .setView(input)
@@ -354,7 +354,7 @@ class SettingsFragment : Fragment() {
         root.addView(hint, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
-        AlertDialog.Builder(ctx)
+        AlertDialog.Builder(ctx, R.style.Theme_NotifySync_Dialog)
             .setTitle("打赏支持")
             .setView(root)
             .setPositiveButton("知道了", null)
@@ -370,7 +370,7 @@ class SettingsFragment : Fragment() {
         }
         val padding = (16 * resources.displayMetrics.density).toInt()
         input.setPadding(padding, padding, padding, padding)
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("重命名设备")
             .setView(input)
             .setPositiveButton("保存") { _, _ ->

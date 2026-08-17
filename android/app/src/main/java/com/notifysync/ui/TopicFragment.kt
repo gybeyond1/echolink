@@ -525,7 +525,7 @@ class TopicFragment : Fragment() {
             }
             val labels = fr.map { "【好友】${it.username}${if (!it.message.isNullOrEmpty()) "：${it.message}" else ""}" } +
                 tr.map { "【加群】${it.username} → ${it.topic}${if (!it.message.isNullOrEmpty()) "：${it.message}" else ""}" }
-            AlertDialog.Builder(requireContext())
+            AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
                 .setTitle("新的申请")
                 .setItems(labels.toTypedArray()) { _, which ->
                     if (which < fr.size) showHandleFriendRequest(fr[which])
@@ -537,7 +537,7 @@ class TopicFragment : Fragment() {
     }
 
     private fun showHandleFriendRequest(req: FriendRequest) {
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("${req.username} 请求加你为好友")
             .setMessage(if (req.message.isNullOrEmpty()) "验证消息：（无）" else "验证消息：${req.message}")
             .setPositiveButton("同意") { _, _ -> handleFriendRequest(req, "accept") }
@@ -562,7 +562,7 @@ class TopicFragment : Fragment() {
     }
 
     private fun showHandleTopicRequest(req: UnifiedTopicRequest) {
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("${req.username} 申请加入「${req.topic}」")
             .setMessage(if (req.message.isNullOrEmpty()) "验证消息：（无）" else "验证消息：${req.message}")
             .setPositiveButton("同意") { _, _ -> handleTopicRequest(req, true) }
@@ -613,18 +613,15 @@ class TopicFragment : Fragment() {
 
     // 长按菜单：打开 / 删除（从列表移除）/ 关闭（彻底关闭，仅创建者）
     private fun showTopicMenu(topic: MyTopic) {
-        if (topic.kind == "devices" || topic.kind == "dm") {
-            Toast.makeText(requireContext(),
-                if (topic.kind == "devices") "「我的设备」是默认会话，不可删除"
-                else "私聊会话不可删除（删除好友请到「好友」页长按）",
-                Toast.LENGTH_SHORT).show()
+        if (topic.kind == "devices") {
+            Toast.makeText(requireContext(), "「我的设备」是默认会话，不可删除", Toast.LENGTH_SHORT).show()
             return
         }
-        val owner = topic.myRole == "owner"
+        val owner = topic.kind == "normal" && topic.myRole == "owner"
         val options = mutableListOf("打开")
         if (owner) options.add("关闭话题（彻底关闭）") else options.add("删除（从我的列表移除）")
-        AlertDialog.Builder(requireContext())
-            .setTitle(topic.name)
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
+            .setTitle(topic.displayName ?: topic.name)
             .setItems(options.toTypedArray()) { _, which ->
                 when (which) {
                     0 -> showChatMode(topic)
@@ -634,18 +631,24 @@ class TopicFragment : Fragment() {
     }
 
     private fun swipeDelete(topic: MyTopic) {
-        if (topic.kind == "devices" || topic.kind == "dm") {
+        if (topic.kind == "devices") {
             Toast.makeText(requireContext(), "该会话不可删除", Toast.LENGTH_SHORT).show()
             loadTopicList() // 还原被滑走的列表项
             return
         }
-        if (topic.myRole == "owner") confirmCloseTopic(topic) else confirmLeaveTopic(topic)
+        val owner = topic.kind == "normal" && topic.myRole == "owner"
+        if (owner) confirmCloseTopic(topic) else confirmLeaveTopic(topic)
     }
 
     private fun confirmLeaveTopic(topic: MyTopic) {
-        AlertDialog.Builder(requireContext())
+        val display = topic.displayName ?: topic.name
+        val message = if (topic.kind == "dm")
+            "确定把私聊会话「$display」从你的列表移除吗？（好友关系保留，再次发消息时会自动恢复）"
+        else
+            "确定把话题「$display」从你的列表移除吗？（仍可在「发现/加入」重新申请）"
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("从列表移除")
-            .setMessage("确定把话题「${topic.name}」从你的列表移除吗？（仍可在「发现/加入」重新申请）")
+            .setMessage(message)
             .setPositiveButton("移除") { _, _ ->
                 lifecycleScope.launch {
                     try { ApiClient.leaveTopic(topic.name); AuthManager.removeTopic(topic.name); Toast.makeText(requireContext(), "已移除", Toast.LENGTH_SHORT).show(); showListMode() }
@@ -655,7 +658,7 @@ class TopicFragment : Fragment() {
     }
 
     private fun confirmCloseTopic(topic: MyTopic) {
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("关闭话题")
             .setMessage("确定彻底关闭话题「${topic.name}」吗？所有成员将无法加入，全部消息会被清空，且不可恢复。")
             .setPositiveButton("彻底关闭") { _, _ ->
@@ -788,7 +791,7 @@ class TopicFragment : Fragment() {
     /** 附件菜单：拍照 / 相册（多选）/ 文件（多选） */
     private fun showAttachMenu() {
         val items = arrayOf("📷  拍照", "🖼️  从相册选择", "📁  选择文件")
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setItems(items) { _, which ->
                 when (which) {
                     0 -> ensureCameraPermission()
@@ -913,7 +916,7 @@ class TopicFragment : Fragment() {
                         val input = requireActivity().layoutInflater.inflate(R.layout.dialog_input_single, null)
                         val etMsg = input.findViewById<TextInputEditText>(R.id.etInput)
                         etMsg.hint = "验证消息（选填）"
-                        AlertDialog.Builder(requireContext())
+                        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
                             .setTitle("添加好友")
                             .setMessage("向 $displayName 发送好友申请")
                             .setView(input)
@@ -961,7 +964,7 @@ class TopicFragment : Fragment() {
         val ids = chatAdapter.getSelectedIds()
         val topic = currentTopic ?: return
         if (ids.isEmpty()) return
-        AlertDialog.Builder(requireContext()).setTitle("删除消息").setMessage("确定删除选中的 ${ids.size} 条消息吗？")
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog).setTitle("删除消息").setMessage("确定删除选中的 ${ids.size} 条消息吗？")
             .setPositiveButton("删除") { _, _ ->
                 lifecycleScope.launch {
                     try { ids.forEach { ApiClient.deleteTopicMessage(topic, it) }; Toast.makeText(requireContext(), "已删除 ${ids.size} 条", Toast.LENGTH_SHORT).show(); chatAdapter.clearSelection(); loadMessages() }
@@ -974,7 +977,7 @@ class TopicFragment : Fragment() {
     private fun showMessageActionDialog(msg: TopicMessage) {
         val topic = currentTopic ?: return
         val options = arrayOf("复制", "删除", "多选")
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("消息操作")
             .setItems(options) { _, which ->
                 when (which) {
@@ -988,7 +991,7 @@ class TopicFragment : Fragment() {
     }
 
     private fun confirmDeleteMessage(topic: String, msg: TopicMessage) {
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("删除消息")
             .setMessage("确定删除这条消息吗？")
             .setPositiveButton("删除") { _, _ ->
@@ -1016,7 +1019,7 @@ class TopicFragment : Fragment() {
                 if (list.isEmpty()) { Toast.makeText(requireContext(), "暂无待审批申请", Toast.LENGTH_SHORT).show(); return@launch }
                 val names = list.map { r -> if (r.message.isNullOrEmpty()) "${r.username} 申请加入" else "${r.username} 申请加入：${r.message}" }.toTypedArray()
                 val checked = BooleanArray(list.size) { true }
-                AlertDialog.Builder(requireContext()).setTitle("待审批申请")
+                AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog).setTitle("待审批申请")
                     .setMultiChoiceItems(names, checked) { _, which, isChecked -> checked[which] = isChecked }
                     .setPositiveButton("通过选中") { _, _ -> handleRequests(topic, list, checked, true) }
                     .setNeutralButton("拒绝选中") { _, _ -> handleRequests(topic, list, checked, false) }
@@ -1174,7 +1177,7 @@ class TopicFragment : Fragment() {
 
     private fun showImageFullscreen(url: String) {
         val ctx = requireContext()
-        val dialog = AlertDialog.Builder(ctx).create()
+        val dialog = AlertDialog.Builder(ctx, R.style.Theme_NotifySync_Dialog).create()
         val root = android.widget.FrameLayout(ctx)
         root.setBackgroundColor(0xFF000000.toInt())
 

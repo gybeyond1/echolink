@@ -37,6 +37,12 @@ jobs:
           ls -lh echolink-server-image.tar.gz
 
       - name: Upload server image to unified Release
-        run: gh release upload v1.0.0 echolink-server-image.tar.gz --clobber
+        run: |
+          for i in 1 2 3 4 5 6 7 8; do
+            if gh release upload v1.0.0 echolink-server-image.tar.gz --clobber; then
+              echo "image tarball upload ok"; break
+            fi
+            echo "attempt $i: gh release upload failed (likely 503), retry in 25s..."; sleep 25
+          done
         env:
           GITHUB_TOKEN=***REDACTED*** secrets.GITHUB_TOKEN }}
