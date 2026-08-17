@@ -66,8 +66,7 @@ jobs:
         with:
           tag_name: v1.0.0
           name: EchoLink v1.0.0
-          overwrite: true
-          allowUpdates: true
+          overwrite_files: true
           files: dist/EchoLink_Android_v1.0.0.apk
         env:
           GITHUB_TOKEN=***REDACTED*** secrets.GITHUB_TOKEN }}
