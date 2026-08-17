@@ -192,6 +192,8 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         when (type) {
             "notification" -> handleSyncedNotification(data)
             "topic_message" -> handleTopicMessage(topic, data)
+            // 已读回执：对方读了你发出的私聊消息 → 通知 UI 把对应气泡翻成双勾
+            "message_read" -> handleMessageRead(topic, data)
             // 有人申请加我为好友 → 刷新「新的申请」+ 好友页红点，弹通知提醒
             "friend_request" -> {
                 val who = data?.optString("username", "有人") ?: "有人"
@@ -345,8 +347,31 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
             putExtra("sender_user_id", data.optLong("user_id", 0))
             if (!data.isNull("sender_avatar")) putExtra("sender_avatar", data.optNullable("sender_avatar"))
             if (!data.isNull("sender_display_name")) putExtra("sender_display_name", data.optNullable("sender_display_name"))
+            putExtra("id", data.optLong("id", 0))
         }
         sendBroadcast(broadcastIntent)
+    }
+
+    // 已读回执：对方读了你发出的私聊消息。把被读消息的 id 广播给 UI 刷新气泡。
+    private fun handleMessageRead(topic: String?, data: JSONObject?) {
+        if (topic == null || data == null) return
+        val ids = mutableListOf<Long>()
+        val arr = data.optJSONArray("ids")
+        if (arr != null) {
+            for (i in 0 until arr.length()) {
+                val id = arr.optLong(i)
+                if (id > 0) ids.add(id)
+            }
+        } else {
+            val single = data.optLong("id", 0)
+            if (single > 0) ids.add(single)
+        }
+        if (ids.isEmpty()) return
+        val intent = Intent("com.notifysync.MESSAGE_READ").apply {
+            putExtra("topic", topic)
+            putExtra("ids", ids.toLongArray())
+        }
+        sendBroadcast(intent)
     }
 
     // 展示一条本地系统通知（同步通知或话题消息）

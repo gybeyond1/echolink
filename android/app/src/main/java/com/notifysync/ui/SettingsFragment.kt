@@ -30,7 +30,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -134,9 +133,6 @@ class SettingsFragment : Fragment() {
 
         // 打赏支持（微信收款二维码）
         binding.llDonate.setOnClickListener { showDonateQrDialog() }
-
-        // 外观主题切换
-        setupThemeToggle()
 
         // 通知监听权限状态
         updatePermissionStatus()
@@ -335,8 +331,6 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    // ===== 外观主题切换 =====
-
     private fun showDonateQrDialog() {
         val ctx = requireContext()
         val dp = ctx.resources.displayMetrics.density
@@ -365,28 +359,6 @@ class SettingsFragment : Fragment() {
             .setView(root)
             .setPositiveButton("知道了", null)
             .show()
-    }
-
-    private fun setupThemeToggle() {
-        when (AuthManager.themeMode) {
-            "light" -> binding.toggleTheme.check(R.id.btnThemeLight)
-            "dark" -> binding.toggleTheme.check(R.id.btnThemeDark)
-            else -> binding.toggleTheme.check(R.id.btnThemeSystem)
-        }
-        binding.toggleTheme.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            val mode = when (checkedId) {
-                R.id.btnThemeLight -> "light"
-                R.id.btnThemeDark -> "dark"
-                else -> "system"
-            }
-            AuthManager.themeMode = mode
-            when (mode) {
-                "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-            }
-        }
     }
 
     // ===== 设备改名 =====
