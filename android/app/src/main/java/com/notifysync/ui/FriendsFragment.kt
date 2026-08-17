@@ -21,6 +21,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.notifysync.R
 import android.widget.ArrayAdapter
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.graphics.drawable.BitmapDrawable
 import com.notifysync.data.ApiClient
 import com.notifysync.data.BingWallpaper
