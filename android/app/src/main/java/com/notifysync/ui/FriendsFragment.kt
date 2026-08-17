@@ -20,8 +20,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.textfield.TextInputEditText
 import com.notifysync.R
 import android.widget.ArrayAdapter
+import android.widget.ImageView
 import com.notifysync.data.ApiClient
 import com.notifysync.data.ApiException
+import com.notifysync.data.AvatarLoader
 import com.notifysync.data.DiscoverTopic
 import java.util.regex.Pattern
 import com.notifysync.data.Friend
@@ -403,6 +405,7 @@ class FriendsFragment : Fragment() {
 
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val tvAvatar: TextView = view.findViewById(R.id.tvAvatar)
+            val ivAvatar: ImageView = view.findViewById(R.id.ivAvatar)
             val tvName: TextView = view.findViewById(R.id.tvFriendName)
         }
 
@@ -415,8 +418,16 @@ class FriendsFragment : Fragment() {
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
             val showName = item.displayName ?: item.username
-            holder.tvAvatar.text = showName.firstOrNull()?.uppercase()?.toString() ?: "?"
             holder.tvName.text = showName
+            if (!item.avatarUrl.isNullOrBlank()) {
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                AvatarLoader.load(ApiClient.fullAvatarUrl(item.avatarUrl), holder.ivAvatar)
+            } else {
+                holder.ivAvatar.visibility = View.GONE
+                holder.tvAvatar.visibility = View.VISIBLE
+                holder.tvAvatar.text = showName.firstOrNull()?.uppercase()?.toString() ?: "?"
+            }
             holder.itemView.setOnClickListener { onItemClick(item) }
             holder.itemView.setOnLongClickListener {
                 onItemLongClick(item)

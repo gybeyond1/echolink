@@ -86,6 +86,11 @@ router.get("/", authMiddleware, (req, res) => {
                                 WHERE m2.topic_id = t.id AND m2.user_id != ? LIMIT 1)
                 ELSE t.name
               END as display_name,
+              CASE t.kind
+                WHEN 'dm' THEN (SELECT u2.avatar FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id
+                                WHERE m2.topic_id = t.id AND m2.user_id != ? LIMIT 1)
+                ELSE NULL
+              END as avatar,
               (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name) as message_count,
               (SELECT MAX(timestamp) FROM topic_messages tm WHERE tm.topic = t.name) as last_message_at,
               (SELECT text FROM topic_messages tm WHERE tm.topic = t.name ORDER BY id DESC LIMIT 1) as last_message,
@@ -97,7 +102,7 @@ router.get("/", authMiddleware, (req, res) => {
        ORDER BY CASE t.kind WHEN 'devices' THEN 0 WHEN 'dm' THEN 1 ELSE 2 END, last_message_at DESC, t.created_at DESC
        LIMIT 100`
     )
-    .all(req.userId, req.userId);
+    .all(req.userId, req.userId, req.userId);
   res.json({ topics });
 });
 

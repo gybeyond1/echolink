@@ -6,12 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.graphics.Rect
-import android.graphics.RectF
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
@@ -28,7 +22,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.notifysync.R
+import com.notifysync.data.ApiClient
 import com.notifysync.data.AuthManager
+import com.notifysync.data.AvatarLoader
 import com.notifysync.data.P2pManager
 import com.notifysync.data.TopicMessage
 import kotlinx.coroutines.CoroutineScope
@@ -460,59 +456,7 @@ class TopicAdapter(
     // ===== Avatar loading =====
 
     private fun loadAvatar(item: TopicMessage, iv: ImageView) {
-        val avatarPath = item.senderAvatar
-        val base = AuthManager.serverUrl.trimEnd('/')
-        val fullAvatarUrl = if (avatarPath.isNullOrBlank()) {
-            null
-        } else if (avatarPath.startsWith("http")) {
-            avatarPath
-        } else if (avatarPath.startsWith("/")) {
-            base + avatarPath
-        } else {
-            "$base/$avatarPath"
-        }
-
-        if (fullAvatarUrl.isNullOrBlank()) {
-            iv.setImageResource(R.drawable.ic_default_avatar)
-            return
-        }
-
-        iv.setImageResource(R.drawable.ic_default_avatar)
-        scope.launch {
-            try {
-                val bmp = withContext(Dispatchers.IO) { downloadBitmap(fullAvatarUrl) }
-                if (bmp != null) {
-                    iv.setImageBitmap(cropCircle(bmp))
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
-    private fun downloadBitmap(urlStr: String): Bitmap? {
-        return try {
-            val conn = URL(urlStr).openConnection() as HttpURLConnection
-            conn.connectTimeout = 8_000
-            conn.readTimeout = 8_000
-            conn.connect()
-            BitmapFactory.decodeStream(conn.inputStream)
-        } catch (e: Exception) { null }
-    }
-
-    private fun cropCircle(src: Bitmap): Bitmap {
-        val size = minOf(src.width, src.height)
-        val x = (src.width - size) / 2
-        val y = (src.height - size) / 2
-        val squared = Bitmap.createBitmap(src, x, y, size, size)
-        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(output)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        val rect = Rect(0, 0, size, size)
-        val rectF = RectF(rect)
-        canvas.drawOval(rectF, paint)
-        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
-        canvas.drawBitmap(squared, rect, rect, paint)
-        if (squared != src) squared.recycle()
-        return output
+        AvatarLoader.load(ApiClient.fullAvatarUrl(item.senderAvatar), iv)
     }
 
     private fun playVoice(url: String) {
