@@ -37,12 +37,6 @@ jobs:
           ls -lh echolink-server-image.tar.gz
 
       - name: Upload server image to unified Release
-        if: always()
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0.0
-          name: EchoLink v1.0.0
-          overwrite_files: true
-          files: echolink-server-image.tar.gz
+        run: gh release upload v1.0.0 echolink-server-image.tar.gz --clobber
         env:
           GITHUB_TOKEN=***REDACTED*** secrets.GITHUB_TOKEN }}

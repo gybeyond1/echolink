@@ -61,12 +61,6 @@ jobs:
           path: dist/EchoLink_Android_v1.0.0.apk
 
       - name: Upload APK to unified Release
-        if: always()
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0.0
-          name: EchoLink v1.0.0
-          overwrite_files: true
-          files: dist/EchoLink_Android_v1.0.0.apk
+        run: gh release upload v1.0.0 dist/EchoLink_Android_v1.0.0.apk --clobber
         env:
           GITHUB_TOKEN=***REDACTED*** secrets.GITHUB_TOKEN }}
