@@ -29,6 +29,11 @@
             android:id="@+id/ivAvatar"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_default_avatar"
+            android:background="@drawable/bg_circle_avatar"
+            android:clipToOutline="true"
+            android:outlineProvider="background"
             android:contentDescription="头像"
             android:visibility="gone" />
     </FrameLayout>
