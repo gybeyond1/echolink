@@ -26,6 +26,14 @@
   // API 基址：浏览器同源=空字符串（相对路径）；Tauri 桌面端=配置的 server_url
   let API_BASE = "";
   function isTauri() { return !!(window.__TAURI__ && window.__TAURI__.core); }
+
+  // 桌面端（Tauri/Windows）：禁用右键菜单与 F5 刷新，强化原生体验
+  if (window.__TAURI__ || window.__TAURI_INTERNALS__) {
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    window.addEventListener("keydown", function (e) {
+      if (e.key === "F5" || (e.ctrlKey && (e.key === "r" || e.key === "R"))) e.preventDefault();
+    });
+  }
   async function initApiBase() {
     if (isTauri()) {
       try {
@@ -409,7 +417,7 @@
       const name = t.display_name || t.name;
       const active = state.chat && state.chat.topic === t.name;
       let av;
-      if (kind === "devices") av = `<div class="avatar avatar-txt devices-ic">📱</div>`;
+      if (kind === "devices") av = `<div class="avatar avatar-txt devices-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M10.5 6.5l1-1a3.5 3.5 0 0 1 5 5l-1 1"/><path d="M13.5 17.5l-1 1a3.5 3.5 0 0 1-5-5l1-1"/></svg></div>`;
       else if (kind === "dm") av = avatarHtml(name, null, 46);
       else av = avatarHtml("#" + t.name, null, 46, 205);
       const preview = t.last_message || mediaLabel(t) || (kind === "devices" ? "我的设备同步会话" : "暂无消息");
@@ -452,7 +460,6 @@
 
   function openNotifications() {
     state.chat = { special: "notifications" };
-    state.notifCount = 0;
     renderSessionList();
     const col = document.getElementById("chatCol");
     col.innerHTML = chatHeader("通知", "所有设备的同步通知",
@@ -545,29 +552,8 @@
     document.getElementById("ci-file").onchange = sendFile;
     setupVoice();
 
-    const body = document.getElementById("chatBody");
-    if (body) body.addEventListener("click", onChatImageClick);
     loadMessages(t.name);
     input.focus();
-  }
-
-  // 聊天图片点击 → 全屏预览（与手机 App 一致），不再新开标签页
-  function onChatImageClick(e) {
-    const img = e.target.closest && e.target.closest(".js-img");
-    if (img && img.dataset.full) openImageLightbox(img.dataset.full);
-  }
-
-  function openImageLightbox(url) {
-    const overlay = document.createElement("div");
-    overlay.className = "modal-mask img-lightbox";
-    overlay.innerHTML = `
-      <img class="img-lb-img" src="${esc(url)}" alt="图片预览" />
-      <div class="img-lb-bar">
-        <a class="btn sm" href="${esc(url)}" target="_blank" download>⬇ 下载原图</a>
-        <button class="btn ghost sm" id="imgLbClose">关闭</button>
-      </div>`;
-    overlay.onclick = (ev) => { if (ev.target === overlay || ev.target.id === "imgLbClose") overlay.remove(); };
-    document.body.appendChild(overlay);
   }
 
   async function loadMessages(topic) {
@@ -597,7 +583,7 @@
       if (String(m.media_url).startsWith("p2p:")) {
         media = `<div class="bubble-media p2p-note">📎 P2P 直传文件 · 请在手机 App 查看</div>`;
       } else if (m.media_type === "image") {
-        media = `<div class="bubble-media"><img class="js-img" data-full="${url}" src="${url}" loading="lazy" alt="图片" /></div>`;
+        media = `<div class="bubble-media"><a href="${url}" target="_blank"><img src="${url}" loading="lazy" /></a></div>`;
       } else if (m.media_type === "voice") {
         media = `<div class="bubble-media"><audio controls preload="none" src="${url}"></audio></div>`;
       } else if (m.media_type === "file") {
@@ -605,7 +591,7 @@
       }
     }
     return `<div class="msg-row ${mine ? "mine" : ""}">
-      ${mine ? "" : avatarHtml(senderName, m.sender_avatar, 34)}
+      ${avatarHtml(senderName, m.sender_avatar, 34)}
       <div class="bubble ${mine ? "bubble-own" : "bubble-other"}">
         <div class="bubble-sender">${esc(senderName)}${m.device_name ? `<span class="bubble-dev"> · ${esc(m.device_name)}</span>` : ""}<span class="bubble-time">${time}</span></div>
         ${m.title ? `<div class="bubble-title">${esc(m.title)}</div>` : ""}

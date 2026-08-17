@@ -307,13 +307,14 @@ class FriendsFragment : Fragment() {
     // ===== 大「+」菜单：添加好友 / 发现·创建话题 =====
 
     private fun showFabMenu() {
-        val options = arrayOf("添加好友", "发现 / 创建话题")
+        val options = arrayOf("添加好友", "发现 / 创建话题", "设置")
         AlertDialog.Builder(requireContext())
             .setTitle("添加")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> showAddFriendDialog()
                     1 -> showDiscoverDialog()
+                    2 -> (requireActivity() as? MainActivity)?.openSettings()
                 }
             }
             .setNegativeButton("取消", null)

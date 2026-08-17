@@ -28,12 +28,6 @@
     ],
     "security": {
       "csp": null
-    },
-    "trayIcon": {
-      "id": "main-tray",
-      "iconPath": "icons/tray.png",
-      "iconAsTemplate": false,
-      "tooltip": "EchoLink"
     }
   },
   "bundle": {

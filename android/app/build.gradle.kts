@@ -15,6 +15,12 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 只打包真机常用 ABI，剔除 x86 / x86_64，显著减小安装包体积
+        // （io.getstream:stream-webrtc-android 原生库占大头，约 40MB+）
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     signingConfigs {

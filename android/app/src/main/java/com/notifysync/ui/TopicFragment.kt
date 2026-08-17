@@ -39,6 +39,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.DividerItemDecoration
+import android.graphics.drawable.BitmapDrawable
+import com.notifysync.data.BingWallpaper
 import com.google.android.material.textfield.TextInputEditText
 import com.notifysync.R
 import com.notifysync.data.ApiClient
@@ -183,6 +186,12 @@ class TopicFragment : Fragment() {
         )
         binding.rvTopics.layoutManager = LinearLayoutManager(requireContext())
         binding.rvTopics.adapter = listAdapter
+        // 不同会话之间用分隔线隔开
+        binding.rvTopics.addItemDecoration(
+            DividerItemDecoration(requireContext(), DividerItemDecoration.VERTICAL).apply {
+                setDrawable(ContextCompat.getDrawable(requireContext(), R.drawable.divider_topic)!!)
+            }
+        )
 
         chatAdapter = TopicAdapter(
             onItemLongClick = { msg ->
@@ -223,8 +232,7 @@ class TopicFragment : Fragment() {
         // 聊天态：待审批
         binding.btnPending.setOnClickListener { showPendingDialog() }
 
-        // 设置入口（顶栏齿轮，替代底栏设置 tab）
-        binding.btnSettings.setOnClickListener { (activity as? MainActivity)?.openSettings() }
+        // 设置入口已移入「+」悬浮菜单（见 showTopicFabMenu），顶栏齿轮不再使用
 
         // 悬浮加号：新建 / 发现话题
         binding.fabAddTopic.setOnClickListener { showTopicFabMenu() }
@@ -349,9 +357,23 @@ class TopicFragment : Fragment() {
         backCallback.isEnabled = false
         binding.tvChatTitle.visibility = View.GONE
         binding.btnPending.visibility = View.GONE
-        binding.btnSettings.visibility = View.VISIBLE
+        // 设置已移入「+」FAB，顶栏齿轮保持隐藏
         binding.fabAddTopic.visibility = View.VISIBLE
         loadTopicList()
+        applyListBackground()
+    }
+
+    private fun applyListBackground() {
+        lifecycleScope.launch {
+            try {
+                val bmp = BingWallpaper.load(requireContext())
+                if (bmp != null) {
+                    binding.listLayout.background = BitmapDrawable(resources, bmp)
+                }
+            } catch (_: Exception) {
+                // 拉取失败时保持原背景
+            }
+        }
     }
 
     private fun showChatMode(topic: MyTopic) {
@@ -384,13 +406,14 @@ class TopicFragment : Fragment() {
     // ===== 悬浮加号菜单：新建 / 发现话题 =====
 
     private fun showTopicFabMenu() {
-        val options = arrayOf("创建话题", "发现 / 加入话题")
+        val options = arrayOf("创建话题", "发现 / 加入话题", "设置")
         AlertDialog.Builder(requireContext())
             .setTitle("新建")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> showCreateTopicDialog()
                     1 -> showDiscoverDialog()
+                    2 -> (activity as? MainActivity)?.openSettings()
                 }
             }
             .setNegativeButton("取消", null)
