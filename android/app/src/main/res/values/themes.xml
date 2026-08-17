@@ -30,11 +30,11 @@
         <item name="materialAlertDialogTheme">@style/Theme.NotifySync.Dialog</item>
     </style>
 
-    <!-- 所有 AlertDialog 统一：白底（聊天页气泡色）+ 品牌蓝强调 + 半透明遮罩区分层级 -->
+    <!-- 所有 AlertDialog 统一：与聊天页面背景同色 + 品牌蓝强调 + 0.5 半透明遮罩区分层级 -->
     <style name="Theme.NotifySync.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
-        <item name="android:windowBackground">@color/surface</item>
-        <item name="android:background">@color/surface</item>
-        <item name="android:colorBackground">@color/surface</item>
+        <item name="android:windowBackground">@color/chat_bg</item>
+        <item name="android:background">@color/chat_bg</item>
+        <item name="android:colorBackground">@color/chat_bg</item>
         <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorOnPrimary">@color/on_primary</item>
         <item name="colorSurface">@color/surface</item>
