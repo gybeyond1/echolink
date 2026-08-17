@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/brand_primary">
+    android:background="@android:color/transparent">
 
     <!-- 顶部栏（列表态 / 聊天态 切换可见性）；背景透明，让整页壁纸（含顶栏）成为统一整体 -->
     <LinearLayout
@@ -286,7 +286,7 @@
                     android:id="@+id/recyclerView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="@drawable/bg_chat"
+                    android:background="@android:color/transparent"
                     android:clipToPadding="false"
                     android:paddingBottom="8dp" />
             </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

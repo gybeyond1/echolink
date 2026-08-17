@@ -456,7 +456,17 @@ class TopicAdapter(
     // ===== Avatar loading =====
 
     private fun loadAvatar(item: TopicMessage, iv: ImageView) {
-        AvatarLoader.load(ApiClient.fullAvatarUrl(item.senderAvatar), iv)
+        // 自己的消息始终用当前头像（换头像后立即生效，不依赖历史消息里存的旧 URL）
+        val url = if (item.senderUserId > 0 && item.senderUserId == AuthManager.userId) {
+            ApiClient.fullAvatarUrl(AuthManager.avatarUrl)
+        } else {
+            ApiClient.fullAvatarUrl(item.senderAvatar)
+        }
+        if (url.isNullOrBlank()) {
+            iv.setImageResource(R.drawable.ic_default_avatar)
+            return
+        }
+        AvatarLoader.load(url, iv)
     }
 
     private fun playVoice(url: String) {

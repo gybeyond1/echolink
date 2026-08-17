@@ -7,7 +7,9 @@ import android.content.IntentFilter
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
+import android.graphics.Color
 import com.notifysync.data.AppFilterStore
 import com.notifysync.data.AuthManager
 import com.notifysync.databinding.ActivityMainBinding
@@ -40,6 +42,14 @@ class MainActivity : AppCompatActivity() {
 
         // 全面屏沉浸式：内容延伸到状态栏/导航栏，不保留系统预留内边距
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        // 状态栏/导航栏透明，让全局壁纸（含顶栏）成为统一整体；
+        // 壁纸经浅色遮罩偏亮，故状态栏/导航栏用深色素图标（light appearance）
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        val insetsCtrl = WindowInsetsControllerCompat(window, window.decorView)
+        insetsCtrl.isAppearanceLightStatusBars = true
+        insetsCtrl.isAppearanceLightNavigationBars = true
 
         setupBottomNav()
 

@@ -75,6 +75,8 @@ class TopicFragment : Fragment() {
     private val myTopics = mutableListOf<MyTopic>()
     private var currentTopic: String? = null
     private var chatTopic: MyTopic? = null
+    // 仅聊天模式：由好友页在平板右侧以子 Fragment 方式承载，只显示聊天、不含左侧列表
+    private var chatOnly = false
     private var unifiedRequests = UnifiedRequests(emptyList(), emptyList())
 
     private var mediaRecorder: MediaRecorder? = null
@@ -93,6 +95,11 @@ class TopicFragment : Fragment() {
                 // 好友关系变化：话题列表可能新增私聊会话
                 "com.notifysync.FRIENDS_CHANGED" -> {
                     if (binding.listLayout.visibility == View.VISIBLE) loadTopicList()
+                }
+                // 头像/昵称变更（含其他设备换头像的 WS 推送）：重绑可见头像
+                "com.notifysync.PROFILE_CHANGED" -> {
+                    if (binding.chatLayout.visibility == View.VISIBLE) chatAdapter.notifyDataSetChanged()
+                    if (binding.listLayout.visibility == View.VISIBLE) listAdapter.notifyDataSetChanged()
                 }
                 else -> {
                     val topic = intent?.getStringExtra("topic") ?: return
@@ -180,6 +187,9 @@ class TopicFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // 仅聊天模式（平板好友页右侧）：不加载左侧列表，直接进入聊天
+        chatOnly = arguments?.getBoolean(EXTRA_CHAT_ONLY) ?: false
+
         listAdapter = TopicListAdapter(
             onItemClick = { showChatMode(it) },
             onItemLongClick = { showTopicMenu(it) }
@@ -223,6 +233,8 @@ class TopicFragment : Fragment() {
             override fun handleOnBackPressed() {
                 when {
                     chatAdapter.selectionMode -> { chatAdapter.clearSelection(); updateSelectionUI() }
+                    chatOnly -> (parentFragment as? ChatPaneHost)?.onChatPaneClosed()
+                        ?: (activity as? MainActivity)?.backToTopics()
                     binding.chatLayout.visibility == View.VISIBLE -> showListMode()
                 }
             }
@@ -287,7 +299,9 @@ class TopicFragment : Fragment() {
         listRefreshHandler.postDelayed(listRefreshRunnable, 15000)
 
         // 平板双栏：左侧列表固定宽度（≈360dp），右侧聊天占剩余空间
-        if (isWide) {
+        // 仅聊天模式（好友页右侧）：左列表隐藏，聊天占满右栏
+        val dual = isWide && !chatOnly
+        if (dual) {
             val lp = binding.listLayout.layoutParams as LinearLayout.LayoutParams
             lp.width = (360 * resources.displayMetrics.density).toInt()
             lp.weight = 0f
@@ -295,7 +309,7 @@ class TopicFragment : Fragment() {
             binding.tvTitleList.text = "消息"
         }
 
-        // 外部入口定位到指定会话（状态栏通知 / 好友私聊）：列表加载完后直接进聊天态
+        // 外部入口定位到指定会话（状态栏通知 / 好友私聊）：直接进入聊天态
         val argTopic = arguments?.getString("topic")
         if (!argTopic.isNullOrEmpty()) {
             val argTitle = arguments?.getString("title")
@@ -314,6 +328,9 @@ class TopicFragment : Fragment() {
                     }
                 } catch (_: Exception) {}
             }
+        } else if (chatOnly) {
+            // 仅聊天模式但未带话题参数：回退到列表（理论上不会发生）
+            showListMode()
         }
     }
 
@@ -324,6 +341,7 @@ class TopicFragment : Fragment() {
             IntentFilter("com.notifysync.TOPIC_MESSAGE_RECEIVED").apply {
                 addAction("com.notifysync.REQUESTS_CHANGED")
                 addAction("com.notifysync.FRIENDS_CHANGED")
+                addAction("com.notifysync.PROFILE_CHANGED")
             },
             Context.RECEIVER_NOT_EXPORTED
         )
@@ -385,7 +403,9 @@ class TopicFragment : Fragment() {
         currentTopic = topic.name
         binding.tvChatTitle.text = topic.displayName ?: topic.name
         binding.btnPending.visibility = if (topic.myRole == "owner" && topic.pendingRequests > 0) View.VISIBLE else View.GONE
-        if (isWide) {
+        // 平板且非仅聊天模式 → 左列表 + 右聊天并排；其余（手机 / 仅聊天模式）→ 聊天占满
+        val dual = isWide && !chatOnly
+        if (dual) {
             // 平板双栏（平行视界）：左侧列表保持显示，聊天在右侧打开
             binding.listLayout.visibility = View.VISIBLE
             binding.chatLayout.visibility = View.VISIBLE
@@ -404,6 +424,8 @@ class TopicFragment : Fragment() {
         }
         backCallback.isEnabled = true
         WebSocketClient.sendSubscribe(topic.name)
+        // 进入聊天也确保整页（含状态栏）铺上统一壁纸
+        applyListBackground()
         loadMessages()
     }
 
@@ -1331,5 +1353,24 @@ class TopicFragment : Fragment() {
             val real = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
             android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, real)
         } catch (_: Exception) { null }
+    }
+
+    /** 仅聊天模式宿主回调：好友页右侧聊天容器关闭时通知宿主收起右栏 */
+    interface ChatPaneHost {
+        fun onChatPaneClosed()
+    }
+
+    companion object {
+        const val EXTRA_CHAT_ONLY = "chat_only"
+        /** 构造一个「仅聊天」的 TopicFragment，用于平板好友页右侧承载私聊 */
+        fun chatOnly(topic: String, title: String?): TopicFragment {
+            val f = TopicFragment()
+            f.arguments = Bundle().apply {
+                putBoolean(EXTRA_CHAT_ONLY, true)
+                putString("topic", topic)
+                putString("title", title)
+            }
+            return f
+        }
     }
 }

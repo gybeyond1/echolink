@@ -41,11 +41,15 @@ import kotlinx.coroutines.launch
  * - 「新的朋友」：收到的好友申请，可同意/拒绝/忽略
  * - 底部大「+」：添加好友 / 发现·创建话题
  */
-class FriendsFragment : Fragment() {
+class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
     private var _binding: FragmentFriendsBinding? = null
     private val binding get() = _binding!!
 
     private lateinit var friendAdapter: FriendAdapter
+
+    /** 平板判定：最小宽度 ≥600dp */
+    private val isWide: Boolean
+        get() = resources.configuration.smallestScreenWidthDp >= 600
 
     // WS 推送（好友申请/通过验证）到达时刷新
     private val friendsReceiver = object : BroadcastReceiver() {
@@ -148,15 +152,56 @@ class FriendsFragment : Fragment() {
     // ===== 好友私聊 =====
 
     private fun openChat(friend: Friend) {
+        if (isWide) {
+            // 平板：右侧聊天容器打开，左栏保留好友列表（镜像消息页的双栏体验）
+            showChatOnRight(friend)
+        } else {
+            // 手机：整页切到聊天
+            lifecycleScope.launch {
+                try {
+                    val (topic, title) = ApiClient.openFriendChat(friend.username)
+                    val displayTitle = friend.displayName ?: title
+                    (activity as? MainActivity)?.openTopic(topic, displayTitle)
+                } catch (e: Exception) {
+                    Toast.makeText(requireContext(), "打开私聊失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    /** 平板：在右侧 chatContainer 以「仅聊天」模式承载私聊，左栏好友列表保持可见 */
+    private fun showChatOnRight(friend: Friend) {
         lifecycleScope.launch {
             try {
                 val (topic, title) = ApiClient.openFriendChat(friend.username)
-                // 优先用好友的昵称作为展示名
                 val displayTitle = friend.displayName ?: title
-                (activity as? MainActivity)?.openTopic(topic, displayTitle)
+                val frag = TopicFragment.chatOnly(topic, displayTitle)
+                childFragmentManager.beginTransaction()
+                    .replace(binding.chatContainer.id, frag)
+                    .commit()
+                binding.chatContainer.visibility = View.VISIBLE
+                // 左栏固定宽度（≈360dp），右栏聊天占剩余空间
+                val dm = resources.displayMetrics.density
+                val lp = binding.leftPane.layoutParams as LinearLayout.LayoutParams
+                lp.width = (360 * dm).toInt()
+                lp.weight = 0f
+                binding.leftPane.layoutParams = lp
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "打开私聊失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    /** 右侧聊天关闭（返回手势）：收起右栏，左栏恢复整宽 */
+    override fun onChatPaneClosed() {
+        binding.chatContainer.visibility = View.GONE
+        val lp = binding.leftPane.layoutParams as LinearLayout.LayoutParams
+        lp.width = 0
+        lp.weight = 1f
+        binding.leftPane.layoutParams = lp
+        // 清理右侧子 Fragment，避免残留
+        childFragmentManager.fragments.firstOrNull()?.let {
+            childFragmentManager.beginTransaction().remove(it).commitAllowingStateLoss()
         }
     }
 

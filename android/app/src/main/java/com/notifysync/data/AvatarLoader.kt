@@ -17,16 +17,23 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.security.MessageDigest
 
 /**
  * 共享头像加载器：内存缓存 + 磁盘缓存 + 异步下载 + 圆形裁剪。
  *
- * 关键点（解决「切换页面头像变白/重新加载」）：
+ * 关键点（解决「切换页面头像变白/重新加载」+「换了头像不更新」）：
  *  1. 内存缓存（进程内，同会话切换瞬时命中，不重拉）；
  *  2. 磁盘缓存（cacheDir/avatars/<md5>.png，进程被杀/冷启动也能瞬时命中，不重拉）；
- *  3. 只有当内存和磁盘都没有时，才显示默认占位图并发起网络请求——
- *     因此视图重绑（切页/重进聊天）时若本地已有缓存，不会闪白、也不会重新下载。
+ *  3. 只有当内存和磁盘都没有时，才显示默认占位图并发起网络请求；
+ *  4. 条件 GET（If-None-Match / If-Modified-Since）：服务端头像变化（哪怕同一 URL）
+ *     也能被探知——304 复用缓存、200 更新缓存，绝不会长期展示过期头像；
+ *  5. invalidate(url) / refresh(url, iv)：换头像后主动让旧缓存失效并立即拉新图。
+ *
+ * 注意：头像只在 cacheDir 磁盘缓存，绝不会写进 APK。换头像后服务端文件名带时间戳，
+ * URL 会变，新 URL 自然命中新缓存；本类的条件 GET 与 invalidate 进一步兜底同 URL 的更新。
  *
  * 用法：AvatarLoader.load(ApiClient.fullAvatarUrl(path), imageView)
  */
@@ -48,62 +55,143 @@ object AvatarLoader {
 
     private fun diskFile(url: String): File? {
         val dir = diskDir() ?: return null
-        val md5 = md5(url)
-        return File(dir, "$md5.png")
+        return File(dir, "${md5(url)}.png")
+    }
+
+    private fun etagFile(url: String): File? {
+        val dir = diskDir() ?: return null
+        return File(dir, "${md5(url)}.etag")
+    }
+
+    private fun lmFile(url: String): File? {
+        val dir = diskDir() ?: return null
+        return File(dir, "${md5(url)}.lm")
     }
 
     fun load(url: String?, iv: ImageView) {
+        load(url, iv, false)
+    }
+
+    /**
+     * @param forceRefresh true 时忽略内存/磁盘缓存，强制重新下载（用于换头像后立即生效）
+     */
+    fun load(url: String?, iv: ImageView, forceRefresh: Boolean) {
         if (url.isNullOrBlank()) {
             iv.setImageResource(R.drawable.ic_default_avatar)
             return
         }
 
-        // 1) 内存命中：瞬时设置，绝不闪白
-        cache.get(url)?.let {
-            iv.setImageBitmap(it)
-            return
+        // 1) 内存命中：瞬时设置，绝不闪白（除非强制刷新）
+        if (!forceRefresh) {
+            cache.get(url)?.let {
+                iv.setImageBitmap(it)
+                return
+            }
         }
 
         // 2) 磁盘命中：后台解码后设置（不显示占位，避免闪白）
-        val df = diskFile(url)
-        if (df != null && df.exists() && df.length() > 100) {
-            if (!loading.add(url)) return
-            scope.launch {
-                try {
-                    val bmp = withContext(Dispatchers.IO) { decodeCircle(df) }
-                    if (bmp != null) {
-                        cache.put(url, bmp)
-                        iv.setImageBitmap(bmp)
-                    } else {
+        if (!forceRefresh) {
+            val df = diskFile(url)
+            if (df != null && df.exists() && df.length() > 100) {
+                if (!loading.add(url)) return
+                scope.launch {
+                    try {
+                        val bmp = withContext(Dispatchers.IO) { decodeCircle(df) }
+                        if (bmp != null) {
+                            cache.put(url, bmp)
+                            iv.setImageBitmap(bmp)
+                        } else {
+                            iv.setImageResource(R.drawable.ic_default_avatar)
+                        }
+                    } catch (_: Exception) {
                         iv.setImageResource(R.drawable.ic_default_avatar)
+                    } finally {
+                        loading.remove(url)
                     }
-                } catch (_: Exception) {
-                    iv.setImageResource(R.drawable.ic_default_avatar)
-                } finally {
-                    loading.remove(url)
                 }
+                return
             }
-            return
         }
 
-        // 3) 全 miss：显示占位 → 下载 → 存磁盘 + 内存
+        // 3) 全 miss（或强制刷新）：显示占位 → 条件 GET 下载 → 存磁盘 + 内存
         iv.setImageResource(R.drawable.ic_default_avatar)
         if (!loading.add(url)) return
 
         scope.launch {
             try {
-                val bmp = withContext(Dispatchers.IO) { download(url) }
-                if (bmp != null) {
-                    val circle = cropCircle(bmp)
-                    cache.put(url, circle)
-                    saveDisk(url, circle)
-                    iv.setImageBitmap(circle)
+                val result = withContext(Dispatchers.IO) {
+                    val etag = if (forceRefresh) null else readSidecar(etagFile(url))
+                    val lm = if (forceRefresh) null else readSidecar(lmFile(url))
+                    download(url, etag, lm)
+                }
+                when (result) {
+                    is DownloadResult.Ok -> {
+                        val circle = cropCircle(result.bmp)
+                        cache.put(url, circle)
+                        saveDisk(url, circle)
+                        writeSidecar(etagFile(url), result.etag)
+                        writeSidecar(lmFile(url), result.lm)
+                        iv.setImageBitmap(circle)
+                    }
+                    is DownloadResult.NotModified -> {
+                        // 304：服务端头像没变，沿用磁盘缓存
+                        val df = diskFile(url)
+                        if (df != null && df.exists() && df.length() > 100) {
+                            val bmp = withContext(Dispatchers.IO) { decodeCircle(df) }
+                            if (bmp != null) {
+                                cache.put(url, bmp)
+                                iv.setImageBitmap(bmp)
+                            } else {
+                                iv.setImageResource(R.drawable.ic_default_avatar)
+                            }
+                        } else {
+                            // 磁盘缓存意外丢失：降级为普通下载
+                            val bmp = withContext(Dispatchers.IO) { download(url, null, null) }
+                            if (bmp is DownloadResult.Ok) {
+                                val circle = cropCircle(bmp.bmp)
+                                cache.put(url, circle)
+                                saveDisk(url, circle)
+                                iv.setImageBitmap(circle)
+                            } else {
+                                iv.setImageResource(R.drawable.ic_default_avatar)
+                            }
+                        }
+                    }
+                    else -> iv.setImageResource(R.drawable.ic_default_avatar)
                 }
             } catch (_: Exception) {
+                iv.setImageResource(R.drawable.ic_default_avatar)
             } finally {
                 loading.remove(url)
             }
         }
+    }
+
+    /** 主动让某个 URL 的缓存失效（换头像后调用，避免旧图残留） */
+    fun invalidate(url: String?) {
+        if (url.isNullOrBlank()) return
+        cache.remove(url)
+        try { diskFile(url)?.delete() } catch (_: Exception) {}
+        try { etagFile(url)?.delete() } catch (_: Exception) {}
+        try { lmFile(url)?.delete() } catch (_: Exception) {}
+    }
+
+    /** 失效并立即重新下载显示（换头像后立即生效的最直接入口） */
+    fun refresh(url: String?, iv: ImageView) {
+        invalidate(url)
+        load(url, iv, true)
+    }
+
+    private fun readSidecar(f: File?): String? {
+        if (f == null || !f.exists()) return null
+        return try { f.readText().trim().ifEmpty { null } } catch (_: Exception) { null }
+    }
+
+    private fun writeSidecar(f: File?, value: String?) {
+        if (f == null) return
+        try {
+            if (value.isNullOrBlank()) f.delete() else f.writeText(value)
+        } catch (_: Exception) {}
     }
 
     private fun decodeCircle(file: File): Bitmap? {
@@ -121,15 +209,33 @@ object AvatarLoader {
         }
     }
 
-    private fun download(urlStr: String): Bitmap? {
+    private sealed class DownloadResult {
+        class Ok(val bmp: Bitmap, val etag: String?, val lm: String?) : DownloadResult()
+        object NotModified : DownloadResult()
+        object Error : DownloadResult()
+    }
+
+    private fun download(urlStr: String, etag: String?, lm: String?): DownloadResult {
         return try {
-            val conn = java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection
+            val conn = URL(urlStr).openConnection() as HttpURLConnection
             conn.connectTimeout = 8_000
             conn.readTimeout = 8_000
+            conn.instanceFollowRedirects = true
+            if (!etag.isNullOrBlank()) conn.setRequestProperty("If-None-Match", etag)
+            if (!lm.isNullOrBlank()) conn.setRequestProperty("If-Modified-Since", lm)
             conn.connect()
-            BitmapFactory.decodeStream(conn.inputStream)
+            when (conn.responseCode) {
+                304 -> DownloadResult.NotModified
+                200 -> {
+                    val bmp = BitmapFactory.decodeStream(conn.inputStream) ?: return DownloadResult.Error
+                    val newEtag = conn.getHeaderField("ETag")
+                    val newLm = conn.getHeaderField("Last-Modified")
+                    DownloadResult.Ok(bmp, newEtag, newLm)
+                }
+                else -> DownloadResult.Error
+            }
         } catch (e: Exception) {
-            null
+            DownloadResult.Error
         }
     }
 

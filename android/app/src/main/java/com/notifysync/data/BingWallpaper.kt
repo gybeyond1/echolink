@@ -10,22 +10,22 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 /**
- * Bing 每日壁纸背景：每天拉取 https://dailybing.com/api/v1/today/zh-cn/UHD
- * （该地址 302 重定向到当天 Bing UHD 壁纸直链，由手机网络直连，不经过服务器）。
+ * 全局统一背景：固定一张图（用户指定，写死地址），手机网络直连，不经过服务器。
  *
  * 处理要点（对应用户要求）：
- *  - 手机网络直连 Bing，不经过服务器；
- *  - 按日期缓存到 cacheDir，每天自动刷新一次（跨天拉新图）；刷新失败则保留当前/昨天的图；
+ *  - 固定图片地址，写死为常量（https://c-ssl.dtstatic.com/.../20160903113821_ThJrQ.thumb.1000_0.jpeg）；
  *  - 近 100% 高斯模糊 + 浅色遮罩（保证深色文字可读），再 centerCrop 覆盖全屏、不拉伸挤压；
- *  - 整页（含顶栏）作为统一背景使用。
+ *  - 整页（含顶栏/状态栏）作为统一背景使用，好友页 / 消息页 / 聊天页共用同一张；
+ *  - 第一次下载后按版本号缓存到 cacheDir，之后直接复用，不再重拉（换图时升 WALLPAPER_VERSION 即可强制刷新）。
  */
 object BingWallpaper {
-    private const val WALLPAPER_URL = "https://dailybing.com/api/v1/today/zh-cn/UHD"
+    // 用户指定的固定背景图（写死）
+    private const val WALLPAPER_URL = "https://c-ssl.dtstatic.com/uploads/item/201609/03/20160903113821_ThJrQ.thumb.1000_0.jpeg"
+    // 缓存版本：换了图就 +1 强制重新下载/模糊（避免一直用旧缓存）
+    private const val WALLPAPER_VERSION = 1
     // 浅色遮罩：让背景整体偏亮，配合深色文字（on_wallpaper）可读性最好，同时仍透出壁纸色调（~60% 白）
     private val MASK = Color.argb(0x99, 0xFF, 0xFF, 0xFF)
 
@@ -36,22 +36,20 @@ object BingWallpaper {
         .followSslRedirects(true)
         .build()
 
-    // 当日已算好的位图缓存，避免每次 onResume 重新解码+模糊
-    @Volatile private var cachedDate: String? = null
+    // 已算好的位图缓存，避免每次 onResume 重新解码+模糊
     @Volatile private var cachedBmp: Bitmap? = null
 
     /** 返回已模糊+遮罩+覆盖裁剪的背景位图；下载/解码失败返回 null（调用方保持原背景） */
     suspend fun load(ctx: Context): Bitmap? = withContext(Dispatchers.IO) {
         try {
-            val date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
-            if (date == cachedDate && cachedBmp != null && !cachedBmp!!.isRecycled) {
+            if (cachedBmp != null && !cachedBmp!!.isRecycled) {
                 return@withContext cachedBmp
             }
 
-            val dir = File(ctx.cacheDir, "bing_wallpaper").apply { mkdirs() }
-            val file = File(dir, "$date.jpg")
+            val dir = File(ctx.cacheDir, "wallpaper").apply { mkdirs() }
+            val file = File(dir, "global_bg_v$WALLPAPER_VERSION.jpg")
 
-            // 当天未缓存 → 尝试下载；下载失败则回退到目录里最新的旧图（保留当前背景）
+            // 未缓存 → 尝试下载；下载失败则回退到目录里最新的旧图（保留当前背景）
             if (!file.exists() || file.length() < 10_000) {
                 if (!download(file)) {
                     findFallback(dir)?.let { file2 -> if (file2.exists()) file2.copyTo(file, overwrite = true) }
@@ -62,7 +60,6 @@ object BingWallpaper {
             val screen = decodeSampled(file, targetMaxDim(ctx)) ?: return@withContext null
             val blurred = blurAndMask(screen)
             val cover = cover(blurred, ctx)
-            cachedDate = date
             cachedBmp = cover
             cover
         } catch (_: Exception) {
