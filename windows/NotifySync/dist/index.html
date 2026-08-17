@@ -2,12 +2,29 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>EchoLink</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    // 主题预加载（防闪烁）：localStorage 优先，否则跟随系统
+    (function () {
+      try {
+        var t = localStorage.getItem("ns_theme") || "system";
+        var dark = t === "dark" ||
+          (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme-mode", t);
+      } catch (e) { document.documentElement.setAttribute("data-theme", "light"); }
+    })();
+  </script>
   <style>
+    /* 首次启动 / 切换服务器的地址输入页（已配置则隐藏） */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { height: 100vh; display: flex; align-items: center; justify-content: center;
+    #setup { position: fixed; inset: 0; z-index: 999; display: none;
+      align-items: center; justify-content: center;
       font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       background: linear-gradient(135deg, #2AABEE 0%, #3390EC 100%); color: #fff; }
+    #setup.show { display: flex; }
     .box { text-align: center; max-width: 380px; width: 90%; }
     .logo { width: 72px; height: 72px; margin: 0 auto 20px;
       background: rgba(255,255,255,.22); border-radius: 18px; font-size: 42px; font-weight: 800;
@@ -35,92 +52,102 @@
   </style>
 </head>
 <body>
-  <!-- 加载中 -->
-  <div id="loading" class="box loading">
-    <div class="spinner"></div>
-    <p>正在连接服务器…</p>
+  <!-- 服务器地址输入页（首次启动 / 托盘切换服务器时显示） -->
+  <div id="setup" class="hidden">
+    <div class="box">
+      <div class="logo">E</div>
+      <h2>EchoLink</h2>
+      <p class="sub">跨设备消息互联平台</p>
+      <input id="serverUrl" type="text" placeholder="https://your-server.com" autocomplete="off" />
+      <button id="btnConnect">连接</button>
+      <p id="error" class="err"></p>
+      <p class="link"><a href="https://github.com/gybeyond1/echolink">github.com/gybeyond1/echolink</a></p>
+    </div>
   </div>
 
-  <!-- 服务器地址输入 -->
-  <div id="setup" class="box hidden">
-    <div class="logo">E</div>
-    <h2>EchoLink</h2>
-    <p class="sub">跨设备消息互联平台</p>
-    <input id="serverUrl" type="text" placeholder="https://your-server.com" autocomplete="off" />
-    <button id="btnConnect" onclick="connectServer()">连接</button>
-    <p id="error" class="err"></p>
-    <p class="link"><a href="https://github.com/gybeyond1/echolink">github.com/gybeyond1/echolink</a></p>
-  </div>
+  <!-- 主界面（本地 WebUI） -->
+  <button id="themeToggle" class="theme-toggle" title="切换主题" aria-label="切换主题（浅色/深色/跟随系统）"></button>
+  <div id="app"></div>
+  <div id="toast"></div>
 
+  <!-- 启动逻辑：已配置服务器 → 直接加载本地 UI；未配置 → 显示地址输入页 -->
   <script>
     (function () {
-      // 1. 通过 Tauri 命令获取已保存的服务器地址
+      var setupEl = document.getElementById("setup");
+      var serverUrl = document.getElementById("serverUrl");
+      var btnConnect = document.getElementById("btnConnect");
+      var errEl = document.getElementById("error");
+
+      function showSetup() {
+        setupEl.classList.remove("hidden");
+        setupEl.classList.add("show");
+        serverUrl.focus();
+      }
+
+      function hideSetup() {
+        setupEl.classList.add("hidden");
+        setupEl.classList.remove("show");
+      }
+
+      // 禁用右键刷新 / 开发者工具 & F5 / Ctrl+R 刷新
+      document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "F5" || (e.ctrlKey && (e.key === "r" || e.key === "R"))) e.preventDefault();
+      });
+
+      function startApp() {
+        hideSetup();
+        // 加载本地 WebUI（API 基址在 app.js 内通过 get_config 读取）
+        var s = document.createElement("script");
+        s.src = "app.js";
+        document.body.appendChild(s);
+      }
+
+      function connectServer() {
+        var url = serverUrl.value.trim().replace(/\/+$/, "");
+        errEl.textContent = "";
+        if (!url) { errEl.textContent = "请输入服务器地址"; return; }
+        if (!/^https?:\/\//.test(url)) { url = "http://" + url; }
+
+        btnConnect.disabled = true;
+        btnConnect.textContent = "连接中…";
+
+        if (window.__TAURI__ && window.__TAURI__.core) {
+          window.__TAURI__.core.invoke("save_server_url", { url: url })
+            .then(function () {
+              // 保存成功 → 重新加载本地 UI（不跳转远程）
+              location.reload();
+            })
+            .catch(function (e) {
+              btnConnect.disabled = false;
+              btnConnect.textContent = "连接";
+              errEl.textContent = "保存失败: " + e;
+            });
+        } else {
+          // 非 Tauri 环境（浏览器调试）→ 当作同源 WebUI
+          location.reload();
+        }
+      }
+
+      btnConnect.onclick = connectServer;
+      serverUrl.addEventListener("keydown", function (e) { if (e.key === "Enter") connectServer(); });
+
+      // 判断是否已配置服务器
       if (window.__TAURI__ && window.__TAURI__.core) {
-        window.__TAURI__.core.invoke('app_info')
+        window.__TAURI__.core.invoke("app_info")
           .then(function (info) {
             if (info.server_url && info.server_url.length > 0) {
-              // 已配置 → 直接跳转
-              window.location.replace(info.server_url);
+              startApp();
             } else {
-              // 未配置 → 显示输入页
               showSetup();
             }
           })
           .catch(function () { showSetup(); });
       } else {
-        // 非 Tauri 环境 → 显示输入页
+        // 非 Tauri 环境：浏览器直接打开 dist → 显示输入页（调试用）
         showSetup();
       }
     })();
-
-    function showSetup() {
-      document.getElementById('loading').classList.add('hidden');
-      document.getElementById('setup').classList.remove('hidden');
-      document.getElementById('serverUrl').focus();
-    }
-
-    function connectServer() {
-      var input = document.getElementById('serverUrl');
-      var btn = document.getElementById('btnConnect');
-      var errEl = document.getElementById('error');
-      var url = input.value.trim().replace(/\/+$/, '');
-      errEl.textContent = '';
-
-      if (!url) { errEl.textContent = '请输入服务器地址'; return; }
-      if (!/^https?:\/\//.test(url)) { url = 'http://' + url; }
-
-      btn.disabled = true;
-      btn.textContent = '连接中…';
-      document.getElementById('loading').classList.remove('hidden');
-      document.getElementById('setup').classList.add('hidden');
-
-      if (window.__TAURI__ && window.__TAURI__.core) {
-        window.__TAURI__.core.invoke('save_server_url', { url: url })
-          .then(function () {
-            // 测试连接 → 2秒后跳转（fetch 验证）
-            fetch(url + '/api/info', { signal: AbortSignal.timeout(5000) })
-              .then(function (r) { if (r.ok) { window.location.replace(url); } else { throw new Error('服务器响应异常'); } })
-              .catch(function (e) {
-                // 连接失败也允许跳转（服务器可能没有 /api/info 端点）
-                window.location.replace(url);
-              });
-          })
-          .catch(function (e) {
-            btn.disabled = false;
-            btn.textContent = '连接';
-            errEl.textContent = '保存失败: ' + e;
-            document.getElementById('loading').classList.add('hidden');
-            document.getElementById('setup').classList.remove('hidden');
-          });
-      } else {
-        window.location.replace(url);
-      }
-    }
-
-    // 回车键连接
-    document.getElementById('serverUrl').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') connectServer();
-    });
   </script>
 </body>
 </html>
