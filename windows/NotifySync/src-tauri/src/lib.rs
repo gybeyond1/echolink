@@ -163,7 +163,7 @@ async fn set_unread_count(app: AppHandle, count: u32) -> Result<(), String> {
 
 /// 托盘状态：保存 CheckMenuItem 引用以便运行时更新勾选
 struct TrayState {
-    sync_check: Mutex<Option<CheckMenuItem>>,
+    sync_check: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
