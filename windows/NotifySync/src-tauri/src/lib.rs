@@ -552,22 +552,24 @@ mod installed_apps {
 
         for (root, subkey) in locations {
             let subkey_w = to_wide(subkey);
-            let mut hkey: HKEY = 0;
+            let mut hkey: HKEY = std::ptr::null_mut();
             let ret = unsafe { RegOpenKeyExW(root, subkey_w.as_ptr(), 0, KEY_READ, &mut hkey) };
             if ret != ERROR_SUCCESS { continue; }
 
             let mut index: u32 = 0;
             loop {
                 let mut name_buf = [0u16; 256];
-                let mut name_len = name_buf.len() as u32;
-                let ret = unsafe { RegEnumKeyW(hkey, index, name_buf.as_mut_ptr(), &mut name_len) };
+                let ret = unsafe { RegEnumKeyW(hkey, index, name_buf.as_mut_ptr(), name_buf.len() as u32) };
                 if ret != ERROR_SUCCESS { break; }
+
+                // Find null terminator to get actual string length
+                let name_len = name_buf.iter().position(|&c| c == 0).unwrap_or(name_buf.len());
                 if name_len == 0 { index += 1; continue; }
 
-                let subkey_name = String::from_utf16_lossy(&name_buf[..name_len as usize]);
+                let subkey_name = String::from_utf16_lossy(&name_buf[..name_len]);
                 let full_path = format!("{}\\{}", subkey, subkey_name);
                 let full_path_w = to_wide(&full_path);
-                let mut sub_hkey: HKEY = 0;
+                let mut sub_hkey: HKEY = std::ptr::null_mut();
                 let ret =
                     unsafe { RegOpenKeyExW(root, full_path_w.as_ptr(), 0, KEY_READ, &mut sub_hkey) };
                 if ret == ERROR_SUCCESS {
