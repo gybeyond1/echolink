@@ -38,7 +38,7 @@ class TopicListAdapter(
             item.kind == "devices" -> {
                 holder.tvAvatar.visibility = View.GONE
                 holder.ivAvatar.visibility = View.VISIBLE
-                holder.ivAvatar.setImageResource(R.drawable.img_devices_avatar)
+                holder.ivAvatar.setImageResource(R.drawable.ic_devices_avatar)
             }
             !item.avatarUrl.isNullOrBlank() -> {
                 holder.tvAvatar.visibility = View.GONE

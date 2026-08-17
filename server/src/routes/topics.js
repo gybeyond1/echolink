@@ -76,10 +76,12 @@ router.get("/", authMiddleware, (req, res) => {
   const db = getDB();
   // 每次拉取都确保设备默认会话存在（登录后的兜底，防旧账号缺失）
   ensureDeviceTopic(req.userId);
+  // 管理员：默认可见全部设备群组与所有人建的群聊，且默认可发消息/文件（my_role 置为 'admin'）
+  const isAdmin = req.role === "admin";
   const topics = db
     .prepare(
       `SELECT t.id, t.name, t.title, t.description, t.owner_id, t.kind, u.username as owner_name,
-              m.role as my_role,
+              ${isAdmin ? "'admin'" : "m.role"} as my_role,
               CASE t.kind
                 WHEN 'devices' THEN '我的设备'
                 WHEN 'dm' THEN (SELECT COALESCE(u2.display_name, u2.username) FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id
@@ -96,13 +98,13 @@ router.get("/", authMiddleware, (req, res) => {
               (SELECT text FROM topic_messages tm WHERE tm.topic = t.name ORDER BY id DESC LIMIT 1) as last_message,
               (SELECT COUNT(*) FROM topic_join_requests jr WHERE jr.topic_id = t.id AND jr.status='pending') as pending_requests
        FROM topics t
-       JOIN topic_members m ON m.topic_id = t.id
+       ${isAdmin ? "LEFT" : "INNER"} JOIN topic_members m ON m.topic_id = t.id
        LEFT JOIN users u ON t.owner_id = u.id
-       WHERE m.user_id = ?
+       WHERE ${isAdmin ? "1=1" : "m.user_id = ?"}
        ORDER BY CASE t.kind WHEN 'devices' THEN 0 WHEN 'dm' THEN 1 ELSE 2 END, last_message_at DESC, t.created_at DESC
        LIMIT 100`
     )
-    .all(req.userId, req.userId, req.userId);
+    .all(req.userId, req.userId, ...(isAdmin ? [] : [req.userId]));
   res.json({ topics });
 });
 

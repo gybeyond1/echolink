@@ -66,13 +66,21 @@
 
     </LinearLayout>
 
-    <!-- 列表态：话题会话列表 -->
+    <!-- 双栏容器：手机=列表/聊天全屏切换；平板(≥600dp)=左列表右聊天并排 -->
     <LinearLayout
-        android:id="@+id/listLayout"
+        android:id="@+id/dualPane"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="horizontal">
+
+        <!-- 列表态：话题会话列表 -->
+        <LinearLayout
+            android:id="@+id/listLayout"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
         <!-- 通知（置顶消息条，点进去看通知详情；原通知页合并至此） -->
         <LinearLayout
@@ -221,8 +229,8 @@
     <!-- 聊天态 -->
     <LinearLayout
         android:id="@+id/chatLayout"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
         android:layout_weight="1"
         android:orientation="vertical"
         android:visibility="gone">
@@ -406,6 +414,8 @@
 
         </FrameLayout>
     </LinearLayout>
+
+    </LinearLayout><!-- dualPane -->
 
     <ProgressBar
         android:id="@+id/progressBar"
