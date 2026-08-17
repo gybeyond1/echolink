@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for NotifySync desktop",
+  "description": "Default capabilities for EchoLink desktop",
   "windows": ["main"],
   "permissions": [
     "core:default",

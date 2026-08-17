@@ -1,7 +1,7 @@
 [package]
 name = "notifysync-desktop"
 version = "0.1.0"
-description = "NotifySync Windows 桌面客户端"
+description = "EchoLink Windows 桌面客户端"
 authors = ["gybeyond"]
 edition = "2021"
 rust-version = "1.77"

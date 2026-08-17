@@ -29,21 +29,21 @@ jobs:
           context: ./server
           push: true
           load: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/notifysync-server:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/echolink-server:latest
 
       - name: Save image as offline package
         run: |
-          docker save ${{ secrets.DOCKERHUB_USERNAME }}/notifysync-server:latest | gzip > notifysync-server-image.tar.gz
-          ls -lh notifysync-server-image.tar.gz
+          docker save ${{ secrets.DOCKERHUB_USERNAME }}/echolink-server:latest | gzip > echolink-server-image.tar.gz
+          ls -lh echolink-server-image.tar.gz
 
       - name: Upload server image to unified Release
         if: always()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0
-          name: NotifySync v1.0.0
+          name: EchoLink v1.0.0
           overwrite: true
           allowUpdates: true
-          files: notifysync-server-image.tar.gz
+          files: echolink-server-image.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

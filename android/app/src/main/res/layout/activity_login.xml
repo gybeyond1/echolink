@@ -18,7 +18,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="NotifySync - 跨设备通知同步"
+        android:text="EchoLink · 跨设备消息互联"
         android:textSize="14sp"
         android:textColor="@color/on_surface_variant"
         android:layout_marginBottom="32dp" />

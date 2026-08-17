@@ -1,6 +1,6 @@
-# NotifySync Desktop (Windows)
+# EchoLink Desktop (Windows)
 
-Tauri 2 桌面客户端，壳里加载 NotifySync WebUI，提供 Windows 专属能力：
+Tauri 2 桌面客户端，壳里加载 EchoLink WebUI，提供 Windows 专属能力：
 
 - 🪟 **常驻托盘** — 关闭按钮 = 隐藏到托盘，不退出进程；托盘右键菜单（打开主页 / 在浏览器中打开 / 开机自启 / 退出）
 - 🔁 **单实例锁** — 重复启动会聚焦已有窗口，不开新窗口
@@ -47,8 +47,8 @@ npx tauri build
 ```
 
 产物路径：
-- `src-tauri/target/release/bundle/nsis/NotifySync_0.1.0_x64-setup.exe`
-- `src-tauri/target/release/bundle/msi/NotifySync_0.1.0_x64_en-US.msi`
+- `src-tauri/target/release/bundle/nsis/EchoLink_0.1.0_x64-setup.exe`
+- `src-tauri/target/release/bundle/msi/EchoLink_0.1.0_x64_en-US.msi`
 
 ## 服务器地址配置
 

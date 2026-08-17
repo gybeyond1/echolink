@@ -63,7 +63,7 @@ app.get("/api/info", (req, res) => {
   let version = "1.0.0";
   try { version = require("../package.json").version; } catch (e) { /* ignore */ }
   res.json({
-    name: "NotifySync",
+    name: "EchoLink",
     version,
     uptime: Math.floor(process.uptime()),
     dataDir: getDataDir(),
@@ -130,7 +130,7 @@ const HOST = "0.0.0.0";
 
 server.listen(PORT, HOST, () => {
   console.log(`\n========================================`);
-  console.log(`  NotifySync Server`);
+  console.log(`  EchoLink Server`);
   console.log(`  HTTP:  http://${HOST}:${PORT}`);
   console.log(`  WS:    ws://${HOST}:${PORT}/ws`);
   console.log(`  WebUI: http://${HOST}:${PORT}/`);

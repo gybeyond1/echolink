@@ -60,7 +60,7 @@ jobs:
       - name: Upload installer as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NotifySync-Desktop-Windows
+          name: EchoLink-Desktop-Windows
           path: out/*
 
       - name: Upload installer to unified Release
@@ -69,7 +69,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0
-          name: NotifySync v1.0.0
+          name: EchoLink v1.0.0
           overwrite: true
           allowUpdates: true
           files: |

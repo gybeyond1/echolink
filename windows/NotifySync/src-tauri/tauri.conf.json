@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "NotifySync",
+  "productName": "EchoLink",
   "version": "0.1.0",
   "identifier": "com.gybeyond.notifysync",
   "build": {
@@ -15,7 +15,7 @@
       {
         "label": "main",
         "url": "index.html",
-        "title": "NotifySync",
+        "title": "EchoLink",
         "width": 1100,
         "height": 720,
         "minWidth": 720,
@@ -33,7 +33,7 @@
       "id": "main-tray",
       "iconPath": "icons/tray.png",
       "iconAsTemplate": false,
-      "tooltip": "NotifySync"
+      "tooltip": "EchoLink"
     }
   },
   "bundle": {

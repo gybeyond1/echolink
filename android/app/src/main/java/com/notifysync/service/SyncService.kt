@@ -401,7 +401,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
 
         return NotificationCompat.Builder(this, App.CHANNEL_SERVICE)
             .setSmallIcon(android.R.drawable.ic_popup_sync)
-            .setContentTitle("NotifySync")
+            .setContentTitle("EchoLink")
             .setContentText(text)
             .setOngoing(true)
             .setContentIntent(pendingIntent)
