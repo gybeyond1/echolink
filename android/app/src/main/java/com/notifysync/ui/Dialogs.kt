@@ -34,6 +34,16 @@ private fun AlertDialog.Builder.buildDimmed(): AlertDialog =
     create().apply { window?.setDimAmount(0.5f) }
 
 /**
+ * 一键创建 + 0.5 遮罩 + 显示。所有 AlertDialog 统一入口，避免每个调用处重复 create/show。
+ */
+fun AlertDialog.Builder.showDimmed(): AlertDialog {
+    val dialog = create()
+    dialog.window?.setDimAmount(0.5f)
+    dialog.show()
+    return dialog
+}
+
+/**
  * 统一的「+」菜单：消息页与好友页共用同一组件，
  * 选项完全一致：创建话题 / 发现·加入话题 / 添加好友 / 设置。
  * 弹窗走 Theme.NotifySync.Dialog（白底 + 0.5 遮罩），与聊天页视觉一致。

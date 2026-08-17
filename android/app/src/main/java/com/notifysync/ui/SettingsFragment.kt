@@ -269,7 +269,7 @@ class SettingsFragment : Fragment() {
                 }
             }
             .setNegativeButton("取消", null)
-            .show()
+            .showDimmed()
     }
 
     private fun pickAvatarImage() {
@@ -358,7 +358,7 @@ class SettingsFragment : Fragment() {
             .setTitle("打赏支持")
             .setView(root)
             .setPositiveButton("知道了", null)
-            .show()
+            .showDimmed()
     }
 
     // ===== 设备改名 =====
@@ -395,7 +395,7 @@ class SettingsFragment : Fragment() {
                 }
             }
             .setNegativeButton("取消", null)
-            .show()
+            .showDimmed()
     }
 
     // ===== 短信验证码自动提取 =====
