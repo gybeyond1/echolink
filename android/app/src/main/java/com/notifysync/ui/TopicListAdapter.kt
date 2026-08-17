@@ -61,6 +61,7 @@ class TopicListAdapter(
         val tvPreview: TextView = view.findViewById(R.id.tvPreview)
         val tvTime: TextView = view.findViewById(R.id.tvTime)
         val tvPending: TextView = view.findViewById(R.id.tvPending)
+        val tvUnread: TextView = view.findViewById(R.id.tvUnread)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -92,6 +93,14 @@ class TopicListAdapter(
             holder.tvPending.text = item.pendingRequests.toString()
         } else {
             holder.tvPending.visibility = View.GONE
+        }
+
+        // 未读数气泡：优先显示未读数；没有未读时显示总消息数
+        if (item.unreadCount > 0) {
+            holder.tvUnread.visibility = View.VISIBLE
+            holder.tvUnread.text = item.unreadCount.toString()
+        } else {
+            holder.tvUnread.visibility = View.GONE
         }
 
         holder.tvTime.text = if (item.messageCount > 0) "${item.messageCount}条" else ""

@@ -108,5 +108,19 @@
             android:textColor="@android:color/white"
             android:background="@drawable/bg_pending_badge"
             android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvUnread"
+            android:layout_width="wrap_content"
+            android:minWidth="20dp"
+            android:layout_height="20dp"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:paddingStart="5dp"
+            android:paddingEnd="5dp"
+            android:textSize="11sp"
+            android:textColor="@android:color/white"
+            android:background="@drawable/bg_unread_badge"
+            android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

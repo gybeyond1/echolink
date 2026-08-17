@@ -256,6 +256,11 @@ object ApiClient {
         execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/messages/read", "POST", body))
     }
 
+    // 标记进入某话题：把该话题最后一条消息 id 作为 last_read_id，未读数清零
+    suspend fun markTopicRead(topic: String) {
+        execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/read", "POST"))
+    }
+
     // 删除整个话题（该用户在此话题下的所有消息）
     suspend fun deleteTopic(topic: String) {
         execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}", "DELETE"))
