@@ -58,5 +58,9 @@ class App : Application() {
 
         lateinit var instance: App
             private set
+
+        /** 全局 Application Context（供无 View 上下文的工具类使用，如 AvatarLoader 磁盘缓存） */
+        val appContext: android.content.Context
+            get() = instance.applicationContext
     }
 }

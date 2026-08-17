@@ -3,17 +3,17 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="@color/brand_primary">
 
-    <!-- 顶部栏（列表态 / 聊天态 切换可见性） -->
+    <!-- 顶部栏（列表态 / 聊天态 切换可见性）；背景透明，让整页壁纸（含顶栏）成为统一整体 -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:minHeight="?attr/actionBarSize"
         android:orientation="horizontal"
-        android:background="@color/brand_primary"
-        android:elevation="4dp"
-        android:padding="12dp"
+        android:background="@android:color/transparent"
         android:gravity="center_vertical">
 
         <!-- 列表态 -->
@@ -22,12 +22,13 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text=""
+            android:layout_gravity="center_vertical"
+            android:text="消息"
             android:visibility="gone"
             android:gravity="center"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/on_primary" />
+            android:textColor="@color/on_wallpaper" />
 
         <!-- 设置入口（列表态显示，替代底栏设置 tab） -->
         <ImageButton
@@ -47,12 +48,12 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_gravity="center"
+            android:layout_gravity="center_vertical"
             android:gravity="center"
             android:text=""
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/on_primary"
+            android:textColor="@color/on_wallpaper"
             android:visibility="gone" />
 
         <com.google.android.material.button.MaterialButton

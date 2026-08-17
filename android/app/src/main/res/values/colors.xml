@@ -20,6 +20,8 @@
     <color name="bubble_own_time">#6BAD6E</color>
     <color name="on_surface">#212121</color>
     <color name="on_surface_variant">#8A8A93</color>
+    <!-- 壁纸背景上的文字（浅色遮罩下用深色，保证可读） -->
+    <color name="on_wallpaper">#1A1A1A</color>
     <color name="outline">#E2E6EA</color>
 
     <!-- 输入框 -->

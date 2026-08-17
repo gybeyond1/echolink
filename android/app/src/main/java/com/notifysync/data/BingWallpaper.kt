@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -15,12 +16,18 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Bing 每日壁纸背景：每天拉取 https://dailybing.com/api/v1/today/zh-cn/UHD
- * （该地址 302 重定向到当天 Bing UHD 壁纸直链），按日期缓存到 cacheDir，
- * 高斯模糊 ~70% + 黑色遮罩后作为消息列表页背景。
+ * （该地址 302 重定向到当天 Bing UHD 壁纸直链，由手机网络直连，不经过服务器）。
+ *
+ * 处理要点（对应用户要求）：
+ *  - 手机网络直连 Bing，不经过服务器；
+ *  - 按日期缓存到 cacheDir，每天自动刷新一次（跨天拉新图）；刷新失败则保留当前/昨天的图；
+ *  - 近 100% 高斯模糊 + 浅色遮罩（保证深色文字可读），再 centerCrop 覆盖全屏、不拉伸挤压；
+ *  - 整页（含顶栏）作为统一背景使用。
  */
 object BingWallpaper {
     private const val WALLPAPER_URL = "https://dailybing.com/api/v1/today/zh-cn/UHD"
-    private const val MASK_ALPHA = 0x73 // 45% 黑色遮罩，保证前景文字可读
+    // 浅色遮罩：让背景整体偏亮，配合深色文字（on_wallpaper）可读性最好，同时仍透出壁纸色调（~60% 白）
+    private val MASK = Color.argb(0x99, 0xFF, 0xFF, 0xFF)
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -29,43 +36,64 @@ object BingWallpaper {
         .followSslRedirects(true)
         .build()
 
-    /** 返回已模糊+遮罩的背景位图；下载/解码失败返回 null（调用方保持原背景） */
+    // 当日已算好的位图缓存，避免每次 onResume 重新解码+模糊
+    @Volatile private var cachedDate: String? = null
+    @Volatile private var cachedBmp: Bitmap? = null
+
+    /** 返回已模糊+遮罩+覆盖裁剪的背景位图；下载/解码失败返回 null（调用方保持原背景） */
     suspend fun load(ctx: Context): Bitmap? = withContext(Dispatchers.IO) {
         try {
             val date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
+            if (date == cachedDate && cachedBmp != null && !cachedBmp!!.isRecycled) {
+                return@withContext cachedBmp
+            }
+
             val dir = File(ctx.cacheDir, "bing_wallpaper").apply { mkdirs() }
             val file = File(dir, "$date.jpg")
 
-            // 当天已缓存且非空 → 直接用；否则下载（跨天自动拉新图）
+            // 当天未缓存 → 尝试下载；下载失败则回退到目录里最新的旧图（保留当前背景）
             if (!file.exists() || file.length() < 10_000) {
-                download(file)
+                if (!download(file)) {
+                    findFallback(dir)?.let { file2 -> if (file2.exists()) file2.copyTo(file, overwrite = true) }
+                }
             }
-            if (!file.exists()) return@withContext null
+            if (!file.exists() || file.length() < 10_000) return@withContext null
 
-            val screen = decodeSampled(file, targetMaxDim(ctx))
-                ?: return@withContext null
-            blurAndMask(screen)
+            val screen = decodeSampled(file, targetMaxDim(ctx)) ?: return@withContext null
+            val blurred = blurAndMask(screen)
+            val cover = cover(blurred, ctx)
+            cachedDate = date
+            cachedBmp = cover
+            cover
         } catch (_: Exception) {
             null
         }
     }
 
-    private fun download(file: File) {
-        try {
+    /** 目录中最近一次成功缓存的壁纸（用于刷新失败时的兜底） */
+    private fun findFallback(dir: File): File? {
+        return dir.listFiles { f -> f.name.endsWith(".jpg") && f.length() >= 10_000 }
+            ?.maxByOrNull { it.lastModified() }
+    }
+
+    private fun download(file: File): Boolean {
+        return try {
             val req = Request.Builder().url(WALLPAPER_URL).build()
             client.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
-                    val bytes = resp.body?.bytes() ?: return
+                    val bytes = resp.body?.bytes() ?: return false
                     if (bytes.size > 10_000) {
                         file.outputStream().use { it.write(bytes) }
-                    }
-                }
+                        true
+                    } else false
+                } else false
             }
         } catch (_: Exception) {
+            false
         }
     }
 
-    /** 采样解码：目标最长边 ≈ 屏幕最长边 × 1.5，控制内存又保证模糊后清晰度 */
+    /** 采样解码：目标最长边 ≈ 屏幕最长边，控制内存又保证模糊后清晰度 */
     private fun decodeSampled(file: File, maxDim: Int): Bitmap? {
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, opts)
@@ -78,29 +106,44 @@ object BingWallpaper {
 
     private fun targetMaxDim(ctx: Context): Int {
         val dm = ctx.resources.displayMetrics
-        return (maxOf(dm.widthPixels, dm.heightPixels) * 1.5f).toInt()
+        return (maxOf(dm.widthPixels, dm.heightPixels) * 1.0f).toInt()
     }
 
-    /** 高斯模糊 ~70% + 黑色遮罩 */
+    /** centerCrop：把源图缩放覆盖到屏幕尺寸并居中裁剪，绝不拉伸变形 */
+    private fun cover(src: Bitmap, ctx: Context): Bitmap {
+        val dm = ctx.resources.displayMetrics
+        val tw = dm.widthPixels
+        val th = dm.heightPixels
+        val scale = maxOf(tw.toFloat() / src.width, th.toFloat() / src.height)
+        val w = (src.width * scale).toInt().coerceAtLeast(1)
+        val h = (src.height * scale).toInt().coerceAtLeast(1)
+        val scaled = Bitmap.createScaledBitmap(src, w, h, true)
+        val x = ((w - tw) / 2f).coerceAtLeast(0f).toInt()
+        val y = ((h - th) / 2f).coerceAtLeast(0f).toInt()
+        val out = Bitmap.createBitmap(scaled, x, y, tw, th)
+        if (scaled != src) scaled.recycle()
+        return out
+    }
+
+    /** 近 100% 高斯模糊（多遍小半径 box blur 等效）+ 浅色遮罩 */
     private fun blurAndMask(src: Bitmap): Bitmap {
         val w = src.width
         val h = src.height
-        // 1) 缩小到 1/4 做多次 box blur（等效高斯，半径大、强度 ~70%）
-        val smallW = (w / 4f).toInt().coerceAtLeast(1)
-        val smallH = (h / 4f).toInt().coerceAtLeast(1)
+        // 缩小到 1/8 做 blur，半径更大 → 模糊更强（观感接近「完全模糊」）
+        val smallW = (w / 8f).toInt().coerceAtLeast(1)
+        val smallH = (h / 8f).toInt().coerceAtLeast(1)
         val small = Bitmap.createScaledBitmap(src, smallW, smallH, true)
-        val blurredSmall = boxBlur(small, 3, 3)
-        // 2) 放大回原尺寸（模糊更均匀）
+        val blurredSmall = boxBlur(small, 4, 4)
+        // 放大回原尺寸（模糊更均匀、无硬边）
         val blurred = Bitmap.createScaledBitmap(blurredSmall, w, h, true)
-        // 3) 叠加黑色遮罩
         val output = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
         canvas.drawBitmap(blurred, 0f, 0f, null)
-        canvas.drawColor(MASK_ALPHA shl 24)
+        canvas.drawColor(MASK)
         return output
     }
 
-    /** 滑动窗口 box blur（3 遍 ≈ 高斯模糊观感） */
+    /** 滑动窗口 box blur（多遍 ≈ 高斯模糊观感） */
     private fun boxBlur(src: Bitmap, radius: Int, passes: Int): Bitmap {
         val w = src.width
         val h = src.height
@@ -114,9 +157,7 @@ object BingWallpaper {
 
     private fun blurPass(pix: IntArray, w: Int, h: Int, radius: Int): IntArray {
         val out = IntArray(pix.size)
-        // 水平
         horizontal(pix, out, w, h, radius)
-        // 垂直（out -> pix 复用）
         horizontal(out, pix, h, w, radius)
         return pix
     }
