@@ -1,6 +1,6 @@
 // EchoLink Desktop —— Tauri 2 库入口
 // 功能：托盘菜单 / 单实例锁 / 关闭窗口隐藏到托盘 / 系统通知 / 未读计数提示 /
-//       开机自启 / 服务器地址配置 / Windows 系统通知监听同步
+//       开机自启 / 服务器地址配置 / Windows 系统通知监听同步 / 应用过滤
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -126,6 +126,18 @@ fn set_blocked_apps(app: AppHandle, apps: Vec<String>) -> Result<(), String> {
     write_config(&app, &config)
 }
 
+/// 列出本机已安装应用（从注册表读取）
+#[derive(Serialize, Clone)]
+struct InstalledApp {
+    name: String,
+    exe: String,
+}
+
+#[tauri::command]
+fn list_installed_apps() -> Vec<InstalledApp> {
+    installed_apps::list()
+}
+
 /// 触发 Windows 原生通知
 #[tauri::command]
 async fn show_notification(app: AppHandle, title: String, body: String) -> Result<(), String> {
@@ -180,13 +192,15 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         config.notification_sync_enabled,
         None::<&str>,
     )?;
+    let app_filter = MenuItem::with_id(app, "app_filter", "应用过滤设置", true, None::<&str>)?;
     let switch_server = MenuItem::with_id(app, "switch_server", "切换服务器", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
+    let sep3 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
-        &[&show, &open_browser, &sep1, &sync_notifications, &switch_server, &sep2, &toggle_autostart, &quit],
+        &[&show, &open_browser, &sep1, &sync_notifications, &app_filter, &switch_server, &sep2, &toggle_autostart, &sep3, &quit],
     )?;
 
     // 保存 CheckMenuItem 以便运行时更新勾选状态
@@ -209,6 +223,16 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 let config = read_config(app);
                 let new_state = !config.notification_sync_enabled;
                 let _ = set_notification_sync(app.clone(), new_state);
+            }
+            "app_filter" => {
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.show();
+                    let _ = win.set_focus();
+                    #[cfg(target_os = "windows")]
+                    let _ = win.eval("window.location.replace('http://tauri.localhost/settings.html')");
+                    #[cfg(not(target_os = "windows"))]
+                    let _ = win.eval("window.location.replace('tauri://localhost/settings.html')");
+                }
             }
             "switch_server" => {
                 let mut config = read_config(app);
@@ -429,6 +453,155 @@ mod win_notif {
     pub fn stop() {}
 }
 
+// ============== 已安装应用列表（注册表读取） ==============
+
+#[cfg(target_os = "windows")]
+mod installed_apps {
+    use super::*;
+    use windows_sys::Win32::System::Registry::{
+        RegCloseKey, RegEnumKeyW, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_CURRENT_USER,
+        HKEY_LOCAL_MACHINE,
+    };
+
+    // 注册表常量（避免依赖 windows-sys 是否导出）
+    const KEY_READ: u32 = 0x20019;
+    const REG_SZ: u32 = 1;
+    const ERROR_SUCCESS: u32 = 0;
+
+    fn to_wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    /// 读取注册表字符串值 (REG_SZ)
+    fn read_reg_string(hkey: HKEY, name: &str) -> Option<String> {
+        let name_w = to_wide(name);
+        let mut data_type: u32 = 0;
+        let mut data_len: u32 = 0;
+
+        // 第一次调用：获取数据大小
+        let ret = unsafe {
+            RegQueryValueExW(
+                hkey,
+                name_w.as_ptr(),
+                std::ptr::null(),
+                &mut data_type,
+                std::ptr::null_mut(),
+                &mut data_len,
+            )
+        };
+        if ret != ERROR_SUCCESS || data_len == 0 {
+            return None;
+        }
+
+        // 第二次调用：读取数据
+        let mut buf = vec![0u8; data_len as usize];
+        let ret = unsafe {
+            RegQueryValueExW(
+                hkey,
+                name_w.as_ptr(),
+                std::ptr::null(),
+                &mut data_type,
+                buf.as_mut_ptr(),
+                &mut data_len,
+            )
+        };
+        if ret != ERROR_SUCCESS || data_type != REG_SZ {
+            return None;
+        }
+
+        // REG_SZ 是 UTF-16 编码
+        let u16_count = buf.len() / 2;
+        let u16_data: &[u16] =
+            unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u16, u16_count) };
+        let s = String::from_utf16_lossy(u16_data);
+        let s = s.trim_end_matches('\0').to_string();
+        if s.is_empty() { None } else { Some(s) }
+    }
+
+    /// 从 DisplayIcon 值提取 exe 文件名
+    /// 例如: "C:\Program Files\Google\Chrome\Application\chrome.exe",0 → chrome.exe
+    fn extract_exe_name(icon_path: &str) -> Option<String> {
+        let path = icon_path.trim();
+        if path.is_empty() { return None; }
+
+        // 去掉引号
+        let path = path.trim_matches('"');
+
+        // 去掉图标索引 (逗号后面的部分)
+        let path = path.split(',').next()?.trim();
+
+        // 只接受 .exe 文件
+        if !path.to_lowercase().ends_with(".exe") { return None; }
+
+        // 提取文件名
+        let exe = path.rsplit('\\').next().or_else(|| path.rsplit('/').next())?;
+        if exe.is_empty() { return None; }
+        Some(exe.to_string())
+    }
+
+    /// 从注册表 Uninstall 键读取已安装应用列表
+    pub fn list() -> Vec<InstalledApp> {
+        let locations: [(HKEY, &str); 3] = [
+            (HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
+            (HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
+            (HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
+        ];
+
+        let mut apps = Vec::new();
+        let mut seen = HashSet::new();
+
+        for (root, subkey) in locations {
+            let subkey_w = to_wide(subkey);
+            let mut hkey: HKEY = 0;
+            let ret = unsafe { RegOpenKeyExW(root, subkey_w.as_ptr(), 0, KEY_READ, &mut hkey) };
+            if ret != ERROR_SUCCESS { continue; }
+
+            let mut index: u32 = 0;
+            loop {
+                let mut name_buf = [0u16; 256];
+                let mut name_len = name_buf.len() as u32;
+                let ret = unsafe { RegEnumKeyW(hkey, index, name_buf.as_mut_ptr(), &mut name_len) };
+                if ret != ERROR_SUCCESS { break; }
+                if name_len == 0 { index += 1; continue; }
+
+                let subkey_name = String::from_utf16_lossy(&name_buf[..name_len as usize]);
+                let full_path = format!("{}\\{}", subkey, subkey_name);
+                let full_path_w = to_wide(&full_path);
+                let mut sub_hkey: HKEY = 0;
+                let ret =
+                    unsafe { RegOpenKeyExW(root, full_path_w.as_ptr(), 0, KEY_READ, &mut sub_hkey) };
+                if ret == ERROR_SUCCESS {
+                    let display_name = read_reg_string(sub_hkey, "DisplayName");
+                    let display_icon = read_reg_string(sub_hkey, "DisplayIcon");
+                    if let (Some(name), Some(icon)) = (display_name, display_icon) {
+                        if let Some(exe) = extract_exe_name(&icon) {
+                            let exe_lower = exe.to_lowercase();
+                            if !seen.contains(&exe_lower) {
+                                seen.insert(exe_lower);
+                                apps.push(InstalledApp { name, exe });
+                            }
+                        }
+                    }
+                    unsafe { RegCloseKey(sub_hkey) };
+                }
+                index += 1;
+            }
+            unsafe { RegCloseKey(hkey) };
+        }
+
+        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        apps
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+mod installed_apps {
+    use super::*;
+    pub fn list() -> Vec<InstalledApp> {
+        Vec::new()
+    }
+}
+
 fn start_notification_listener(app: &AppHandle) {
     win_notif::start(app);
 }
@@ -458,7 +631,7 @@ pub fn run() {
         .manage(ServerUrl(String::new()))
         .invoke_handler(tauri::generate_handler![
             show_notification, set_unread_count, app_info, save_server_url,
-            get_config, set_notification_sync, set_blocked_apps
+            get_config, set_notification_sync, set_blocked_apps, list_installed_apps
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
