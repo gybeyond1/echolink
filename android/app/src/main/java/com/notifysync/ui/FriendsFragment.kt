@@ -52,6 +52,9 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
     private val isWide: Boolean
         get() = resources.configuration.smallestScreenWidthDp >= 600
 
+    /** 仅首次加载后自动选中第一个好友，避免 onResume 反复重置用户已选的聊天 */
+    private var initialAutoSelectDone = false
+
     // WS 推送（好友申请/通过验证）到达时刷新
     private val friendsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -87,7 +90,19 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
             insets
         }
 
+        setupWideMode()
         load()
+    }
+
+    /** 平板双栏：左列表固定宽度（≈360dp），右栏聊天/占位容器占剩余空间 */
+    private fun setupWideMode() {
+        if (!isWide) return
+        val lp = binding.leftPane.layoutParams as LinearLayout.LayoutParams
+        lp.width = (360 * resources.displayMetrics.density).toInt()
+        lp.weight = 0f
+        binding.leftPane.layoutParams = lp
+        binding.chatContainer.visibility = View.VISIBLE
+        binding.tvChatPlaceholder.visibility = View.VISIBLE
     }
 
     override fun onResume() {
@@ -124,6 +139,11 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                 if (_binding == null) return@launch
                 friendAdapter.setItems(friends)
                 binding.tvEmptyFriends.visibility = if (friends.isEmpty()) View.VISIBLE else View.GONE
+                // 平板双栏：首次加载后自动选中第一个好友，让右侧立即显示聊天（镜像消息页体验）
+                if (isWide && !initialAutoSelectDone && friends.isNotEmpty()) {
+                    initialAutoSelectDone = true
+                    showChatOnRight(friends.first())
+                }
             } catch (e: Exception) {
                 if (ApiClient.cachedFriends == null) {
                     Toast.makeText(requireContext(), "好友列表加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -180,6 +200,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                     .replace(binding.chatContainer.id, frag)
                     .commit()
                 binding.chatContainer.visibility = View.VISIBLE
+                binding.tvChatPlaceholder.visibility = View.GONE
                 // 左栏固定宽度（≈360dp），右栏聊天占剩余空间
                 val dm = resources.displayMetrics.density
                 val lp = binding.leftPane.layoutParams as LinearLayout.LayoutParams
@@ -192,16 +213,19 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
         }
     }
 
-    /** 右侧聊天关闭（返回手势）：收起右栏，左栏恢复整宽 */
+    /** 右侧聊天关闭（返回手势）：移除聊天 Fragment，显示占位提示，左栏保持双栏宽度 */
     override fun onChatPaneClosed() {
-        binding.chatContainer.visibility = View.GONE
-        val lp = binding.leftPane.layoutParams as LinearLayout.LayoutParams
-        lp.width = 0
-        lp.weight = 1f
-        binding.leftPane.layoutParams = lp
         // 清理右侧子 Fragment，避免残留
         childFragmentManager.fragments.firstOrNull()?.let {
             childFragmentManager.beginTransaction().remove(it).commitAllowingStateLoss()
+        }
+        binding.tvChatPlaceholder.visibility = View.VISIBLE
+        // 平板保持左栏 360dp；手机不会走到这里（手机用全屏聊天）
+        if (isWide) {
+            val lp = binding.leftPane.layoutParams as LinearLayout.LayoutParams
+            lp.width = (360 * resources.displayMetrics.density).toInt()
+            lp.weight = 0f
+            binding.leftPane.layoutParams = lp
         }
     }
 
