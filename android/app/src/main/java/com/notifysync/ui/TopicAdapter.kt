@@ -226,10 +226,20 @@ class TopicAdapter(
             else -> "*/*"
         }
 
+        /**
+         * 判断触摸点是否落在目标 View 内。
+         * 用全局屏幕坐标比较：getHitRect() 返回的是相对父容器的坐标，
+         * 而 MotionEvent.x/y 相对监听视图（itemView 根布局）——两者直接比较会因
+         * 头像占位/左右分栏导致命中区域整体偏移，图片右侧点不中。因此改用
+         * getLocationOnScreen + rawX/rawY 全局坐标。
+         */
         private fun inViewBounds(v: View, ev: MotionEvent): Boolean {
-            val rect = android.graphics.Rect()
-            v.getHitRect(rect)
-            return rect.contains(ev.x.toInt(), ev.y.toInt())
+            val loc = IntArray(2)
+            v.getLocationOnScreen(loc)
+            val rx = ev.rawX.toInt()
+            val ry = ev.rawY.toInt()
+            return rx >= loc[0] && rx < loc[0] + v.width &&
+                   ry >= loc[1] && ry < loc[1] + v.height
         }
     }
 
