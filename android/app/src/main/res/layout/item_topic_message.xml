@@ -30,7 +30,6 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:minWidth="72dp"
         android:orientation="vertical">
 
         <!-- Sender + time row (GONE for consecutive messages) -->
@@ -122,14 +121,17 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <!-- 已读回执：仅自己发出的私聊消息显示（单勾=已送达，双勾=对方已读） -->
-        <TextView
-            android:id="@+id/tvStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:layout_marginTop="2dp"
-            android:textSize="12sp"
-            android:visibility="gone" />
     </LinearLayout>
+
+    <!-- 已读回执：放在气泡外侧右下角，避免撑高气泡 -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        android:layout_marginBottom="6dp"
+        android:textSize="12sp"
+        android:visibility="gone" />
 </LinearLayout>
