@@ -77,6 +77,9 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
         binding.fabAdd.setOnClickListener { showFabMenu() }
         binding.rowNewFriends.setOnClickListener { showNewFriendsDialog() }
 
+        // 好友列表下拉刷新
+        binding.swipeFriendsRefresh.setOnRefreshListener { load() }
+
         // 全面屏沉浸式：顶部栏避开状态栏
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -85,20 +88,6 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
         }
 
         load()
-        applyWallpaper()
-    }
-
-    /** 整页（含顶栏）铺 Bing 每日壁纸作为统一背景；失败保持原底色 */
-    private fun applyWallpaper() {
-        lifecycleScope.launch {
-            try {
-                val bmp = BingWallpaper.load(requireContext())
-                if (bmp != null) {
-                    binding.root.background = BitmapDrawable(resources, bmp)
-                }
-            } catch (_: Exception) {
-            }
-        }
     }
 
     override fun onResume() {
@@ -109,7 +98,6 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
             Context.RECEIVER_NOT_EXPORTED
         )
         load()
-        applyWallpaper()
     }
 
     override fun onPause() {
@@ -123,14 +111,25 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
     }
 
     private fun load() {
+        // 先展示本地内存缓存，避免切换 tab 时列表空掉/过会儿才出
+        ApiClient.cachedFriends?.let { cached ->
+            if (_binding != null) {
+                friendAdapter.setItems(cached)
+                binding.tvEmptyFriends.visibility = if (cached.isEmpty()) View.VISIBLE else View.GONE
+            }
+        }
         lifecycleScope.launch {
             try {
                 val friends = ApiClient.getFriends()
+                if (_binding == null) return@launch
                 friendAdapter.setItems(friends)
                 binding.tvEmptyFriends.visibility = if (friends.isEmpty()) View.VISIBLE else View.GONE
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), "好友列表加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                if (ApiClient.cachedFriends == null) {
+                    Toast.makeText(requireContext(), "好友列表加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
+            if (_binding != null) binding.swipeFriendsRefresh.isRefreshing = false
             refreshNewBadge()
         }
     }

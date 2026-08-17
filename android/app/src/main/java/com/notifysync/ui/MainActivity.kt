@@ -10,8 +10,11 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
 import android.graphics.Color
+import android.graphics.drawable.BitmapDrawable
+import androidx.core.content.ContextCompat
 import com.notifysync.data.AppFilterStore
 import com.notifysync.data.AuthManager
+import com.notifysync.data.BingWallpaper
 import com.notifysync.databinding.ActivityMainBinding
 import com.notifysync.service.SyncService
 
@@ -39,6 +42,14 @@ class MainActivity : AppCompatActivity() {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // 浅色兜底底色（壁纸加载完成前不黑屏），壁纸就绪后整体覆盖
+        binding.root.setBackgroundColor(ContextCompat.getColor(this, R.color.background))
+        // 底部导航栏透明，让全局壁纸（含底栏区域）成为统一整体
+        binding.bottomNav.background = null
+
+        // 一次性把统一壁纸画到 Activity 根布局：覆盖状态栏 / 底栏 / 聊天输入框 / 通知页整页
+        applyGlobalWallpaper()
 
         // 全面屏沉浸式：内容延伸到状态栏/导航栏，不保留系统预留内边距
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -80,6 +91,20 @@ class MainActivity : AppCompatActivity() {
         } else if (supportFragmentManager.fragments.isEmpty()) {
             switchFragment(TopicFragment())
             binding.bottomNav.menu.findItem(com.notifysync.R.id.nav_topic)?.isChecked = true
+        }
+    }
+
+    /** 把统一壁纸一次性画到 Activity 根布局，覆盖状态栏/底栏/各页面整页（含聊天输入框、通知页） */
+    private fun applyGlobalWallpaper() {
+        lifecycleScope.launch {
+            try {
+                val bmp = BingWallpaper.load(this@MainActivity)
+                if (bmp != null && _binding != null) {
+                    binding.root.background = BitmapDrawable(resources, bmp)
+                }
+            } catch (_: Exception) {
+                // 拉取失败保持浅色兜底底色
+            }
         }
     }
 

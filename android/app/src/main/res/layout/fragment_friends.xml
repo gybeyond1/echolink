@@ -91,12 +91,18 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvFriends"
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipeFriendsRefresh"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingBottom="8dp" />
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvFriends"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingBottom="8dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
             <TextView
                 android:id="@+id/tvEmptyFriends"
