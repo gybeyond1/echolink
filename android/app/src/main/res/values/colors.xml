@@ -1,20 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 品牌色：哔哩紫系 -->
-    <color name="brand_primary">#FB7299</color>
-    <color name="brand_primary_dark">#E0527F</color>
-    <color name="brand_primary_light">#FFD9E5</color>
+    <!-- 品牌色：玫瑰粉系（更饱和更深邃） -->
+    <color name="brand_primary">#F75C92</color>
+    <color name="brand_primary_dark">#D63E75</color>
+    <color name="brand_primary_light">#FFE4EE</color>
+    <color name="brand_gradient_start">#F9709F</color>
+    <color name="brand_gradient_end">#E84E86</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="secondary">#8A6AFF</color>
+    <color name="secondary">#7C5CFC</color>
     <color name="on_secondary">#FFFFFF</color>
 
-    <!-- 表面 / 背景（亮色） -->
+    <!-- 表面 / 背景（中性灰，高级感基底） -->
     <color name="surface">#FFFFFF</color>
-    <color name="surface_variant">#F3F4F8</color>
-    <color name="background">#F6F7FB</color>
-    <color name="on_surface">#20232B</color>
-    <color name="on_surface_variant">#6B7280</color>
-    <color name="outline">#ECEDF3</color>
+    <color name="surface_variant">#ECECF2</color>
+    <color name="background">#F4F4F8</color>
+    <color name="chat_bg">#F1F1F6</color>
+    <color name="bubble_other">#FFFFFF</color>
+    <color name="on_surface">#1B1B22</color>
+    <color name="on_surface_variant">#8A8A93</color>
+    <color name="outline">#E5E5EC</color>
 
     <!-- 输入框 -->
     <color name="bg_input_fill">#FFFFFF</color>

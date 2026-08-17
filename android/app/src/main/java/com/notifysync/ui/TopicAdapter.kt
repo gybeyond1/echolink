@@ -316,8 +316,9 @@ class TopicAdapter(
     }
 
     /**
-     * 微信式左右分栏：自己的消息头像在右、内容右对齐、淡品牌色气泡；
-     * 他人消息头像在左、内容左对齐、无底色。只在归属变化时重排，避免复用抖动。
+     * 微信式左右分栏 + 双侧气泡（高级感材质）：
+     * 自己的消息头像在右、品牌渐变气泡白字；他人消息头像在左、白色悬浮气泡。
+     * 气泡宽度自适应内容（上限屏宽 72%），只在归属变化时重排，避免复用抖动。
      */
     private fun applyOwnStyle(holder: ViewHolder, isMine: Boolean) {
         if (holder.lastMine == isMine) return
@@ -332,21 +333,44 @@ class TopicAdapter(
             root.addView(holder.ivAvatar, 0)
         }
         val g = if (isMine) Gravity.END else Gravity.START
+        root.gravity = g or Gravity.CENTER_VERTICAL
         holder.llSenderInfo.gravity = g
         holder.tvTitle.gravity = g
         holder.tvText.gravity = g
         (holder.ivMedia.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
         (holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
         (holder.llFile.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
+
+        val ctx = holder.itemView.context
+        val dp = ctx.resources.displayMetrics.density
+
+        // 气泡宽度自适应内容，上限屏宽 72%，长文本自动换行
+        val maxW = (ctx.resources.displayMetrics.widthPixels * 0.72f).toInt()
+        holder.tvTitle.maxWidth = maxW
+        holder.tvText.maxWidth = maxW
+        val lp = holder.llContent.layoutParams as android.widget.LinearLayout.LayoutParams
+        lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
+        lp.weight = 0f
+        holder.llContent.layoutParams = lp
+
+        val padH = (12 * dp).toInt()
+        val padV = (7 * dp).toInt()
+        holder.llContent.setPadding(padH, padV, padH, padV)
+        holder.llContent.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
+
         if (isMine) {
             holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
-            val dp = holder.itemView.resources.displayMetrics.density
-            val padH = (10 * dp).toInt()
-            val padV = (4 * dp).toInt()
-            holder.llContent.setPadding(padH, padV, padH, padV)
+            val white = 0xFFFFFFFF.toInt()
+            holder.tvTitle.setTextColor(white)
+            holder.tvText.setTextColor(white)
+            holder.tvSender.setTextColor(white)
+            holder.tvTime.setTextColor(0xCCFFFFFF.toInt())
         } else {
-            holder.llContent.setBackgroundResource(0)
-            holder.llContent.setPadding(0, 0, 0, 0)
+            holder.llContent.setBackgroundResource(R.drawable.bg_msg_other)
+            holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))
+            holder.tvText.setTextColor(ctx.getColor(R.color.on_surface))
+            holder.tvSender.setTextColor(ctx.getColor(R.color.brand_primary))
+            holder.tvTime.setTextColor(ctx.getColor(R.color.on_surface_variant))
         }
     }
 

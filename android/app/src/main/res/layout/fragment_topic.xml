@@ -11,6 +11,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
+        android:background="@color/surface"
+        android:elevation="3dp"
         android:padding="12dp"
         android:gravity="center_vertical">
 
@@ -246,6 +248,7 @@
                     android:id="@+id/recyclerView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:background="@drawable/bg_chat"
                     android:clipToPadding="false"
                     android:paddingBottom="8dp" />
             </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
@@ -268,8 +271,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:background="@color/surface_variant"
-            android:padding="6dp"
+            android:background="@color/surface"
+            android:elevation="6dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
             android:gravity="center_vertical">
 
             <ImageButton
