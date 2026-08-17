@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 头像底：品牌渐变圆，更立体 -->
+<!-- 头像底：Telegram 品牌蓝渐变圆 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
     <gradient

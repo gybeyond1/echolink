@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 自己的消息气泡：品牌渐变 + 右下小尾角（微信式靠右） -->
+<!-- 自己的消息气泡：Telegram 绿 + 右下小尾角 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <gradient
-        android:angle="270"
-        android:startColor="@color/brand_gradient_start"
-        android:endColor="@color/brand_gradient_end" />
+    <solid android:color="@color/bubble_own" />
     <corners
         android:topLeftRadius="18dp"
         android:topRightRadius="18dp"
