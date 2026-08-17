@@ -316,8 +316,8 @@ class TopicAdapter(
     }
 
     /**
-     * 微信式左右分栏 + 双侧气泡（高级感材质）：
-     * 自己的消息头像在右、品牌渐变气泡白字；他人消息头像在左、白色悬浮气泡。
+     * 微信式左右分栏 + Telegram 双侧气泡材质：
+     * 自己的消息头像在右、Telegram 绿气泡深色字；他人消息头像在左、白色悬浮气泡。
      * 气泡宽度自适应内容（上限屏宽 72%），只在归属变化时重排，避免复用抖动。
      */
     private fun applyOwnStyle(holder: ViewHolder, isMine: Boolean) {
@@ -359,12 +359,12 @@ class TopicAdapter(
         holder.llContent.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
 
         if (isMine) {
+            // Telegram 风：绿色气泡 + 深色正文 + 淡绿时间
             holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
-            val white = 0xFFFFFFFF.toInt()
-            holder.tvTitle.setTextColor(white)
-            holder.tvText.setTextColor(white)
-            holder.tvSender.setTextColor(white)
-            holder.tvTime.setTextColor(0xCCFFFFFF.toInt())
+            holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))
+            holder.tvText.setTextColor(ctx.getColor(R.color.on_surface))
+            holder.tvSender.setTextColor(ctx.getColor(R.color.on_surface_variant))
+            holder.tvTime.setTextColor(ctx.getColor(R.color.bubble_own_time))
         } else {
             holder.llContent.setBackgroundResource(R.drawable.bg_msg_other)
             holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))

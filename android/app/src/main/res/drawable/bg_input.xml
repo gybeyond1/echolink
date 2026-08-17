@@ -3,5 +3,5 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="@color/bg_input_fill" />
     <corners android:radius="20dp" />
-    <stroke android:color="#E4E4EA" android:width="1dp" />
+    <stroke android:color="@color/bg_input_stroke" android:width="1dp" />
 </shape>
