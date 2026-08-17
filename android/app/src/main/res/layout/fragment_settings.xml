@@ -1,49 +1,178 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:orientation="vertical">
 
+    <!-- 顶部栏 -->
     <LinearLayout
+        android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="horizontal"
+        android:background="@color/brand_primary"
+        android:elevation="4dp"
+        android:padding="12dp"
+        android:gravity="center_vertical">
 
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="设置"
-            android:textSize="24sp"
+            android:gravity="center"
+            android:textSize="18sp"
             android:textStyle="bold"
-            android:layout_marginBottom="24dp" />
+            android:textColor="@color/on_primary" />
+    </LinearLayout>
 
-        <!-- 账号资料（头像 + 昵称 + 设备名） -->
-        <com.google.android.material.card.MaterialCardView
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            android:orientation="vertical"
+            android:padding="16dp">
 
-            <LinearLayout
+            <!-- 账号资料（头像 + 昵称 + 设备名） -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp">
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
 
-                <!-- 左侧：昵称 + 设备名 + 用户名 -->
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="16dp">
 
-                    <!-- 昵称（可点击修改） -->
+                    <!-- 左侧：昵称 + 设备名 + 用户名 -->
                     <LinearLayout
-                        android:id="@+id/llNickname"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <!-- 昵称（可点击修改） -->
+                        <LinearLayout
+                            android:id="@+id/llNickname"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:background="?attr/selectableItemBackground"
+                            android:paddingTop="2dp"
+                            android:paddingBottom="2dp">
+
+                            <TextView
+                                android:id="@+id/tvDisplayName"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="—"
+                                android:textSize="18sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <!-- 设备名（可点击修改） -->
+                        <LinearLayout
+                            android:id="@+id/llDeviceName"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:background="?attr/selectableItemBackground"
+                            android:paddingTop="2dp"
+                            android:paddingBottom="2dp"
+                            android:layout_marginTop="4dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="设备: "
+                                android:textSize="14sp"
+                                android:textColor="@color/on_surface_variant" />
+
+                            <TextView
+                                android:id="@+id/tvDeviceName"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="—"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+
+                        <!-- 用户名（不可改，uid 格式） -->
+                        <TextView
+                            android:id="@+id/tvUsername"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="—"
+                            android:textSize="12sp"
+                            android:textColor="@color/on_surface_variant"
+                            android:layout_marginTop="4dp" />
+                    </LinearLayout>
+
+                    <!-- 右侧：圆形头像（可点击上传） -->
+                    <FrameLayout
+                        android:id="@+id/flAvatar"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:layout_marginStart="12dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackgroundBorderless">
+
+                        <ImageView
+                            android:id="@+id/ivAvatar"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/ic_default_avatar"
+                            android:background="@drawable/bg_circle_avatar"
+                            android:clipToOutline="true"
+                            android:outlineProvider="background" />
+                    </FrameLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 关于（项目地址 + 赞赏支持） -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="关于"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginBottom="8dp" />
+
+                    <!-- 项目地址 -->
+                    <LinearLayout
+                        android:id="@+id/llProjectUrl"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
@@ -51,525 +180,417 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:background="?attr/selectableItemBackground"
-                        android:paddingTop="2dp"
-                        android:paddingBottom="2dp">
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_github"
+                            android:layout_marginEnd="12dp" />
 
                         <TextView
-                            android:id="@+id/tvDisplayName"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="—"
-                            android:textSize="18sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <!-- 设备名（可点击修改） -->
-                    <LinearLayout
-                        android:id="@+id/llDeviceName"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:background="?attr/selectableItemBackground"
-                        android:paddingTop="2dp"
-                        android:paddingBottom="2dp"
-                        android:layout_marginTop="4dp">
+                            android:text="项目地址"
+                            android:textSize="15sp" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="设备: "
-                            android:textSize="14sp"
+                            android:text="›"
+                            android:textSize="18sp"
                             android:textColor="@color/on_surface_variant" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/surface_variant" />
+
+                    <!-- 赞赏支持 -->
+                    <LinearLayout
+                        android:id="@+id/llDonate"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackground"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_donate"
+                            android:layout_marginEnd="12dp" />
 
                         <TextView
-                            android:id="@+id/tvDeviceName"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="—"
-                            android:textSize="14sp" />
-                    </LinearLayout>
+                            android:text="打赏支持"
+                            android:textSize="15sp" />
 
-                    <!-- 用户名（不可改，uid 格式） -->
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="›"
+                            android:textSize="18sp"
+                            android:textColor="@color/on_surface_variant" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 外观（主题切换） -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
                     <TextView
-                        android:id="@+id/tvUsername"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="—"
+                        android:text="外观"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="选择界面主题，立即生效"
                         android:textSize="12sp"
                         android:textColor="@color/on_surface_variant"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
+                        android:layout_marginBottom="12dp" />
 
-                <!-- 右侧：圆形头像（可点击上传） -->
-                <FrameLayout
-                    android:id="@+id/flAvatar"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
-                    android:layout_marginStart="12dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="?attr/selectableItemBackgroundBorderless">
-
-                    <ImageView
-                        android:id="@+id/ivAvatar"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/ic_default_avatar"
-                        android:background="@drawable/bg_circle_avatar"
-                        android:clipToOutline="true"
-                        android:outlineProvider="background" />
-                </FrameLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- 关于（项目地址 + 赞赏支持） -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="关于"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:layout_marginBottom="8dp" />
-
-                <!-- 项目地址 -->
-                <LinearLayout
-                    android:id="@+id/llProjectUrl"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="?attr/selectableItemBackground"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp">
-
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_github"
-                        android:layout_marginEnd="12dp" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="项目地址"
-                        android:textSize="15sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="›"
-                        android:textSize="18sp"
-                        android:textColor="@color/on_surface_variant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/surface_variant" />
-
-                <!-- 赞赏支持 -->
-                <LinearLayout
-                    android:id="@+id/llDonate"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="?attr/selectableItemBackground"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp">
-
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_donate"
-                        android:layout_marginEnd="12dp" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="打赏支持"
-                        android:textSize="15sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="›"
-                        android:textSize="18sp"
-                        android:textColor="@color/on_surface_variant" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- 外观（主题切换） -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="外观"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="选择界面主题，立即生效"
-                    android:textSize="12sp"
-                    android:textColor="@color/on_surface_variant"
-                    android:layout_marginBottom="12dp" />
-
-                <com.google.android.material.button.MaterialButtonToggleGroup
-                    android:id="@+id/toggleTheme"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:singleSelection="true"
-                    app:selectionRequired="true">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnThemeSystem"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="跟随系统" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnThemeLight"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="浅色" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnThemeDark"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="深色" />
-                </com.google.android.material.button.MaterialButtonToggleGroup>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- 服务器设置 -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="服务器"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:layout_marginBottom="12dp" />
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_marginBottom="8dp">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etServerUrl"
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/toggleTheme"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="服务器地址"
-                        android:inputType="textUri"
-                        android:singleLine="true" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        app:singleSelection="true"
+                        app:selectionRequired="true">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="end">
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeSystem"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="跟随系统" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnTestConnection"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="测试连接"
-                        style="@style/Widget.MaterialComponents.Button.TextButton" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeLight"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="浅色" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnSaveServerUrl"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="保存" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeDark"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="深色" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
                 </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            </com.google.android.material.card.MaterialCardView>
 
-        <!-- 通知监听权限 -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
-
-            <LinearLayout
+            <!-- 服务器设置 -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="通知监听权限"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="12dp">
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
                     <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="状态: " />
-
-                    <TextView
-                        android:id="@+id/tvPermissionStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="未授权"
-                        android:textColor="@color/danger"
-                        android:textStyle="bold" />
+                        android:text="服务器"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginBottom="12dp" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_marginBottom="8dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etServerUrl"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="服务器地址"
+                            android:inputType="textUri"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="end">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnTestConnection"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="测试连接"
+                            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSaveServerUrl"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="保存" />
+                    </LinearLayout>
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnNotificationPermission"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="去授权通知监听" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- 短信验证码 -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
-
-            <LinearLayout
+            <!-- 通知监听权限 -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="短信验证码"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="开启后自动读取新短信，提取验证码并复制到剪贴板"
-                    android:textSize="12sp"
-                    android:textColor="@color/on_surface_variant"
-                    android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="12dp">
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
                     <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="状态: " />
-
-                    <TextView
-                        android:id="@+id/tvSmsStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="未授权"
-                        android:textColor="@color/danger"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                        android:text="通知监听权限"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginBottom="8dp" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="自动提取并复制验证码"
-                        android:textSize="14sp" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="状态: " />
+
+                        <TextView
+                            android:id="@+id/tvPermissionStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="未授权"
+                            android:textColor="@color/danger"
+                            android:textStyle="bold" />
+                    </LinearLayout>
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnSmsPermission"
-                        style="@style/Widget.MaterialComponents.Button.TextButton"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/btnNotificationPermission"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="授权读取短信" />
-
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/swSmsCapture"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
+                        android:text="去授权通知监听" />
                 </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            </com.google.android.material.card.MaterialCardView>
 
-        <!-- 应用过滤 -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
-
-            <LinearLayout
+            <!-- 短信验证码 -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="应用过滤"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="4dp">
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
                     <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="仅同步所选应用"
-                        android:textSize="14sp" />
-
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/swFilterEnabled"
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
+                        android:layout_height="wrap_content"
+                        android:text="短信验证码"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="开启后自动读取新短信，提取验证码并复制到剪贴板"
+                        android:textSize="12sp"
+                        android:textColor="@color/on_surface_variant"
+                        android:layout_marginBottom="12dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="状态: " />
+
+                        <TextView
+                            android:id="@+id/tvSmsStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="未授权"
+                            android:textColor="@color/danger"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="自动提取并复制验证码"
+                            android:textSize="14sp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSmsPermission"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="授权读取短信" />
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/swSmsCapture"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                <TextView
+            <!-- 应用过滤 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="关闭 = 同步所有应用；开启后只同步下方勾选的应用"
-                    android:textSize="12sp"
-                    android:textColor="@color/on_surface_variant"
-                    android:layout_marginBottom="8dp" />
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvAppFilter"
-                    android:layout_width="match_parent"
-                    android:layout_height="240dp"
-                    android:clipToPadding="false" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="应用过滤"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginBottom="8dp" />
 
-                <ProgressBar
-                    android:id="@+id/progressBarFilters"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:visibility="gone" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="4dp">
 
-                <TextView
-                    android:id="@+id/tvEmptyFilters"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="未找到可同步的应用"
-                    android:gravity="center"
-                    android:padding="24dp"
-                    android:textColor="@color/on_surface_variant"
-                    android:visibility="gone" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="仅同步所选应用"
+                            android:textSize="14sp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnSaveFilters"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="保存应用过滤" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/swFilterEnabled"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
 
-        <!-- 退出登录 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnLogout"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="退出登录"
-            android:backgroundTint="@color/danger"
-            android:textColor="@android:color/white" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="关闭 = 同步所有应用；开启后只同步下方勾选的应用"
+                        android:textSize="12sp"
+                        android:textColor="@color/on_surface_variant"
+                        android:layout_marginBottom="8dp" />
 
-    </LinearLayout>
-</ScrollView>
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvAppFilter"
+                        android:layout_width="match_parent"
+                        android:layout_height="240dp"
+                        android:clipToPadding="false" />
+
+                    <ProgressBar
+                        android:id="@+id/progressBarFilters"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tvEmptyFilters"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="未找到可同步的应用"
+                        android:gravity="center"
+                        android:padding="24dp"
+                        android:textColor="@color/on_surface_variant"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveFilters"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="保存应用过滤" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 退出登录 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnLogout"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="退出登录"
+                android:backgroundTint="@color/danger"
+                android:textColor="@android:color/white" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

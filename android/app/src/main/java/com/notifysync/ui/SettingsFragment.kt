@@ -29,6 +29,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -84,6 +86,13 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupUI() {
+        // 全面屏沉浸式：顶部栏避开状态栏
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            binding.topBar.setPadding(binding.topBar.paddingLeft, systemBars.top, binding.topBar.paddingRight, binding.topBar.paddingBottom)
+            insets
+        }
+
         // 账号资料
         loadProfile()
         binding.tvUsername.text = "uid:${AuthManager.username ?: "未知"}"

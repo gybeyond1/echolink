@@ -10,6 +10,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
+        android:background="@color/brand_primary"
+        android:elevation="4dp"
         android:padding="12dp"
         android:gravity="center_vertical">
 
@@ -18,8 +20,10 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="通知"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:gravity="center"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/on_primary" />
     </LinearLayout>
 
     <!-- 多选操作栏（默认隐藏）：与话题页一致——右上角两个等大图标（全选 / 删除）；

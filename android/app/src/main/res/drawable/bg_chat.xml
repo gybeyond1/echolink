@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 聊天区底色：比页面背景稍深一档，衬托白色气泡 -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="@color/chat_bg" />
-</shape>
+<!-- 聊天区背景：Telegram Day 底色 + 六边形蛛网纹理 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape>
+            <solid android:color="@color/chat_bg" />
+        </shape>
+    </item>
+    <item>
+        <bitmap
+            android:src="@drawable/bg_chat_pattern"
+            android:tileMode="repeat" />
+    </item>
+</layer-list>

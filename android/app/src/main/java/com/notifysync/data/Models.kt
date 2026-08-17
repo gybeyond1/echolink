@@ -174,7 +174,8 @@ data class MyTopic(
     val ownerName: String?,
     val lastMessage: String? = null,
     val kind: String = "normal",        // "normal" | "devices"（我的设备）| "dm"（好友私聊）
-    val displayName: String? = null     // 展示名：设备会话=我的设备，私聊=对方用户名，普通=话题名
+    val displayName: String? = null,     // 展示名：设备会话=我的设备，私聊=对方用户名，普通=话题名
+    val avatarUrl: String? = null        // dm 会话=好友头像（其余为 null）
 )
 
 // 可发现（非成员）的话题
@@ -216,7 +217,8 @@ fun parseMyTopics(jsonArray: JSONArray): List<MyTopic> {
                 ownerName = obj.optNullable("owner_name"),
                 lastMessage = obj.optNullable("last_message"),
                 kind = obj.optString("kind", "normal"),
-                displayName = obj.optNullable("display_name")
+                displayName = obj.optNullable("display_name"),
+                avatarUrl = obj.optNullable("avatar")
             )
         )
     }

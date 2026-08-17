@@ -10,16 +10,28 @@
     android:paddingBottom="10dp"
     android:background="?attr/selectableItemBackground">
 
-    <!-- 头像（首字母） -->
-    <TextView
-        android:id="@+id/tvAvatar"
+    <!-- 头像：首字母（无图时）或真实头像图片 -->
+    <FrameLayout
         android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:gravity="center"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="@android:color/white"
-        android:background="@drawable/bg_circle_avatar" />
+        android:layout_height="44dp">
+
+        <TextView
+            android:id="@+id/tvAvatar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/white"
+            android:background="@drawable/bg_circle_avatar" />
+
+        <ImageView
+            android:id="@+id/ivAvatar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="头像"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"

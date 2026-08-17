@@ -3,9 +3,12 @@ package com.notifysync.ui
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.notifysync.R
+import com.notifysync.data.ApiClient
+import com.notifysync.data.AvatarLoader
 import com.notifysync.data.MyTopic
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -29,8 +32,30 @@ class TopicListAdapter(
     fun getItem(position: Int): MyTopic = items[position]
     fun getItems(): List<MyTopic> = items
 
+    // 头像：设备会话→手机图标；私聊→好友头像（有则图片，无则首字母）；群聊→首字母
+    private fun bindAvatar(holder: ViewHolder, item: MyTopic, display: String) {
+        when {
+            item.kind == "devices" -> {
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                holder.ivAvatar.setImageResource(R.drawable.ic_devices)
+            }
+            !item.avatarUrl.isNullOrBlank() -> {
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                AvatarLoader.load(ApiClient.fullAvatarUrl(item.avatarUrl), holder.ivAvatar)
+            }
+            else -> {
+                holder.ivAvatar.visibility = View.GONE
+                holder.tvAvatar.visibility = View.VISIBLE
+                holder.tvAvatar.text = display.firstOrNull()?.uppercase()?.toString() ?: "#"
+            }
+        }
+    }
+
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvAvatar: TextView = view.findViewById(R.id.tvAvatar)
+        val ivAvatar: ImageView = view.findViewById(R.id.ivAvatar)
         val tvName: TextView = view.findViewById(R.id.tvName)
         val tvRole: TextView = view.findViewById(R.id.tvRole)
         val tvPreview: TextView = view.findViewById(R.id.tvPreview)
@@ -47,8 +72,8 @@ class TopicListAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
         val display = item.displayName ?: item.name
-        holder.tvAvatar.text = display.firstOrNull()?.uppercase()?.toString() ?: "#"
         holder.tvName.text = display
+        bindAvatar(holder, item, display)
 
         // 角色标签（设备/私聊会话不显示）
         if (item.myRole == "owner" && item.kind == "normal") {
