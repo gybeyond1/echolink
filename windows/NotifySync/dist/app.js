@@ -452,6 +452,7 @@
 
   function openNotifications() {
     state.chat = { special: "notifications" };
+    state.notifCount = 0;
     renderSessionList();
     const col = document.getElementById("chatCol");
     col.innerHTML = chatHeader("通知", "所有设备的同步通知",
@@ -544,8 +545,29 @@
     document.getElementById("ci-file").onchange = sendFile;
     setupVoice();
 
+    const body = document.getElementById("chatBody");
+    if (body) body.addEventListener("click", onChatImageClick);
     loadMessages(t.name);
     input.focus();
+  }
+
+  // 聊天图片点击 → 全屏预览（与手机 App 一致），不再新开标签页
+  function onChatImageClick(e) {
+    const img = e.target.closest && e.target.closest(".js-img");
+    if (img && img.dataset.full) openImageLightbox(img.dataset.full);
+  }
+
+  function openImageLightbox(url) {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-mask img-lightbox";
+    overlay.innerHTML = `
+      <img class="img-lb-img" src="${esc(url)}" alt="图片预览" />
+      <div class="img-lb-bar">
+        <a class="btn sm" href="${esc(url)}" target="_blank" download>⬇ 下载原图</a>
+        <button class="btn ghost sm" id="imgLbClose">关闭</button>
+      </div>`;
+    overlay.onclick = (ev) => { if (ev.target === overlay || ev.target.id === "imgLbClose") overlay.remove(); };
+    document.body.appendChild(overlay);
   }
 
   async function loadMessages(topic) {
@@ -575,7 +597,7 @@
       if (String(m.media_url).startsWith("p2p:")) {
         media = `<div class="bubble-media p2p-note">📎 P2P 直传文件 · 请在手机 App 查看</div>`;
       } else if (m.media_type === "image") {
-        media = `<div class="bubble-media"><a href="${url}" target="_blank"><img src="${url}" loading="lazy" /></a></div>`;
+        media = `<div class="bubble-media"><img class="js-img" data-full="${url}" src="${url}" loading="lazy" alt="图片" /></div>`;
       } else if (m.media_type === "voice") {
         media = `<div class="bubble-media"><audio controls preload="none" src="${url}"></audio></div>`;
       } else if (m.media_type === "file") {
