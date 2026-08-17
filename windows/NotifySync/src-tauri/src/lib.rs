@@ -46,7 +46,6 @@ fn read_config(app: &AppHandle) -> AppConfig {
             }
         }
     }
-    // 回退：环境变量
     if let Ok(v) = std::env::var("NOTIFYSYNC_SERVER") {
         if !v.trim().is_empty() {
             return AppConfig {
@@ -59,10 +58,7 @@ fn read_config(app: &AppHandle) -> AppConfig {
 }
 
 fn write_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = config_file_path(app).ok_or("Cannot determine config path")?;
     let json = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
@@ -109,15 +105,12 @@ fn set_notification_sync(app: AppHandle, enabled: bool) -> Result<(), String> {
     write_config(&app, &config)?;
 
     // 更新托盘菜单勾选状态
-    if let Some(tray) = app.tray_by_id("main-tray") {
-        if let Some(item) = tray.menu().and_then(|m| m.get("sync_notifications")) {
-            if let Some(check_item) = item.as_checkMenuItem() {
-                let _ = check_item.set_checked(enabled);
-            }
+    if let Some(state) = app.try_state::<TrayState>() {
+        if let Some(item) = state.sync_check.lock().unwrap().as_ref() {
+            let _ = item.set_checked(enabled);
         }
     }
 
-    // 启动/停止通知监听
     if enabled {
         start_notification_listener(&app);
     } else {
@@ -168,24 +161,17 @@ async fn set_unread_count(app: AppHandle, count: u32) -> Result<(), String> {
 
 // ============== 托盘 ==============
 
+/// 托盘状态：保存 CheckMenuItem 引用以便运行时更新勾选
+struct TrayState {
+    sync_check: Mutex<Option<CheckMenuItem>>,
+}
+
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let config = read_config(app);
 
     let show = MenuItem::with_id(app, "show", "打开主页", true, None::<&str>)?;
-    let open_browser = MenuItem::with_id(
-        app,
-        "open_browser",
-        "在浏览器中打开",
-        true,
-        None::<&str>,
-    )?;
-    let toggle_autostart = MenuItem::with_id(
-        app,
-        "toggle_autostart",
-        "开机自启",
-        true,
-        None::<&str>,
-    )?;
+    let open_browser = MenuItem::with_id(app, "open_browser", "在浏览器中打开", true, None::<&str>)?;
+    let toggle_autostart = MenuItem::with_id(app, "toggle_autostart", "开机自启", true, None::<&str>)?;
     let sync_notifications = CheckMenuItem::with_id(
         app,
         "sync_notifications",
@@ -194,29 +180,19 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         config.notification_sync_enabled,
         None::<&str>,
     )?;
-    let switch_server = MenuItem::with_id(
-        app,
-        "switch_server",
-        "切换服务器",
-        true,
-        None::<&str>,
-    )?;
+    let switch_server = MenuItem::with_id(app, "switch_server", "切换服务器", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
-        &[
-            &show,
-            &open_browser,
-            &sep1,
-            &sync_notifications,
-            &switch_server,
-            &sep2,
-            &toggle_autostart,
-            &quit,
-        ],
+        &[&show, &open_browser, &sep1, &sync_notifications, &switch_server, &sep2, &toggle_autostart, &quit],
     )?;
+
+    // 保存 CheckMenuItem 以便运行时更新勾选状态
+    app.manage(TrayState {
+        sync_check: Mutex::new(Some(sync_notifications.clone())),
+    });
 
     TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
@@ -230,18 +206,15 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 }
             }
             "sync_notifications" => {
-                // 从配置读取当前状态，取反后设置
                 let config = read_config(app);
                 let new_state = !config.notification_sync_enabled;
                 let _ = set_notification_sync(app.clone(), new_state);
             }
             "switch_server" => {
-                // 清除保存的服务器地址，重新显示输入页
                 let mut config = read_config(app);
                 config.server_url = String::new();
                 let _ = write_config(app, &config);
                 stop_notification_listener();
-                // 导航回本地 index.html
                 if let Some(win) = app.get_webview_window("main") {
                     #[cfg(target_os = "windows")]
                     let _ = win.eval("window.location.replace('http://tauri.localhost/index.html')");
@@ -253,11 +226,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 use tauri_plugin_autostart::ManagerExt;
                 let mgr = app.autolaunch();
                 let enabled = mgr.is_enabled().unwrap_or(false);
-                if enabled {
-                    let _ = mgr.disable();
-                } else {
-                    let _ = mgr.enable();
-                }
+                if enabled { let _ = mgr.disable(); } else { let _ = mgr.enable(); }
             }
             "quit" => app.exit(0),
             _ => {}
@@ -284,95 +253,70 @@ fn show_main(app: &AppHandle) {
 #[cfg(target_os = "windows")]
 mod win_notif {
     use super::*;
-    use std::sync::Mutex;
+    use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
     use windows_sys::Win32::Foundation::{CloseHandle, HWND, HANDLE};
     use windows_sys::Win32::System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
     };
-    use windows_sys::Win32::UI::Accessibility::{
-        SetWinEventHook, UnhookWinEvent, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
-        HWINEVENTHOOK,
-    };
+    use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        DispatchMessageW, GetClassNameW, GetMessageW, GetWindowThreadProcessId, GetWindowTextLengthW,
-        GetWindowTextW, MSG, EVENT_OBJECT_SHOW,
+        DispatchMessageW, GetClassNameW, GetMessageW, GetWindowThreadProcessId,
+        GetWindowTextLengthW, GetWindowTextW, MSG, EVENT_OBJECT_SHOW,
     };
 
-    // 已见通知窗口去重（窗口句柄 + 时间戳）
+    // WinEvent 常量（windows-sys 0.59 未导出，手动定义）
+    const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
+    const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;
+
+    static HOOK: AtomicIsize = AtomicIsize::new(0);
+    static SHOULD_RUN: AtomicBool = AtomicBool::new(false);
+
+    // 已见通知去重
     struct SeenSet {
         entries: HashSet<(isize, u32)>,
         last_cleanup: u32,
     }
     static SEEN: Mutex<Option<SeenSet>> = Mutex::new(None);
-    static HOOK: Mutex<Option<HWINEVENTHOOK>> = Mutex::new(None);
-    static SHOULD_RUN: Mutex<bool> = Mutex::new(false);
 
-    // 获取窗口类名
     fn get_class_name(hwnd: HWND) -> String {
         unsafe {
             let mut buf = [0u16; 512];
             let len = GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
-            if len > 0 {
-                String::from_utf16_lossy(&buf[..len as usize])
-            } else {
-                String::new()
-            }
+            if len > 0 { String::from_utf16_lossy(&buf[..len as usize]) } else { String::new() }
         }
     }
 
-    // 获取窗口标题文本
     fn get_window_text(hwnd: HWND) -> String {
         unsafe {
             let len = GetWindowTextLengthW(hwnd);
-            if len <= 0 {
-                return String::new();
-            }
+            if len <= 0 { return String::new(); }
             let mut buf = vec![0u16; (len + 1) as usize];
             let actual = GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
-            if actual > 0 {
-                String::from_utf16_lossy(&buf[..actual as usize])
-            } else {
-                String::new()
-            }
+            if actual > 0 { String::from_utf16_lossy(&buf[..actual as usize]) } else { String::new() }
         }
     }
 
-    // 通过 PID 获取进程可执行文件路径
     fn get_process_path(pid: u32) -> Option<String> {
         unsafe {
             let handle: HANDLE = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-            if handle == 0 {
-                return None;
-            }
+            if handle.is_null() { return None; }
             let mut buf = [0u16; 1024];
             let mut len = buf.len() as u32;
             let ok = QueryFullProcessImageNameW(handle, 0, buf.as_mut_ptr(), &mut len);
             CloseHandle(handle);
-            if ok != 0 && len > 0 {
-                Some(String::from_utf16_lossy(&buf[..len as usize]))
-            } else {
-                None
-            }
+            if ok != 0 && len > 0 { Some(String::from_utf16_lossy(&buf[..len as usize])) } else { None }
         }
     }
 
-    // 从完整路径提取进程名（如 chrome.exe）
     fn extract_process_name(path: &str) -> String {
-        path.rsplit('\\')
-            .next()
-            .unwrap_or(path)
-            .to_string()
+        path.rsplit('\\').next().unwrap_or(path).to_string()
     }
 
-    // 判断窗口是否为 Toast 通知
     fn is_toast_window(class_name: &str) -> bool {
-        // Windows 10/11 Toast 通知窗口类名特征
-        class_name.contains("Toast")
-            || class_name.contains("Notification")
+        class_name.contains("Toast") || class_name.contains("Notification")
             || class_name == "Windows.UI.Core.CoreWindow"
     }
 
-    // 通知事件回调
     unsafe extern "system" fn win_event_callback(
         _hook: HWINEVENTHOOK,
         event: u32,
@@ -382,95 +326,59 @@ mod win_notif {
         _thread: u32,
         event_time: u32,
     ) {
-        // 只处理窗口本身（非子对象）的 SHOW 事件
-        if event != EVENT_OBJECT_SHOW || id_object != 0 || hwnd == 0 {
+        if event != EVENT_OBJECT_SHOW || id_object != 0 || hwnd.is_null() {
             return;
         }
-
-        // 检查是否在运行
-        {
-            let running = SHOULD_RUN.lock().unwrap();
-            if !*running {
-                return;
-            }
-        }
+        if !SHOULD_RUN.load(Ordering::SeqCst) { return; }
 
         let class = get_class_name(hwnd);
-        if !is_toast_window(&class) {
-            return;
-        }
+        if !is_toast_window(&class) { return; }
 
-        // 去重：同一窗口同一时间段不重复处理
+        // 去重
         {
             let mut seen = SEEN.lock().unwrap();
             let seen = seen.get_or_insert_with(|| SeenSet {
                 entries: HashSet::new(),
                 last_cleanup: event_time,
             });
-
-            // 每 60 秒清理一次过期条目
             if event_time.wrapping_sub(seen.last_cleanup) > 60_000 {
                 seen.entries.retain(|(_, t)| event_time.wrapping_sub(*t) < 60_000);
                 seen.last_cleanup = event_time;
             }
-
-            let key = (hwnd, event_time);
-            if seen.entries.contains(&key) {
-                return;
-            }
+            let key = (hwnd as isize, event_time);
+            if seen.entries.contains(&key) { return; }
             seen.entries.insert(key);
         }
 
-        // 稍等一下让通知内容渲染完成
+        // 等待通知内容渲染
         std::thread::sleep(std::time::Duration::from_millis(200));
 
         let title = get_window_text(hwnd);
-        if title.is_empty() {
-            return;
-        }
+        if title.is_empty() { return; }
 
-        // 获取进程信息
         let mut pid: u32 = 0;
         let _ = GetWindowThreadProcessId(hwnd, &mut pid);
         let process_name = if pid > 0 {
-            get_process_path(pid)
-                .map(|p| extract_process_name(&p))
-                .unwrap_or_else(|| format!("pid:{}", pid))
-        } else {
-            "unknown".to_string()
-        };
+            get_process_path(pid).map(|p| extract_process_name(&p)).unwrap_or_else(|| format!("pid:{}", pid))
+        } else { "unknown".to_string() };
 
-        // 跳过自身（EchoLink）
-        if process_name.eq_ignore_ascii_case("echolink.exe") {
-            return;
-        }
+        // 跳过自身
+        if process_name.eq_ignore_ascii_case("echolink.exe") { return; }
 
-        // 通过 AppHandle 发送到服务器（JS eval 方式，复用 WebUI 的 auth token）
         if let Some(app) = super::APP_HANDLE.get() {
             let config = read_config(app);
-
-            // 检查应用过滤
-            if config.blocked_apps.iter().any(|b| b.eq_ignore_ascii_case(&process_name)) {
-                return;
-            }
-
-            let server_url = &config.server_url;
-            if server_url.is_empty() {
-                return;
-            }
+            if config.blocked_apps.iter().any(|b| b.eq_ignore_ascii_case(&process_name)) { return; }
+            if config.server_url.is_empty() { return; }
 
             if let Some(win) = app.get_webview_window("main") {
-                let escaped_title = title.replace('\\', "\\\\").replace('\'', "\\'").replace('"', "\\\"");
-                let escaped_app = process_name.replace('\'', "\\'").replace('"', "\\\"");
-                let display_name = process_name.trim_end_matches(".exe").to_string();
-                let escaped_display = display_name.replace('\'', "\\'").replace('"', "\\\"");
-
+                let esc = |s: &str| s.replace('\\', "\\\\").replace('\'', "\\'").replace('"', "\\\"");
+                let display = process_name.trim_end_matches(".exe").to_string();
                 let js = format!(
                     r#"fetch('{srv}/api/notifications',{{method:'POST',headers:{{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('ns_token')||'')}},body:JSON.stringify({{package_name:'{pkg}',app_name:'{app}',title:'{title}',text:'',timestamp:Date.now()}})}}).catch(function(){{}})"#,
-                    srv = server_url,
-                    pkg = escaped_app,
-                    app = escaped_display,
-                    title = escaped_title,
+                    srv = config.server_url,
+                    pkg = esc(&process_name),
+                    app = esc(&display),
+                    title = esc(&title),
                 );
                 let _ = win.eval(&js);
             }
@@ -478,54 +386,38 @@ mod win_notif {
     }
 
     pub fn start(app: &AppHandle) {
-        let mut running = SHOULD_RUN.lock().unwrap();
-        if *running {
-            return;
-        }
-        *running = true;
-        drop(running);
+        if SHOULD_RUN.load(Ordering::SeqCst) { return; }
+        SHOULD_RUN.store(true, Ordering::SeqCst);
+        let _ = APP_HANDLE.set(app.clone());
 
-        let app_handle = app.clone();
-        let _ = APP_HANDLE.set(app_handle);
-
-        // 在单独线程上设置 hook + 消息循环
         std::thread::spawn(|| {
             unsafe {
                 let hook = SetWinEventHook(
-                    EVENT_OBJECT_SHOW,
-                    EVENT_OBJECT_SHOW,
-                    0, // hmod
+                    EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW,
+                    core::ptr::null_mut(),
                     Some(win_event_callback),
-                    0, // all processes
-                    0, // all threads
+                    0, 0,
                     WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
                 );
-
-                if hook != 0 {
-                    *HOOK.lock().unwrap() = Some(hook);
-
-                    // 消息循环（WINEVENT_OUTOFCONTEXT 需要）
+                if !hook.is_null() {
+                    HOOK.store(hook as isize, Ordering::SeqCst);
                     let mut msg: MSG = std::mem::zeroed();
-                    while GetMessageW(&mut msg, 0, 0, 0) > 0 {
+                    while GetMessageW(&mut msg, core::ptr::null_mut(), 0, 0) > 0 {
                         DispatchMessageW(&msg);
                     }
-
-                    // 清理
                     UnhookWinEvent(hook);
-                    *HOOK.lock().unwrap() = None;
+                    HOOK.store(0, Ordering::SeqCst);
                 }
             }
-            *SHOULD_RUN.lock().unwrap() = false;
+            SHOULD_RUN.store(false, Ordering::SeqCst);
         });
     }
 
     pub fn stop() {
-        *SHOULD_RUN.lock().unwrap() = false;
-        // UnhookWinEvent 会让 GetMessageW 返回 0，从而退出消息循环
-        if let Some(hook) = HOOK.lock().unwrap().take() {
-            unsafe {
-                windows_sys::Win32::UI::Accessibility::UnhookWinEvent(hook);
-            }
+        SHOULD_RUN.store(false, Ordering::SeqCst);
+        let hook = HOOK.swap(0, Ordering::SeqCst);
+        if hook != 0 {
+            unsafe { UnhookWinEvent(hook as HWINEVENTHOOK); }
         }
     }
 }
@@ -545,7 +437,6 @@ fn stop_notification_listener() {
     win_notif::stop();
 }
 
-// 全局 AppHandle（通知回调使用）
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 // ============== 应用入口 ==============
@@ -566,13 +457,8 @@ pub fn run() {
         ))
         .manage(ServerUrl(String::new()))
         .invoke_handler(tauri::generate_handler![
-            show_notification,
-            set_unread_count,
-            app_info,
-            save_server_url,
-            get_config,
-            set_notification_sync,
-            set_blocked_apps
+            show_notification, set_unread_count, app_info, save_server_url,
+            get_config, set_notification_sync, set_blocked_apps
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -582,14 +468,11 @@ pub fn run() {
         })
         .setup(|app| {
             build_tray(app.handle())?;
-
-            // 如果配置中已开启通知同步，启动监听
             let config = read_config(app.handle());
             let _ = APP_HANDLE.set(app.handle().clone());
             if config.notification_sync_enabled && !config.server_url.is_empty() {
                 start_notification_listener(app.handle());
             }
-
             Ok(())
         })
         .run(tauri::generate_context!())
