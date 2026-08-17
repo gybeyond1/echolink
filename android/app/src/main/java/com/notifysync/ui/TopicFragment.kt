@@ -102,11 +102,19 @@ class TopicFragment : Fragment() {
                     if (binding.chatLayout.visibility == View.VISIBLE) chatAdapter.notifyDataSetChanged()
                     if (binding.listLayout.visibility == View.VISIBLE) listAdapter.notifyDataSetChanged()
                 }
+                "com.notifysync.MESSAGE_READ" -> {
+                    // 对方读了你发出的私聊消息 → 把对应气泡翻成双勾
+                    val t = intent?.getStringExtra("topic") ?: return
+                    if (t == currentTopic) {
+                        val ids = intent.getLongArrayExtra("ids")?.toSet() ?: emptySet()
+                        chatAdapter.markRead(ids)
+                    }
+                }
                 else -> {
                     val topic = intent?.getStringExtra("topic") ?: return
                     if (topic == currentTopic) {
                         val msg = TopicMessage(
-                            id = 0,
+                            id = intent.getLongExtra("id", 0),
                             topic = topic,
                             title = intent.getStringExtra("title") ?: "",
                             text = intent.getStringExtra("text") ?: "",
@@ -124,6 +132,12 @@ class TopicFragment : Fragment() {
                         )
                         chatAdapter.appendItems(listOf(msg))
                         scrollToBottom()
+                        // dm 私聊：聊天页正打开对方发来的消息 → 标记已读并通知对方（实时双勾）
+                        if (chatTopic?.kind == "dm" && msg.id > 0) {
+                            lifecycleScope.launch {
+                                try { ApiClient.markMessagesRead(topic, listOf(msg.id)) } catch (_: Exception) {}
+                            }
+                        }
                     }
                 }
             }
@@ -347,6 +361,7 @@ class TopicFragment : Fragment() {
                 addAction("com.notifysync.REQUESTS_CHANGED")
                 addAction("com.notifysync.FRIENDS_CHANGED")
                 addAction("com.notifysync.PROFILE_CHANGED")
+                addAction("com.notifysync.MESSAGE_READ")
             },
             Context.RECEIVER_NOT_EXPORTED
         )
@@ -371,6 +386,14 @@ class TopicFragment : Fragment() {
     private val isWide: Boolean
         get() = resources.configuration.smallestScreenWidthDp >= 600
 
+    /** 平板双栏：左列表标题栏宽度跟随列表列（360dp, weight=0），聊天标题才能在聊天面板内居中 */
+    private fun setDualTitleListWidth(width: Int, weight: Float) {
+        val lp = binding.tvTitleList.layoutParams as LinearLayout.LayoutParams
+        lp.width = width
+        lp.weight = weight
+        binding.tvTitleList.layoutParams = lp
+    }
+
     private fun showListMode() {
         currentTopic = null
         chatTopic = null
@@ -378,6 +401,8 @@ class TopicFragment : Fragment() {
         binding.chatLayout.visibility = View.GONE
         binding.tvTitleList.text = "消息"
         binding.tvTitleList.visibility = View.VISIBLE
+        // 列表态：标题占满整行（weight=1）
+        setDualTitleListWidth(0, 1f)
         backCallback.isEnabled = false
         binding.tvChatTitle.visibility = View.GONE
         binding.btnPending.visibility = View.GONE
@@ -389,6 +414,8 @@ class TopicFragment : Fragment() {
     private fun showChatMode(topic: MyTopic) {
         chatTopic = topic
         currentTopic = topic.name
+        // 已读回执：仅 dm 私聊开启（通知/我的设备/群组不显示单双勾）
+        chatAdapter.showReadReceipts = topic.kind == "dm"
         // 聊天标题显示昵称（优先外部传入的展示名），并强制水平居中
         binding.tvChatTitle.text = topic.displayName ?: topic.name
         binding.tvChatTitle.gravity = Gravity.CENTER
@@ -401,6 +428,8 @@ class TopicFragment : Fragment() {
             binding.chatLayout.visibility = View.VISIBLE
             binding.tvTitleList.visibility = View.VISIBLE
             binding.tvChatTitle.visibility = View.VISIBLE
+            // #198 修复：左列表固定 360dp、weight=0，使聊天标题在「聊天面板」内而非整屏右半居中
+            setDualTitleListWidth((360 * resources.displayMetrics.density).toInt(), 0f)
             binding.btnSettings.visibility = View.GONE
             binding.fabAddTopic.visibility = View.VISIBLE
         } else {
@@ -417,120 +446,16 @@ class TopicFragment : Fragment() {
         loadMessages()
     }
 
-    // ===== 悬浮加号菜单：新建 / 发现话题 =====
+    // ===== 悬浮加号菜单：新建 / 发现话题（与好友页统一，见 Dialogs.kt） =====
 
     private fun showTopicFabMenu() {
-        val options = arrayOf("创建话题", "发现 / 加入话题", "设置")
-        AlertDialog.Builder(requireContext())
-            .setTitle("新建")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showCreateTopicDialog()
-                    1 -> showDiscoverDialog()
-                    2 -> (activity as? MainActivity)?.openSettings()
-                }
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun showCreateTopicDialog() {
-        val layout = layoutInflater.inflate(R.layout.dialog_create_topic, null)
-        val etName = layout.findViewById<TextInputEditText>(R.id.etTopicName)
-        val etTitle = layout.findViewById<TextInputEditText>(R.id.etTopicTitle)
-        AlertDialog.Builder(requireContext())
-            .setTitle("创建话题")
-            .setView(layout)
-            .setPositiveButton("创建") { _, _ ->
-                val name = etName.text?.toString()?.trim()?.lowercase() ?: ""
-                val title = etTitle.text?.toString()?.trim() ?: ""
-                if (!Pattern.matches("^[a-z0-9_-]{1,64}$", name)) {
-                    Toast.makeText(requireContext(), "话题名不合法（字母/数字/_/-，≤64字符）", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                lifecycleScope.launch {
-                    try {
-                        ApiClient.createTopic(name, title, "")
-                        Toast.makeText(requireContext(), "话题已创建", Toast.LENGTH_SHORT).show()
-                        (activity as? MainActivity)?.openTopic(name)
-                    } catch (e: Exception) {
-                        if (e is ApiException && e.code == 409) {
-                            Toast.makeText(requireContext(), "话题已存在，请到「发现」申请加入", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(requireContext(), "创建失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun showDiscoverDialog() {
-        val layout = requireActivity().layoutInflater.inflate(R.layout.dialog_discover_topic, null)
-        val etName = layout.findViewById<TextInputEditText>(R.id.etJoinName)
-        val listView = layout.findViewById<android.widget.ListView>(R.id.lvDiscover)
-        val empty = layout.findViewById<android.widget.TextView>(R.id.tvDiscoverEmpty)
-        val btnJoin = layout.findViewById<android.widget.Button>(R.id.btnJoinByName)
-        btnJoin.text = "创建/加入"
-
-        val dialog = AlertDialog.Builder(requireContext()).setTitle("发现 / 创建话题").setView(layout).setNegativeButton("关闭", null).create()
-
-        val items = mutableListOf<DiscoverTopic>()
-        val adapterList = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, mutableListOf<String>())
-        listView.adapter = adapterList
-        listView.setOnItemClickListener { _, _, pos, _ -> items.getOrNull(pos)?.let { requestJoinTopic(it.name, dialog) } }
-
-        fun refresh() {
-            lifecycleScope.launch {
-                try {
-                    val list = ApiClient.getDiscoverTopics()
-                    items.clear(); items.addAll(list)
-                    adapterList.clear(); adapterList.addAll(list.map { "#${it.name}  (创建者 ${it.ownerName ?: "-"} · ${it.memberCount}人)" }); adapterList.notifyDataSetChanged()
-                    empty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
-                } catch (e: Exception) { Toast.makeText(requireContext(), "加载失败: ${e.message}", Toast.LENGTH_SHORT).show() }
-            }
-        }
-        refresh()
-
-        btnJoin.setOnClickListener {
-            val n = etName.text?.toString()?.trim()?.lowercase() ?: ""
-            if (!Pattern.matches("^[a-z0-9_-]{1,64}$", n)) { Toast.makeText(requireContext(), "话题名不合法", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
-            lifecycleScope.launch {
-                try {
-                    ApiClient.createTopic(n, "", "")
-                    Toast.makeText(requireContext(), "话题已创建（你是创建者）", Toast.LENGTH_SHORT).show()
-                    dialog.dismiss()
-                    (activity as? MainActivity)?.openTopic(n)
-                } catch (e: Exception) {
-                    if (e is ApiException && e.code == 409) {
-                        requestJoinTopic(n, dialog)
-                    } else {
-                        Toast.makeText(requireContext(), "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
-        dialog.show()
-    }
-
-    private fun requestJoinTopic(name: String, dialog: AlertDialog) {
-        val input = layoutInflater.inflate(R.layout.dialog_input_single, null)
-        val et = input.findViewById<TextInputEditText>(R.id.etInput)
-        et.hint = "验证消息（选填）"
-        AlertDialog.Builder(requireContext())
-            .setTitle("申请加入「$name」")
-            .setMessage("填写验证消息发送加群申请")
-            .setView(input)
-            .setPositiveButton("发送申请") { _, _ ->
-                val message = et.text?.toString()?.trim() ?: ""
-                lifecycleScope.launch {
-                    try { ApiClient.requestJoinTopic(name, message); Toast.makeText(requireContext(), "已发送加入申请，等待创建者审批", Toast.LENGTH_SHORT).show(); dialog.dismiss() }
-                    catch (e: Exception) { Toast.makeText(requireContext(), "申请失败: ${e.message}", Toast.LENGTH_SHORT).show() }
-                }
-            }
-            .setNegativeButton("取消", null)
-            .show()
+        showGlobalFabMenu(
+            owner = this,
+            onDiscover = { showDiscoverDialog(this) { t -> (activity as? MainActivity)?.openTopic(t) } },
+            onCreateTopic = { showCreateTopicDialog(this) { t -> (activity as? MainActivity)?.openTopic(t) } },
+            onAddFriend = { showAddFriendDialog(this) },
+            onSettings = { (activity as? MainActivity)?.openSettings() }
+        )
     }
 
     // ===== 话题列表 =====

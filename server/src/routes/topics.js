@@ -70,6 +70,30 @@ function ensureDmTopic(userA, userB) {
   return topic;
 }
 
+// 标记 dm 私聊里「对方发来的」消息为已读，并实时通知发送者（已读回执）。
+// 仅标记 user_id != viewerUserId 且尚未已读的消息，避免误标自己的消息。
+function markDmRead(topic, ids, viewerUserId) {
+  if (!ids || ids.length === 0) return;
+  const db = getDB();
+  const placeholders = ids.map(() => "?").join(",");
+  const toMark = db
+    .prepare(`SELECT id, user_id FROM topic_messages WHERE topic = ? AND id IN (${placeholders}) AND user_id != ? AND read = 0`)
+    .all(topic, ...ids, viewerUserId);
+  if (toMark.length === 0) return;
+  const markIds = toMark.map((r) => r.id);
+  const markPh = markIds.map(() => "?").join(",");
+  db.prepare(`UPDATE topic_messages SET read = 1 WHERE topic = ? AND id IN (${markPh})`).run(topic, ...markIds);
+  // 按发送者分组，逐一通知原发送者其消息已被读取
+  const bySender = {};
+  toMark.forEach((r) => { (bySender[r.user_id] = bySender[r.user_id] || []).push(r.id); });
+  const { broadcastToUser } = require("../websocket");
+  Object.keys(bySender).forEach((senderId) => {
+    try {
+      broadcastToUser(parseInt(senderId), { type: "message_read", data: { topic, ids: bySender[senderId] } });
+    } catch (_) { /* WS 推送失败不影响标记 */ }
+  });
+}
+
 // 列出我参与（成员）的话题
 // GET /api/topics
 router.get("/", authMiddleware, (req, res) => {
@@ -439,7 +463,36 @@ router.get("/:topic/messages", authMiddleware, (req, res) => {
       ? db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? AND tm.timestamp > ? ORDER BY tm.id ASC LIMIT ?`).all(name, since, limit)
       : db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? ORDER BY tm.id DESC LIMIT ?`).all(name, limit).reverse();
 
+  // dm 私聊：把「对方发来且未读」的消息标记为已读，并通知对方（已读回执）
+  if (topic.kind === "dm") {
+    const unread = messages
+      .filter((m) => m.user_id != null && m.user_id !== req.userId && m.read === 0)
+      .map((m) => m.id);
+    if (unread.length) markDmRead(name, unread, req.userId);
+  }
+
   res.json({ topic: name, messages });
+});
+
+// 显式标记消息已读（已读回执）。仅 dm 私聊；只影响「对方发来的」消息。
+// POST /api/topics/:topic/messages/read  body: { ids: [id, ...] }
+router.post("/:topic/messages/read", authMiddleware, (req, res) => {
+  const name = normalizeTopic(req.params.topic);
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
+  const db = getDB();
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  if (topic.kind !== "dm") {
+    return res.status(400).json({ error: "Read receipts only supported in direct messages" });
+  }
+  if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
+    return res.status(403).json({ error: "Not a member of this topic" });
+  }
+  const ids = Array.isArray(req.body.ids)
+    ? req.body.ids.map((x) => parseInt(x)).filter((x) => x > 0)
+    : [];
+  markDmRead(name, ids, req.userId);
+  res.json({ ok: true });
 });
 
 // 删除单条话题消息（成员可删自己的；管理员可删任意）

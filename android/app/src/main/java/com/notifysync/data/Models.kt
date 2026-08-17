@@ -65,7 +65,8 @@ data class TopicMessage(
     val mediaSize: Long = 0,
     val senderUserId: Long = 0,
     val senderAvatar: String? = null,
-    val senderDisplayName: String? = null
+    val senderDisplayName: String? = null,
+    val read: Boolean = false
 )
 
 // ===== JSON 解析扩展 =====
@@ -136,7 +137,8 @@ fun parseTopicMessages(jsonArray: JSONArray): List<TopicMessage> {
                 mediaSize = obj.optLong("media_size", 0),
                 senderUserId = obj.optLong("user_id", 0),
                 senderAvatar = obj.optNullable("sender_avatar"),
-                senderDisplayName = obj.optNullable("sender_display_name")
+                senderDisplayName = obj.optNullable("sender_display_name"),
+                read = obj.optInt("read", 0) == 1
             )
         )
     }
@@ -159,7 +161,8 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
         mediaSize = json.optLong("media_size", 0),
         senderUserId = json.optLong("user_id", 0),
         senderAvatar = json.optNullable("sender_avatar"),
-        senderDisplayName = json.optNullable("sender_display_name")
+        senderDisplayName = json.optNullable("sender_display_name"),
+        read = json.optInt("read", 0) == 1
     )
 }
 

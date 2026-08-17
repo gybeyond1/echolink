@@ -209,6 +209,10 @@ function initDB() {
       db.exec(`ALTER TABLE topic_messages ADD COLUMN ${c} TEXT`);
     }
   });
+  // 已读回执列：dm 私聊里对方是否已读（仅 dm 使用）
+  if (!tmCols.includes("read")) {
+    db.exec("ALTER TABLE topic_messages ADD COLUMN read INTEGER DEFAULT 0");
+  }
 
   // 话题类型列：normal=普通群聊 | devices=同账号设备默认会话（置顶不可删）| dm=好友两人私聊
   const topicCols = db.pragma("table_info(topics)").map((c) => c.name);

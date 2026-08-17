@@ -50,6 +50,9 @@ class TopicAdapter(
     private val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    /** 是否显示已读回执（仅 dm 私聊开启）：自己发出的消息显示单勾/双勾 */
+    var showReadReceipts: Boolean = false
+
     var selectionMode = false
         private set
     private val selected = mutableSetOf<Long>()
@@ -98,6 +101,18 @@ class TopicAdapter(
     fun getSelectedIds(): List<Long> = selected.filter { it > 0 }
     val selectedCount: Int get() = selected.size
 
+    /** 已读回执：把指定 id 的消息标记为「已读」（对方已读），刷新对应气泡 */
+    fun markRead(ids: Set<Long>) {
+        if (ids.isEmpty()) return
+        ids.forEach { id ->
+            val pos = items.indexOfFirst { it.id == id }
+            if (pos >= 0 && !items[pos].read) {
+                items[pos] = items[pos].copy(read = true)
+                notifyItemChanged(pos)
+            }
+        }
+    }
+
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val ivAvatar: ImageView = view.findViewById(R.id.ivAvatar)
         val llContent: View = view.findViewById(R.id.llContent)
@@ -110,6 +125,7 @@ class TopicAdapter(
         val llVoice: View = view.findViewById(R.id.llVoice)
         val llFile: View = view.findViewById(R.id.llFile)
         val tvFile: TextView = view.findViewById(R.id.tvFile)
+        val tvStatus: TextView = view.findViewById(R.id.tvStatus)
         var item: TopicMessage? = null
         private var selectionTapHandled = false
         var lastMine: Boolean? = null
@@ -311,6 +327,22 @@ class TopicAdapter(
         // Avatar loading (only for first message in group to save bandwidth)
         if (!isSameSenderAsPrev) {
             loadAvatar(item, holder.ivAvatar)
+        }
+
+        // 已读回执（Telegram 式）：仅 dm 私聊里「自己发出的」消息显示
+        // 单勾=已送达，双勾=对方已读
+        if (isMine && showReadReceipts) {
+            val ctx = holder.itemView.context
+            holder.tvStatus.visibility = View.VISIBLE
+            if (item.read) {
+                holder.tvStatus.text = "✓✓" // 双勾：已读
+                holder.tvStatus.setTextColor(ctx.getColor(R.color.brand_primary))
+            } else {
+                holder.tvStatus.text = "✓"   // 单勾：已送达
+                holder.tvStatus.setTextColor(ctx.getColor(R.color.on_surface_variant))
+            }
+        } else {
+            holder.tvStatus.visibility = View.GONE
         }
 
         // Selection visual

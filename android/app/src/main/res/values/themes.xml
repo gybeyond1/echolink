@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      NotifySync 主题：哔哩紫品牌色 + DayNight（亮/暗双主题）
-      parent 用 MaterialComponents.DayNight，可通过
-      AppCompatDelegate.setDefaultNightMode() 切换亮/暗/跟随系统。
-      颜色全部引用 @color，亮暗由 values/ 与 values-night/ 自动适配。
+      NotifySync 主题：Telegram Day 浅色风格（已移除深浅色切换，统一浅色）
+      parent 用 MaterialComponents.Light，固定浅色，不再随系统/手动切换。
+      颜色全部引用 @color（values/ 中定义）。
     -->
-    <style name="Theme.NotifySync" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.NotifySync" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorPrimaryVariant">@color/brand_primary_dark</item>
         <item name="colorOnPrimary">@color/on_primary</item>
@@ -25,5 +24,24 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
+        <!-- 弹窗（菜单/创建话题/发现/添加好友等）统一为聊天页浅色材质 + 周围遮罩 -->
+        <item name="alertDialogTheme">@style/Theme.NotifySync.Dialog</item>
+        <item name="dialogTheme">@style/Theme.NotifySync.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/Theme.NotifySync.Dialog</item>
+    </style>
+
+    <!-- 所有 AlertDialog 统一：白底（聊天页气泡色）+ 品牌蓝强调 + 半透明遮罩区分层级 -->
+    <style name="Theme.NotifySync.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:background">@color/surface</item>
+        <item name="android:colorBackground">@color/surface</item>
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="android:textColorPrimary">@color/on_surface</item>
+        <item name="android:textColor">@color/on_surface</item>
+        <item name="android:windowDimAmount">0.5</item>
+        <item name="android:windowIsFloating">true</item>
     </style>
 </resources>

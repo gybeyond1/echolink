@@ -248,6 +248,14 @@ object ApiClient {
         execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/messages/$id", "DELETE"))
     }
 
+    // 标记私聊消息已读（仅 dm），通知对方把「单勾」升级为「双勾」回执
+    suspend fun markMessagesRead(topic: String, ids: List<Long>) {
+        val arr = JSONArray()
+        ids.forEach { arr.put(it) }
+        val body = JSONObject().put("ids", arr)
+        execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/messages/read", "POST", body))
+    }
+
     // 删除整个话题（该用户在此话题下的所有消息）
     suspend fun deleteTopic(topic: String) {
         execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}", "DELETE"))

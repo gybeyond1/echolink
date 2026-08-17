@@ -13,7 +13,6 @@ object AuthManager {
     private const val KEY_DEVICE_NAME = "device_name"
     private const val KEY_DEVICE_UUID = "device_uuid"
     private const val KEY_TOPICS = "subscribed_topics"
-    private const val KEY_THEME = "theme_mode"
     private const val KEY_SMS_CAPTURE = "sms_capture_enabled"
     private const val KEY_DISPLAY_NAME = "display_name"
     private const val KEY_AVATAR_URL = "avatar_url"
@@ -74,11 +73,6 @@ object AuthManager {
             ?.toSet()
             ?: emptySet()
         set(value) = prefs.edit().putString(KEY_TOPICS, value.joinToString(",")).apply()
-
-    // 主题模式："system"（跟随系统）/ "light"（浅色）/ "dark"（深色）
-    var themeMode: String
-        get() = prefs.getString(KEY_THEME, "system") ?: "system"
-        set(value) = prefs.edit().putString(KEY_THEME, value).apply()
 
     // 短信验证码自动提取开关（需 READ_SMS 权限，提取到的验证码自动复制到剪贴板）
     var smsCaptureEnabled: Boolean
