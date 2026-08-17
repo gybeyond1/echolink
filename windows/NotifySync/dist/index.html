@@ -4,39 +4,123 @@
   <meta charset="utf-8" />
   <title>EchoLink</title>
   <style>
-    body { margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { height: 100vh; display: flex; align-items: center; justify-content: center;
       font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       background: linear-gradient(135deg, #2AABEE 0%, #3390EC 100%); color: #fff; }
-    .box { text-align: center; }
-    .logo { width: 64px; height: 64px; margin: 0 auto 16px;
-      background: rgba(255,255,255,.22); border-radius: 16px; font-size: 38px; font-weight: 800;
-      line-height: 64px; }
-    p { margin: 6px 0 18px; opacity: .92; }
-    a { color: #fff; text-decoration: underline; }
+    .box { text-align: center; max-width: 380px; width: 90%; }
+    .logo { width: 72px; height: 72px; margin: 0 auto 20px;
+      background: rgba(255,255,255,.22); border-radius: 18px; font-size: 42px; font-weight: 800;
+      line-height: 72px; }
+    h2 { margin: 0 0 6px; font-size: 26px; }
+    .sub { margin: 0 0 28px; opacity: .88; font-size: 14px; }
+    input { width: 100%; padding: 12px 16px; border: none; border-radius: 10px;
+      font-size: 15px; outline: none; background: rgba(255,255,255,.18); color: #fff;
+      border: 1.5px solid rgba(255,255,255,.25); transition: border-color .2s; }
+    input::placeholder { color: rgba(255,255,255,.6); }
+    input:focus { border-color: rgba(255,255,255,.5); background: rgba(255,255,255,.12); }
+    button { width: 100%; margin-top: 14px; padding: 13px; border: none; border-radius: 10px;
+      font-size: 16px; font-weight: 600; cursor: pointer; background: #fff; color: #2AABEE;
+      transition: transform .1s, opacity .2s; }
+    button:active { transform: scale(.98); }
+    button:disabled { opacity: .6; cursor: default; }
+    .link { margin-top: 18px; font-size: 13px; opacity: .75; }
+    .link a { color: #fff; text-decoration: underline; }
+    .loading { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,.3);
+      border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .err { color: #ffddd2; font-size: 13px; margin-top: 8px; }
+    .hidden { display: none !important; }
   </style>
-  <script>
-    // 默认跳到 NOTIFYSYNC_SERVER 编译期注入值；运行时由 Tauri 命令 app_info 校正。
-    (function () {
-      try {
-        if (window.__TAURI__ && window.__TAURI__.core) {
-          window.__TAURI__.core.invoke('app_info')
-            .then(info => { window.location.replace(info.server_url); })
-            .catch(() => window.location.replace('https://ntfy.225600.xyz:1314/'));
-        } else {
-          window.location.replace('https://ntfy.225600.xyz:1314/');
-        }
-      } catch (e) {
-        window.location.replace('https://ntfy.225600.xyz:1314/');
-      }
-    })();
-  </script>
 </head>
 <body>
-  <div class="box">
-    <div class="logo">E</div>
-    <h2 style="margin:0 0 6px">EchoLink</h2>
-    <p>正在跳转到消息页…</p>
-    <p style="font-size:13px;opacity:.8"><a href="https://github.com/gybeyond1/echolink">github.com/gybeyond1/echolink</a></p>
+  <!-- 加载中 -->
+  <div id="loading" class="box loading">
+    <div class="spinner"></div>
+    <p>正在连接服务器…</p>
   </div>
+
+  <!-- 服务器地址输入 -->
+  <div id="setup" class="box hidden">
+    <div class="logo">E</div>
+    <h2>EchoLink</h2>
+    <p class="sub">跨设备消息互联平台</p>
+    <input id="serverUrl" type="text" placeholder="https://your-server.com" autocomplete="off" />
+    <button id="btnConnect" onclick="connectServer()">连接</button>
+    <p id="error" class="err"></p>
+    <p class="link"><a href="https://github.com/gybeyond1/echolink">github.com/gybeyond1/echolink</a></p>
+  </div>
+
+  <script>
+    (function () {
+      // 1. 通过 Tauri 命令获取已保存的服务器地址
+      if (window.__TAURI__ && window.__TAURI__.core) {
+        window.__TAURI__.core.invoke('app_info')
+          .then(function (info) {
+            if (info.server_url && info.server_url.length > 0) {
+              // 已配置 → 直接跳转
+              window.location.replace(info.server_url);
+            } else {
+              // 未配置 → 显示输入页
+              showSetup();
+            }
+          })
+          .catch(function () { showSetup(); });
+      } else {
+        // 非 Tauri 环境 → 显示输入页
+        showSetup();
+      }
+    })();
+
+    function showSetup() {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('setup').classList.remove('hidden');
+      document.getElementById('serverUrl').focus();
+    }
+
+    function connectServer() {
+      var input = document.getElementById('serverUrl');
+      var btn = document.getElementById('btnConnect');
+      var errEl = document.getElementById('error');
+      var url = input.value.trim().replace(/\/+$/, '');
+      errEl.textContent = '';
+
+      if (!url) { errEl.textContent = '请输入服务器地址'; return; }
+      if (!/^https?:\/\//.test(url)) { url = 'http://' + url; }
+
+      btn.disabled = true;
+      btn.textContent = '连接中…';
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('setup').classList.add('hidden');
+
+      if (window.__TAURI__ && window.__TAURI__.core) {
+        window.__TAURI__.core.invoke('save_server_url', { url: url })
+          .then(function () {
+            // 测试连接 → 2秒后跳转（fetch 验证）
+            fetch(url + '/api/info', { signal: AbortSignal.timeout(5000) })
+              .then(function (r) { if (r.ok) { window.location.replace(url); } else { throw new Error('服务器响应异常'); } })
+              .catch(function (e) {
+                // 连接失败也允许跳转（服务器可能没有 /api/info 端点）
+                window.location.replace(url);
+              });
+          })
+          .catch(function (e) {
+            btn.disabled = false;
+            btn.textContent = '连接';
+            errEl.textContent = '保存失败: ' + e;
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('setup').classList.remove('hidden');
+          });
+      } else {
+        window.location.replace(url);
+      }
+    }
+
+    // 回车键连接
+    document.getElementById('serverUrl').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') connectServer();
+    });
+  </script>
 </body>
 </html>

@@ -26,6 +26,14 @@ tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
 url = "2"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_UI_Accessibility",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+] }
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
