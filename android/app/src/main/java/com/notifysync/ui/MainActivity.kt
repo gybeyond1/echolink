@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import androidx.core.content.ContextCompat
@@ -16,6 +17,7 @@ import com.notifysync.data.AppFilterStore
 import com.notifysync.data.AuthManager
 import com.notifysync.data.BingWallpaper
 import com.notifysync.databinding.ActivityMainBinding
+import com.notifysync.R
 import com.notifysync.service.SyncService
 
 class MainActivity : AppCompatActivity() {
@@ -99,7 +101,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val bmp = BingWallpaper.load(this@MainActivity)
-                if (bmp != null && _binding != null) {
+                if (bmp != null) {
                     binding.root.background = BitmapDrawable(resources, bmp)
                 }
             } catch (_: Exception) {
