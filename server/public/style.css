@@ -1,70 +1,83 @@
 /* ============================================================
-   NotifySync Web 管理后台 — 双主题（亮/暗）+ 哔哩紫品牌色
-   亮色「清爽现代」 / 暗色「深色科技感」 由 [data-theme] 切换
+   NotifySync Web — Telegram Day 配色（蓝白基底 + 绿色发出气泡）
+   亮色 / 暗色 由 [data-theme] 切换
    ============================================================ */
 
 :root {
-  /* ---- 亮色主题（默认）---- */
-  --bg: #f6f7fb;
-  --bg-grad: radial-gradient(1200px 600px at 85% -10%, rgba(251, 114, 153, .10), transparent 60%),
-             radial-gradient(900px 500px at -10% 110%, rgba(138, 106, 255, .08), transparent 55%);
+  /* ---- 亮色主题（Telegram Day）---- */
+  --bg: #ffffff;
+  --bg-grad: none;
   --panel: #ffffff;
-  --panel-2: #fafafd;
-  --primary: #f25d8e;            /* 哔哩紫系主色（按钮/激活） */
-  --primary-d: #e04a7d;
-  --primary-grad: linear-gradient(135deg, #fb7299, #f25d8e 55%, #e76a9e);
-  --primary-soft: #fff0f5;       /* 主色浅底 */
+  --panel-2: #f4f6f8;
+  --primary: #3390ec;            /* Telegram Blue */
+  --primary-d: #2b7cd3;
+  --primary-grad: linear-gradient(135deg, #2aabee, #3390ec);
+  --primary-soft: #e3f0fc;       /* 主色浅底 */
   --on-primary: #ffffff;
-  --text: #20232b;
-  --muted: #6b7280;
-  --border: #ecedf3;
+  --text: #212121;
+  --muted: #8a8a93;
+  --border: #e2e6ea;
   --ok: #2bb673;
   --ok-soft: #e5f7ee;
   --danger: #e25555;
   --danger-soft: #fdecec;
   --warn: #e8a33d;
   --warn-soft: #fff3dd;
-  --accent: #8a6aff;
-  --accent-soft: #efecff;
+  --accent: #3390ec;
+  --accent-soft: #e3f0fc;
   --shadow: 0 1px 2px rgba(24, 30, 54, .05), 0 8px 24px rgba(24, 30, 54, .07);
   --shadow-lg: 0 4px 10px rgba(24, 30, 54, .08), 0 20px 48px rgba(24, 30, 54, .12);
   --mask: rgba(24, 30, 54, .42);
   --input-bg: #ffffff;
-  --hover: rgba(242, 93, 142, .07);
+  --hover: rgba(51, 144, 236, .07);
   --toast-bg: #23232e;
-  --ring: rgba(242, 93, 142, .35);
+  --ring: rgba(51, 144, 236, .32);
+  /* ---- 聊天（Telegram 风格）---- */
+  --chat-bg: #d6dde4;            /* 聊天区壁纸底色 */
+  --bubble-own-bg: #effdce;      /* 发出气泡 Telegram 绿 */
+  --bubble-own-text: #212121;
+  --bubble-own-time: #6bad6e;
+  --bubble-other-bg: #ffffff;
+  --bubble-other-text: #212121;
+  --bubble-other-time: #9aa2ab;
 }
 
 [data-theme="dark"] {
-  /* ---- 暗色主题「深色科技感」---- */
-  --bg: #15151d;
-  --bg-grad: radial-gradient(1200px 600px at 85% -10%, rgba(251, 114, 153, .12), transparent 60%),
-             radial-gradient(900px 500px at -10% 110%, rgba(138, 106, 255, .10), transparent 55%);
-  --panel: #1e1e28;
-  --panel-2: #23232f;
-  --primary: #fb7299;
-  --primary-d: #ff8aa6;
-  --primary-grad: linear-gradient(135deg, #ff7fa3, #fb7299 55%, #c76aef);
-  --primary-soft: rgba(251, 114, 153, .14);
-  --on-primary: #2a0f18;
-  --text: #e9e9f2;
-  --muted: #9b9bae;
-  --border: #2d2d3b;
+  /* ---- 暗色主题（Telegram Night 风）---- */
+  --bg: #17212b;
+  --bg-grad: none;
+  --panel: #1e2a35;
+  --panel-2: #22303c;
+  --primary: #6ab3f3;
+  --primary-d: #5aa9f0;
+  --primary-grad: linear-gradient(135deg, #3a8fd9, #2b7cd3);
+  --primary-soft: rgba(106, 179, 243, .14);
+  --on-primary: #ffffff;
+  --text: #e9edf2;
+  --muted: #8d9aa7;
+  --border: #26333f;
   --ok: #3ecf8e;
   --ok-soft: rgba(62, 207, 142, .14);
   --danger: #ff7070;
   --danger-soft: rgba(255, 112, 112, .14);
   --warn: #f0b050;
   --warn-soft: rgba(240, 176, 80, .14);
-  --accent: #9d85ff;
-  --accent-soft: rgba(157, 133, 255, .16);
+  --accent: #6ab3f3;
+  --accent-soft: rgba(106, 179, 243, .16);
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
   --shadow-lg: 0 4px 10px rgba(0, 0, 0, .45), 0 20px 48px rgba(0, 0, 0, .5);
   --mask: rgba(0, 0, 0, .6);
-  --input-bg: #17171f;
-  --hover: rgba(251, 114, 153, .09);
-  --toast-bg: #2e2e3c;
-  --ring: rgba(251, 114, 153, .4);
+  --input-bg: #17212b;
+  --hover: rgba(106, 179, 243, .09);
+  --toast-bg: #22303c;
+  --ring: rgba(106, 179, 243, .4);
+  --chat-bg: #0e1621;
+  --bubble-own-bg: #2b5278;      /* Telegram 夜间发出气泡蓝 */
+  --bubble-own-text: #ffffff;
+  --bubble-own-time: #a3c8ee;
+  --bubble-other-bg: #1e2a35;
+  --bubble-other-text: #e9edf2;
+  --bubble-other-time: #7d8b99;
 }
 
 * { box-sizing: border-box; }
@@ -125,10 +138,10 @@ body {
   color: #fff; font-size: 28px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 14px;
-  box-shadow: 0 8px 20px rgba(242, 93, 142, .35);
+  box-shadow: 0 8px 20px rgba(51, 144, 236, .35);
   letter-spacing: -1px;
 }
-[data-theme="dark"] .brand .logo { box-shadow: 0 8px 24px rgba(251, 114, 153, .3); }
+[data-theme="dark"] .brand .logo { box-shadow: 0 8px 24px rgba(51, 144, 236, .3); }
 .brand h1 { font-size: 21px; margin: 0; letter-spacing: .2px; }
 .brand p { color: var(--muted); margin: 5px 0 0; font-size: 12.5px; }
 
@@ -143,7 +156,7 @@ body {
   display: flex; flex-direction: column;
 }
 .sidebar .brand { text-align: left; margin-bottom: 20px; padding-left: 8px; }
-.sidebar .brand .logo { width: 38px; height: 38px; font-size: 19px; border-radius: 11px; margin: 0 0 10px; box-shadow: 0 5px 14px rgba(242, 93, 142, .3); }
+.sidebar .brand .logo { width: 38px; height: 38px; font-size: 19px; border-radius: 11px; margin: 0 0 10px; box-shadow: 0 5px 14px rgba(51, 144, 236, .3); }
 .sidebar .brand h1 { font-size: 16.5px; }
 .nav-item {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
@@ -156,7 +169,7 @@ body {
 .nav-item.active {
   background: var(--primary-grad);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(242, 93, 142, .32);
+  box-shadow: 0 6px 16px rgba(51, 144, 236, .32);
 }
 [data-theme="dark"] .nav-item.active { color: #fff; }
 .nav-item .ic { font-size: 16px; width: 20px; text-align: center; }
@@ -185,7 +198,7 @@ body {
 .stat .label { color: var(--muted); font-size: 12.5px; }
 .stat .value { font-size: 28px; font-weight: 800; margin-top: 7px; letter-spacing: -.5px;
   background: var(--primary-grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-[data-theme="dark"] .stat .value { -webkit-text-fill-color: #ff8aa6; background: none; }
+[data-theme="dark"] .stat .value { -webkit-text-fill-color: #6ab3f3; background: none; }
 .kv { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
 .kv:last-child { border-bottom: none; }
 .kv .k { color: var(--muted); }
@@ -214,10 +227,10 @@ textarea { resize: vertical; min-height: 64px; }
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   border: none; border-radius: 10px; padding: 10px 18px; font-size: 14px;
   background: var(--primary-grad); color: #fff; cursor: pointer; font-weight: 600;
-  box-shadow: 0 4px 14px rgba(242, 93, 142, .3);
+  box-shadow: 0 4px 14px rgba(51, 144, 236, .3);
   transition: transform .15s cubic-bezier(.2, .8, .2, 1), box-shadow .15s ease, filter .15s ease, opacity .15s ease;
 }
-.btn:hover { filter: brightness(1.06); box-shadow: 0 6px 18px rgba(242, 93, 142, .38); transform: translateY(-1px); }
+.btn:hover { filter: brightness(1.06); box-shadow: 0 6px 18px rgba(51, 144, 236, .38); transform: translateY(-1px); }
 .btn:active { transform: scale(.97); }
 .btn.block { width: 100%; }
 .btn.ghost {
@@ -290,7 +303,7 @@ tr:hover td { background: var(--hover); }
 .stab:hover { border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
 .stab.active {
   background: var(--primary-grad); color: #fff; border-color: transparent;
-  box-shadow: 0 4px 12px rgba(242, 93, 142, .3);
+  box-shadow: 0 4px 12px rgba(51, 144, 236, .3);
 }
 .topic-card .label { line-height: 1.4; }
 .topic-card { cursor: pointer; }
@@ -326,4 +339,199 @@ tr:hover td { background: var(--hover); }
   .sidebar .brand, .sidebar .spacer, .sidebar .user-box { display: none; }
   .nav-item { width: auto; }
   .main { padding: 18px; }
+}
+
+/* ============================================================
+   消息页（Telegram Web 式双栏 messenger）
+   ============================================================ */
+.msg-layout {
+  display: flex; height: calc(100vh - 60px);
+  margin: -30px -34px;           /* 撑满 main 区域 */
+  background: var(--panel);
+}
+
+/* ---- 左侧会话列表 ---- */
+.sess-col {
+  width: 320px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  background: var(--panel);
+}
+.sess-header {
+  padding: 16px 18px; font-size: 17px;
+  border-bottom: 1px solid var(--border);
+  min-height: 56px; display: flex; align-items: center;
+}
+.sess-list { flex: 1; overflow-y: auto; padding: 6px; }
+.sess-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px; cursor: pointer;
+  transition: background .15s ease;
+}
+.sess-item:hover { background: var(--hover); }
+.sess-item.active { background: var(--primary); }
+.sess-item.active b, .sess-item.active .sess-preview, .sess-item.active .sess-time { color: #fff; }
+.sess-item.active .sess-badge { background: #fff; color: var(--primary); }
+.sess-body { flex: 1; min-width: 0; }
+.sess-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.sess-row b { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess-time { color: var(--muted); font-size: 11.5px; flex-shrink: 0; }
+.sess-preview {
+  color: var(--muted); font-size: 12.5px; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sess-badge {
+  background: var(--danger); color: #fff; font-size: 11px; font-weight: 700;
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.nav-badge {
+  margin-left: auto; background: var(--danger); color: #fff;
+  font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px;
+}
+
+/* ---- 头像 ---- */
+.avatar { border-radius: 50%; object-fit: cover; flex-shrink: 0; display: block; }
+.avatar-txt {
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; user-select: none;
+}
+.avatar-txt.notif-ic { background: linear-gradient(135deg, #f5a623, #e8862d); font-size: 20px; }
+.avatar-txt.req-ic { background: linear-gradient(135deg, #e25555, #c94242); font-size: 19px; }
+.avatar-txt.devices-ic { background: linear-gradient(135deg, #2aabee, #229ed9); font-size: 19px; }
+
+/* ---- 右侧聊天区 ---- */
+.chat-col {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+  background: var(--chat-bg);
+}
+.chat-welcome {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; color: var(--muted);
+}
+.chat-welcome-ic {
+  width: 84px; height: 84px; border-radius: 50%;
+  background: rgba(255, 255, 255, .55); font-size: 38px;
+  display: flex; align-items: center; justify-content: center; margin-bottom: 14px;
+}
+[data-theme="dark"] .chat-welcome-ic { background: rgba(30, 42, 53, .6); }
+
+.chat-header {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); padding: 10px 16px;
+  border-bottom: 1px solid var(--border); min-height: 56px;
+}
+.chat-back { display: none; font-size: 17px; padding: 4px 12px; }
+.chat-title b { font-size: 15.5px; display: block; line-height: 1.3; }
+.chat-title span { color: var(--muted); font-size: 12px; }
+.chat-actions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+.chat-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
+
+/* ---- 气泡 ---- */
+.msg-row {
+  display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;
+}
+.msg-row.mine { flex-direction: row-reverse; }
+.bubble {
+  max-width: min(560px, 72%);
+  border-radius: 14px; padding: 7px 12px 6px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .12);
+  word-break: break-word;
+}
+.bubble-other {
+  background: var(--bubble-other-bg); color: var(--bubble-other-text);
+  border-bottom-left-radius: 4px;
+}
+.bubble-own {
+  background: var(--bubble-own-bg); color: var(--bubble-own-text);
+  border-bottom-right-radius: 4px;
+}
+.bubble-sender { font-size: 12.5px; font-weight: 700; color: var(--primary); }
+.bubble-dev { color: var(--muted); font-weight: 400; font-size: 11px; }
+.bubble-time {
+  float: right; margin-left: 10px; margin-top: 4px;
+  font-size: 11px; font-weight: 400;
+}
+.bubble-other .bubble-time { color: var(--bubble-other-time); }
+.bubble-own .bubble-time { color: var(--bubble-own-time); }
+.bubble-own .bubble-sender { color: inherit; opacity: .75; }
+.bubble-title { font-weight: 700; margin-top: 2px; }
+.bubble-text { margin-top: 2px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.bubble-media { margin-top: 6px; }
+.bubble-media img { max-width: 100%; max-height: 320px; border-radius: 10px; display: block; }
+.bubble-media audio { max-width: 320px; width: 100%; }
+.p2p-note { font-size: 12.5px; color: var(--muted); font-style: italic; }
+
+/* ---- 输入栏 ---- */
+.chat-input {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--panel); padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+.chat-input input[type=text] {
+  flex: 1; border-radius: 20px; padding: 9px 16px;
+}
+.ci-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  border: none; background: var(--panel-2); font-size: 17px;
+  cursor: pointer; flex-shrink: 0;
+  transition: background .15s ease, transform .12s ease;
+}
+.ci-btn:hover { background: var(--hover); transform: scale(1.06); }
+.ci-btn.rec { background: var(--danger); animation: recpulse 1.2s infinite; }
+@keyframes recpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(226, 85, 85, .5); } 50% { box-shadow: 0 0 0 8px rgba(226, 85, 85, 0); } }
+
+.chat-loading { text-align: center; color: var(--muted); padding: 40px 0; }
+
+/* ---- 通知卡片（右侧通知会话）---- */
+.notif-card {
+  background: var(--panel); border-radius: 12px; padding: 12px 15px;
+  margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+}
+.notif-app { font-size: 12px; font-weight: 700; color: var(--primary); }
+.notif-time { color: var(--muted); font-weight: 400; float: right; font-size: 11px; }
+.notif-title { font-weight: 700; margin-top: 4px; }
+.notif-text { color: var(--muted); font-size: 13px; margin-top: 2px; white-space: pre-wrap; }
+.notif-meta { color: var(--muted); font-size: 11.5px; margin-top: 6px; overflow: hidden; }
+
+/* ---- 申请卡片 ---- */
+.req-section {
+  font-size: 12.5px; font-weight: 700; color: var(--primary);
+  margin: 16px 0 8px;
+}
+.req-card {
+  background: var(--panel); border-radius: 12px; padding: 12px 15px;
+  margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+}
+.req-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.req-time { color: var(--muted); font-size: 11px; }
+.req-msg { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.req-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* ---- 好友页 ---- */
+.page-head-row {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.page-head-row .page-sub { margin-bottom: 0; }
+.section-title { font-size: 15px; margin: 24px 0 10px; }
+.friend-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.friend-card { padding: 14px 16px; }
+
+/* ---- 移动端适配 ---- */
+@media (max-width: 720px) {
+  .msg-layout { flex-direction: column; margin: -18px; height: calc(100vh - 92px); }
+  .sess-col { width: 100%; border-right: none; }
+  .chat-col { display: none; }
+  .msg-layout.chat-open .sess-col { display: none; }
+  .msg-layout.chat-open .chat-col { display: flex; }
+  .chat-back { display: inline-flex; }
+  .bubble { max-width: 84%; }
 }
