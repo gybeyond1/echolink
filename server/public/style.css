@@ -466,6 +466,15 @@ tr:hover td { background: var(--hover); }
 .bubble-media audio { max-width: 320px; width: 100%; }
 .p2p-note { font-size: 12.5px; color: var(--muted); font-style: italic; }
 
+/* ---- 图片全屏预览（灯箱，与手机 App 对齐）---- */
+.img-lightbox { flex-direction: column; cursor: zoom-out; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.img-lb-img {
+  max-width: 92vw; max-height: 80vh; object-fit: contain;
+  border-radius: 12px; box-shadow: var(--shadow-lg);
+  animation: rise .2s cubic-bezier(.2, .8, .2, 1);
+}
+.img-lb-bar { display: flex; gap: 10px; margin-top: 14px; }
+
 /* ---- 输入栏 ---- */
 .chat-input {
   display: flex; align-items: center; gap: 8px;
