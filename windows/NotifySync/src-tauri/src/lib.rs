@@ -49,15 +49,15 @@ async fn set_unread_count(app: AppHandle, count: u32) -> Result<(), String> {
 struct AppInfo {
     version: &'static str,
     target: &'static str,
-    server_url: &'static str,
+    server_url: String,
 }
 
 #[tauri::command]
-fn app_info(server_url: String) -> AppInfo {
+fn app_info(app: AppHandle) -> AppInfo {
     AppInfo {
         version: env!("CARGO_PKG_VERSION"),
         target: std::env::consts::OS,
-        server_url,
+        server_url: app.state::<ServerUrl>().0.clone(),
     }
 }
 

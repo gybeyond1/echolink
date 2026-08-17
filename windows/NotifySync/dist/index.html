@@ -19,7 +19,7 @@
     (function () {
       try {
         if (window.__TAURI__ && window.__TAURI__.core) {
-          window.__TAURI__.core.invoke('app_info', { serverUrl: '' })
+          window.__TAURI__.core.invoke('app_info')
             .then(info => { window.location.replace(info.server_url); })
             .catch(() => window.location.replace('https://ntfy.225600.xyz:1314/'));
         } else {
