@@ -63,15 +63,15 @@ jobs:
           name: NotifySync-Desktop-Windows
           path: out/*
 
-      - name: Update "Windows Desktop (latest)" release
+      - name: Upload installer to unified Release
         if: always()
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: windows-desktop-latest
-          name: Windows Desktop (latest)
-          generate_release_notes: true
+          tag_name: latest
+          name: NotifySync 最新版
           overwrite: true
+          allowUpdates: true
           files: |
             ${{ github.workspace }}/out/*.exe
             ${{ github.workspace }}/out/*.msi
