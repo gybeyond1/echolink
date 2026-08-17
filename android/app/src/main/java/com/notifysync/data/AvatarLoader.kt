@@ -16,13 +16,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
+import java.io.File
+import java.security.MessageDigest
 
 /**
- * 共享头像加载器：内存缓存 + 异步下载 + 圆形裁剪。
+ * 共享头像加载器：内存缓存 + 磁盘缓存 + 异步下载 + 圆形裁剪。
+ *
+ * 关键点（解决「切换页面头像变白/重新加载」）：
+ *  1. 内存缓存（进程内，同会话切换瞬时命中，不重拉）；
+ *  2. 磁盘缓存（cacheDir/avatars/<md5>.png，进程被杀/冷启动也能瞬时命中，不重拉）；
+ *  3. 只有当内存和磁盘都没有时，才显示默认占位图并发起网络请求——
+ *     因此视图重绑（切页/重进聊天）时若本地已有缓存，不会闪白、也不会重新下载。
+ *
  * 用法：AvatarLoader.load(ApiClient.fullAvatarUrl(path), imageView)
- * 无 URL / 加载失败时自动回退到默认头像占位图。
  */
 object AvatarLoader {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -34,15 +40,55 @@ object AvatarLoader {
 
     private val loading = mutableSetOf<String>()
 
-    fun load(url: String?, iv: ImageView) {
-        iv.setImageResource(R.drawable.ic_default_avatar)
-        if (url.isNullOrBlank()) return
+    /** 磁盘缓存根目录 */
+    private fun diskDir(): File? = try {
+        val ctx = com.notifysync.App.appContext
+        File(ctx.cacheDir, "avatars").apply { mkdirs() }
+    } catch (_: Exception) { null }
 
+    private fun diskFile(url: String): File? {
+        val dir = diskDir() ?: return null
+        val md5 = md5(url)
+        return File(dir, "$md5.png")
+    }
+
+    fun load(url: String?, iv: ImageView) {
+        if (url.isNullOrBlank()) {
+            iv.setImageResource(R.drawable.ic_default_avatar)
+            return
+        }
+
+        // 1) 内存命中：瞬时设置，绝不闪白
         cache.get(url)?.let {
             iv.setImageBitmap(it)
             return
         }
-        if (!loading.add(url)) return // 同一 URL 只发一次请求
+
+        // 2) 磁盘命中：后台解码后设置（不显示占位，避免闪白）
+        val df = diskFile(url)
+        if (df != null && df.exists() && df.length() > 100) {
+            if (!loading.add(url)) return
+            scope.launch {
+                try {
+                    val bmp = withContext(Dispatchers.IO) { decodeCircle(df) }
+                    if (bmp != null) {
+                        cache.put(url, bmp)
+                        iv.setImageBitmap(bmp)
+                    } else {
+                        iv.setImageResource(R.drawable.ic_default_avatar)
+                    }
+                } catch (_: Exception) {
+                    iv.setImageResource(R.drawable.ic_default_avatar)
+                } finally {
+                    loading.remove(url)
+                }
+            }
+            return
+        }
+
+        // 3) 全 miss：显示占位 → 下载 → 存磁盘 + 内存
+        iv.setImageResource(R.drawable.ic_default_avatar)
+        if (!loading.add(url)) return
 
         scope.launch {
             try {
@@ -50,6 +96,7 @@ object AvatarLoader {
                 if (bmp != null) {
                     val circle = cropCircle(bmp)
                     cache.put(url, circle)
+                    saveDisk(url, circle)
                     iv.setImageBitmap(circle)
                 }
             } catch (_: Exception) {
@@ -59,9 +106,24 @@ object AvatarLoader {
         }
     }
 
+    private fun decodeCircle(file: File): Bitmap? {
+        val raw = BitmapFactory.decodeFile(file.absolutePath) ?: return null
+        return cropCircle(raw)
+    }
+
+    private fun saveDisk(url: String, bmp: Bitmap) {
+        try {
+            val df = diskFile(url) ?: return
+            df.outputStream().use { out ->
+                bmp.compress(Bitmap.CompressFormat.PNG, 90, out)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     private fun download(urlStr: String): Bitmap? {
         return try {
-            val conn = URL(urlStr).openConnection() as HttpURLConnection
+            val conn = java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection
             conn.connectTimeout = 8_000
             conn.readTimeout = 8_000
             conn.connect()
@@ -69,6 +131,11 @@ object AvatarLoader {
         } catch (e: Exception) {
             null
         }
+    }
+
+    private fun md5(s: String): String {
+        val bytes = MessageDigest.getInstance("MD5").digest(s.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     private fun cropCircle(src: Bitmap): Bitmap {

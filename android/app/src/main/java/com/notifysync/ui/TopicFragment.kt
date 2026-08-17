@@ -328,6 +328,8 @@ class TopicFragment : Fragment() {
             Context.RECEIVER_NOT_EXPORTED
         )
         currentTopic?.let { WebSocketClient.sendSubscribe(it) }
+        // 回到本页时按日期检查：跨天则自动刷新壁纸（BingWallpaper 内部按日期缓存）
+        applyListBackground()
     }
 
     override fun onPause() {
@@ -353,6 +355,7 @@ class TopicFragment : Fragment() {
         chatTopic = null
         binding.listLayout.visibility = View.VISIBLE
         binding.chatLayout.visibility = View.GONE
+        binding.tvTitleList.text = "消息"
         binding.tvTitleList.visibility = View.VISIBLE
         backCallback.isEnabled = false
         binding.tvChatTitle.visibility = View.GONE
@@ -368,10 +371,11 @@ class TopicFragment : Fragment() {
             try {
                 val bmp = BingWallpaper.load(requireContext())
                 if (bmp != null) {
-                    binding.listLayout.background = BitmapDrawable(resources, bmp)
+                    // 整页（含顶栏）统一铺这张壁纸，作为整体背景
+                    binding.root.background = BitmapDrawable(resources, bmp)
                 }
             } catch (_: Exception) {
-                // 拉取失败时保持原背景
+                // 拉取失败时保持原背景（根布局已设 brand_primary 兜底）
             }
         }
     }

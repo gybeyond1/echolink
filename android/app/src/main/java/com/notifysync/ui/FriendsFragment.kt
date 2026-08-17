@@ -21,7 +21,9 @@ import com.google.android.material.textfield.TextInputEditText
 import com.notifysync.R
 import android.widget.ArrayAdapter
 import android.widget.ImageView
+import android.graphics.drawable.BitmapDrawable
 import com.notifysync.data.ApiClient
+import com.notifysync.data.BingWallpaper
 import com.notifysync.data.ApiException
 import com.notifysync.data.AvatarLoader
 import com.notifysync.data.DiscoverTopic
@@ -78,6 +80,20 @@ class FriendsFragment : Fragment() {
         }
 
         load()
+        applyWallpaper()
+    }
+
+    /** 整页（含顶栏）铺 Bing 每日壁纸作为统一背景；失败保持原底色 */
+    private fun applyWallpaper() {
+        lifecycleScope.launch {
+            try {
+                val bmp = BingWallpaper.load(requireContext())
+                if (bmp != null) {
+                    binding.root.background = BitmapDrawable(resources, bmp)
+                }
+            } catch (_: Exception) {
+            }
+        }
     }
 
     override fun onResume() {
@@ -88,6 +104,7 @@ class FriendsFragment : Fragment() {
             Context.RECEIVER_NOT_EXPORTED
         )
         load()
+        applyWallpaper()
     }
 
     override fun onPause() {
