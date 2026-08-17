@@ -5,6 +5,8 @@ import com.notifysync.data.optNullable
 import android.Manifest
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -36,6 +38,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.notifysync.R
 import com.notifysync.data.ApiClient
+import com.notifysync.data.AvatarLoader
 import com.notifysync.data.AppFilter
 import com.notifysync.data.AppFilterStore
 import com.notifysync.data.AuthManager
@@ -47,8 +50,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 
 class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
@@ -56,6 +57,15 @@ class SettingsFragment : Fragment() {
 
     private val filterAdapter = AppFilterAdapter { filter, enabled -> onFilterToggle(filter, enabled) }
     private val selectedPackages = mutableSetOf<String>()
+
+    // 其他设备换头像/昵称后，WS 推送 PROFILE_CHANGED，这里刷新本页头像
+    private val profileReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.notifysync.PROFILE_CHANGED") {
+                loadAvatar(AuthManager.avatarUrl)
+            }
+        }
+    }
 
     companion object {
         private const val REQ_SMS_PERMISSION = 1001
@@ -209,28 +219,7 @@ class SettingsFragment : Fragment() {
             binding.ivAvatar.setImageResource(R.drawable.ic_default_avatar)
             return
         }
-        lifecycleScope.launch {
-            try {
-                val bmp = withContext(Dispatchers.IO) { downloadBitmap(fullUrl) }
-                if (bmp != null) {
-                    binding.ivAvatar.setImageBitmap(cropCircle(bmp))
-                } else {
-                    binding.ivAvatar.setImageResource(R.drawable.ic_default_avatar)
-                }
-            } catch (e: Exception) {
-                binding.ivAvatar.setImageResource(R.drawable.ic_default_avatar)
-            }
-        }
-    }
-
-    private fun downloadBitmap(urlStr: String): Bitmap? {
-        return try {
-            val conn = URL(urlStr).openConnection() as HttpURLConnection
-            conn.connectTimeout = 10_000
-            conn.readTimeout = 10_000
-            conn.connect()
-            BitmapFactory.decodeStream(conn.inputStream)
-        } catch (e: Exception) { null }
+        AvatarLoader.load(fullUrl, binding.ivAvatar)
     }
 
     private fun cropCircle(src: Bitmap): Bitmap {
@@ -329,7 +318,13 @@ class SettingsFragment : Fragment() {
                 val json = ApiClient.uploadAvatar(tmpFile)
                 val avatarPath = json.optNullable("avatar")
                 if (!avatarPath.isNullOrBlank()) {
+                    val oldUrl = AuthManager.avatarUrl
                     AuthManager.avatarUrl = avatarPath
+                    // 立即用新头像刷新显示，并让旧缓存失效（避免旧图残留）
+                    AvatarLoader.refresh(ApiClient.fullAvatarUrl(avatarPath), binding.ivAvatar)
+                    if (!oldUrl.isNullOrBlank()) {
+                        AvatarLoader.invalidate(ApiClient.fullAvatarUrl(oldUrl))
+                    }
                     Toast.makeText(requireContext(), "头像已更新", Toast.LENGTH_SHORT).show()
                 }
                 tmpFile.delete()
@@ -498,8 +493,18 @@ class SettingsFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        requireActivity().registerReceiver(
+            profileReceiver,
+            IntentFilter("com.notifysync.PROFILE_CHANGED"),
+            Context.RECEIVER_NOT_EXPORTED
+        )
         updatePermissionStatus()
         updateSmsStatus()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try { requireActivity().unregisterReceiver(profileReceiver) } catch (_: Exception) {}
     }
 
     private fun updatePermissionStatus() {

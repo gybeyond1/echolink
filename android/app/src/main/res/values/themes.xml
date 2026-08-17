@@ -20,7 +20,10 @@
         <item name="colorControlNormal">@color/on_surface_variant</item>
         <item name="colorControlActivated">@color/brand_primary</item>
         <item name="android:windowBackground">@color/background</item>
-        <item name="android:statusBarColor">@color/brand_primary_dark</item>
-        <item name="android:navigationBarColor">@color/surface</item>
+        <!-- 状态栏/导航栏透明：让全局壁纸（含顶栏）成为统一整体，文字用浅色背景上的深图标 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>
