@@ -41,7 +41,6 @@
         <item name="colorOnSurface">@color/on_surface</item>
         <item name="android:textColorPrimary">@color/on_surface</item>
         <item name="android:textColor">@color/on_surface</item>
-        <item name="android:windowDimAmount">0.5</item>
         <item name="android:windowIsFloating">true</item>
     </style>
 </resources>
