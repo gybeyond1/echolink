@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,8 +48,25 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: gradle assembleRelease --no-daemon
 
-      - name: Upload APK
+      - name: Prepare APK for release
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/*.apk dist/NotifySync_Android_latest.apk
+          ls -lh dist/
+
+      - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: android/app/build/outputs/apk/release/*.apk
+          path: dist/NotifySync_Android_latest.apk
+
+      - name: Upload APK to unified Release
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: NotifySync 最新版
+          overwrite: true
+          files: dist/NotifySync_Android_latest.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
