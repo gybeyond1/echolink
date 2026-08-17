@@ -11,6 +11,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import android.graphics.Color
+import kotlinx.coroutines.launch
 import android.graphics.drawable.BitmapDrawable
 import androidx.core.content.ContextCompat
 import com.notifysync.data.AppFilterStore
