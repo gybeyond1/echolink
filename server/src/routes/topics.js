@@ -300,9 +300,8 @@ router.post("/:topic/leave", authMiddleware, (req, res) => {
   const db = getDB();
   const topic = getTopic(name);
   if (!topic) return res.status(404).json({ error: "Topic not found" });
-  // 设备会话不可退出；好友私聊通过删除好友处理
+  // 设备会话为默认会话，不可退出；私聊会话允许从列表移除（仅删除自己的 membership，不删好友关系）
   if (topic.kind === "devices") return res.status(400).json({ error: "设备会话不可退出" });
-  if (topic.kind === "dm") return res.status(400).json({ error: "私聊会话不可退出（删除好友即可）" });
   const mem = getMembership(topic.id, req.userId);
   if (!mem) return res.status(404).json({ error: "You are not a member" });
   if (mem.role === "owner") return res.status(400).json({ error: "Owner cannot leave; delete the topic instead" });

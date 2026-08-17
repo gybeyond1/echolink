@@ -61,6 +61,12 @@ jobs:
           path: dist/EchoLink_Android_v1.0.0.apk
 
       - name: Upload APK to unified Release
-        run: gh release upload v1.0.0 dist/EchoLink_Android_v1.0.0.apk --clobber
+        run: |
+          for i in 1 2 3 4 5 6 7 8; do
+            if gh release upload v1.0.0 dist/EchoLink_Android_v1.0.0.apk --clobber; then
+              echo "APK upload ok"; break
+            fi
+            echo "attempt $i: gh release upload failed (likely 503), retry in 25s..."; sleep 25
+          done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

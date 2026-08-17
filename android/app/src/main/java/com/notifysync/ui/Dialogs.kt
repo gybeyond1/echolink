@@ -57,7 +57,7 @@ fun showGlobalFabMenu(
 ) {
     val ctx = contextOf(owner)
     val options = arrayOf("创建话题", "发现 / 加入话题", "添加好友", "设置")
-    AlertDialog.Builder(ctx)
+    AlertDialog.Builder(ctx, R.style.Theme_NotifySync_Dialog)
         .setTitle("菜单")
         .setItems(options) { _, which ->
             when (which) {
@@ -78,7 +78,7 @@ fun showCreateTopicDialog(owner: LifecycleOwner, openTopic: (String) -> Unit) {
     val layout = inflater.inflate(R.layout.dialog_create_topic, null)
     val etName = layout.findViewById<TextInputEditText>(R.id.etTopicName)
     val etTitle = layout.findViewById<TextInputEditText>(R.id.etTopicTitle)
-    AlertDialog.Builder(ctx)
+    AlertDialog.Builder(ctx, R.style.Theme_NotifySync_Dialog)
         .setTitle("创建话题")
         .setView(layout)
         .setPositiveButton("创建") { _, _ ->
@@ -117,7 +117,7 @@ fun showDiscoverDialog(owner: LifecycleOwner, openTopic: (String) -> Unit) {
     val btnJoin = layout.findViewById<android.widget.Button>(R.id.btnJoinByName)
     btnJoin.text = "创建/加入"
 
-    val dialog = AlertDialog.Builder(ctx).setTitle("发现 / 创建话题").setView(layout).setNegativeButton("关闭", null).buildDimmed()
+    val dialog = AlertDialog.Builder(ctx, R.style.Theme_NotifySync_Dialog).setTitle("发现 / 创建话题").setView(layout).setNegativeButton("关闭", null).buildDimmed()
 
     val items = mutableListOf<DiscoverTopic>()
     val adapterList = ArrayAdapter(ctx, android.R.layout.simple_list_item_1, mutableListOf<String>())
@@ -164,7 +164,7 @@ private fun discoverRequestJoin(owner: LifecycleOwner, ctx: Context, inflater: L
     val input = inflater.inflate(R.layout.dialog_input_single, null)
     val et = input.findViewById<TextInputEditText>(R.id.etInput)
     et.hint = "验证消息（选填）"
-    AlertDialog.Builder(ctx)
+    AlertDialog.Builder(ctx, R.style.Theme_NotifySync_Dialog)
         .setTitle("申请加入「$name」")
         .setMessage("填写验证消息发送加群申请")
         .setView(input)
@@ -188,7 +188,7 @@ fun showAddFriendDialog(owner: LifecycleOwner) {
     val inflater = inflaterOf(owner)
     val input = inflater.inflate(R.layout.dialog_input_single, null)
     val et = input.findViewById<TextInputEditText>(R.id.etInput)
-    AlertDialog.Builder(ctx)
+    AlertDialog.Builder(ctx, R.style.Theme_NotifySync_Dialog)
         .setTitle("添加好友")
         .setMessage("输入对方用户名的一部分进行搜索")
         .setView(input)
@@ -221,7 +221,7 @@ private fun addFriendDoSearch(owner: LifecycleOwner, ctx: Context, q: String) {
                 else -> name
             }
         }.toTypedArray()
-        AlertDialog.Builder(ctx)
+        AlertDialog.Builder(ctx, R.style.Theme_NotifySync_Dialog)
             .setTitle("搜索结果")
             .setItems(labels) { _, which ->
                 val u = users[which]
@@ -240,7 +240,7 @@ private fun addFriendSendRequest(owner: LifecycleOwner, ctx: Context, inflater: 
     val input = inflater.inflate(R.layout.dialog_input_single, null)
     val et = input.findViewById<TextInputEditText>(R.id.etInput)
     et.hint = "验证消息（选填）"
-    AlertDialog.Builder(ctx)
+    AlertDialog.Builder(ctx, R.style.Theme_NotifySync_Dialog)
         .setTitle("添加好友")
         .setMessage("向 ${user.displayName ?: user.username} 发送好友申请")
         .setView(input)

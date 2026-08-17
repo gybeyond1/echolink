@@ -231,7 +231,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
 
     private fun confirmDeleteFriend(friend: Friend) {
         val showName = friend.displayName ?: friend.username
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("删除好友")
             .setMessage("确定删除好友「$showName」吗？聊天记录将保留，但需重新添加好友才能继续私聊。")
             .setPositiveButton("删除") { _, _ ->
@@ -267,7 +267,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
             // 待处理在前；已处理的显示状态
             val labels = (pending.map { "【待处理】${it.username}${if (!it.message.isNullOrEmpty()) "：${it.message}" else ""}" } +
                 handled.map { "【${statusLabel(it.status)}】${it.username}" }).toTypedArray()
-            AlertDialog.Builder(requireContext())
+            AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
                 .setTitle("新的朋友")
                 .setItems(labels) { _, which ->
                     if (which < pending.size) showHandleRequestDialog(pending[which])
@@ -285,7 +285,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
     }
 
     private fun showHandleRequestDialog(req: FriendRequest) {
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("${req.username} 请求加你为好友")
             .setMessage(if (req.message.isNullOrEmpty()) "验证消息：（无）" else "验证消息：${req.message}")
             .setPositiveButton("同意") { _, _ -> handleFriendRequest(req, "accept") }
@@ -331,7 +331,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                     else -> name
                 }
             }.toTypedArray()
-            AlertDialog.Builder(requireContext())
+            AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
                 .setTitle("搜索结果")
                 .setItems(labels) { _, which ->
                     val u = users[which]
@@ -352,7 +352,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
         val input = layoutInflater.inflate(R.layout.dialog_input_single, null)
         val et = input.findViewById<TextInputEditText>(R.id.etInput)
         et.hint = "验证消息（选填）"
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
             .setTitle("添加好友")
             .setMessage("向 ${user.displayName ?: user.username} 发送好友申请")
             .setView(input)
