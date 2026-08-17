@@ -78,12 +78,16 @@ class MainActivity : AppCompatActivity() {
             val fragment: Fragment = when (item.itemId) {
                 com.notifysync.R.id.nav_friends -> FriendsFragment()
                 com.notifysync.R.id.nav_topic -> TopicFragment()
-                com.notifysync.R.id.nav_settings -> SettingsFragment()
                 else -> return@setOnItemSelectedListener false
             }
             switchFragment(fragment)
             true
         }
+    }
+
+    /** 顶栏齿轮 → 打开设置页（设置已从底栏移除，改由消息页顶栏进入） */
+    fun openSettings() {
+        switchFragment(SettingsFragment())
     }
 
     private fun switchFragment(fragment: Fragment) {

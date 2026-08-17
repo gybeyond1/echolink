@@ -29,6 +29,18 @@
             android:textStyle="bold"
             android:textColor="@color/on_primary" />
 
+        <!-- 设置入口（列表态显示，替代底栏设置 tab） -->
+        <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="设置"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_settings"
+            android:visibility="gone" />
+
         <!-- 聊天态（返回交给系统返回手势/按键，不再显示返回按钮） -->
         <TextView
             android:id="@+id/tvChatTitle"
@@ -190,6 +202,19 @@
                 android:textColor="@color/on_surface_variant"
                 android:textSize="16sp"
                 android:visibility="gone" />
+
+            <!-- 悬浮加号：新建 / 发现话题（与好友页 FAB 对齐） -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabAddTopic"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|bottom"
+                android:layout_margin="16dp"
+                android:contentDescription="新建话题"
+                android:src="@android:drawable/ic_input_add"
+                app:backgroundTint="@color/brand_primary"
+                app:tint="@color/white"
+                app:elevation="6dp" />
         </FrameLayout>
     </LinearLayout>
 

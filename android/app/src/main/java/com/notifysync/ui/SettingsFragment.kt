@@ -75,6 +75,13 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        // 设置页从顶栏齿轮进入：返回键 → 回消息列表
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
+            object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    (activity as? MainActivity)?.backToTopics()
+                }
+            })
         try {
             setupUI()
         } catch (e: Exception) {
