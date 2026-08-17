@@ -27,6 +27,13 @@ private fun inflaterOf(owner: LifecycleOwner): LayoutInflater =
     (owner as? Fragment)?.layoutInflater ?: (owner as AppCompatActivity).layoutInflater
 
 /**
+ * 创建弹窗并强制设置 0.5 遮罩（windowDimAmount 在当前 compileSdk 的 AAPT2 下无法解析，
+ * 故改在代码里 setDimAmount，效果等价且稳定）。满足 #201「白底菜单 + 周围遮罩」。
+ */
+private fun AlertDialog.Builder.buildDimmed(): AlertDialog =
+    create().apply { window?.setDimAmount(0.5f) }
+
+/**
  * 统一的「+」菜单：消息页与好友页共用同一组件，
  * 选项完全一致：创建话题 / 发现·加入话题 / 添加好友 / 设置。
  * 弹窗走 Theme.NotifySync.Dialog（白底 + 0.5 遮罩），与聊天页视觉一致。
@@ -51,7 +58,7 @@ fun showGlobalFabMenu(
             }
         }
         .setNegativeButton("取消", null)
-        .show()
+        .buildDimmed().show()
 }
 
 /** 创建话题（消息页 / 好友页共用） */
@@ -86,7 +93,7 @@ fun showCreateTopicDialog(owner: LifecycleOwner, openTopic: (String) -> Unit) {
             }
         }
         .setNegativeButton("取消", null)
-        .show()
+        .buildDimmed().show()
 }
 
 /** 发现 / 创建 / 加入话题（消息页 / 好友页共用，天然合并「发现」与「加入」） */
@@ -100,7 +107,7 @@ fun showDiscoverDialog(owner: LifecycleOwner, openTopic: (String) -> Unit) {
     val btnJoin = layout.findViewById<android.widget.Button>(R.id.btnJoinByName)
     btnJoin.text = "创建/加入"
 
-    val dialog = AlertDialog.Builder(ctx).setTitle("发现 / 创建话题").setView(layout).setNegativeButton("关闭", null).create()
+    val dialog = AlertDialog.Builder(ctx).setTitle("发现 / 创建话题").setView(layout).setNegativeButton("关闭", null).buildDimmed()
 
     val items = mutableListOf<DiscoverTopic>()
     val adapterList = ArrayAdapter(ctx, android.R.layout.simple_list_item_1, mutableListOf<String>())
@@ -162,7 +169,7 @@ private fun discoverRequestJoin(owner: LifecycleOwner, ctx: Context, inflater: L
             }
         }
         .setNegativeButton("取消", null)
-        .show()
+        .buildDimmed().show()
 }
 
 /** 添加好友（消息页 / 好友页共用）：搜索用户名 -> 选人 -> 发申请 */
@@ -181,7 +188,7 @@ fun showAddFriendDialog(owner: LifecycleOwner) {
             else addFriendDoSearch(owner, ctx, q)
         }
         .setNegativeButton("取消", null)
-        .show()
+        .buildDimmed().show()
 }
 
 private fun addFriendDoSearch(owner: LifecycleOwner, ctx: Context, q: String) {
@@ -215,7 +222,7 @@ private fun addFriendDoSearch(owner: LifecycleOwner, ctx: Context, q: String) {
                 }
             }
             .setNegativeButton("关闭", null)
-            .show()
+            .buildDimmed().show()
     }
 }
 
@@ -239,5 +246,5 @@ private fun addFriendSendRequest(owner: LifecycleOwner, ctx: Context, inflater: 
             }
         }
         .setNegativeButton("取消", null)
-        .show()
+        .buildDimmed().show()
 }
