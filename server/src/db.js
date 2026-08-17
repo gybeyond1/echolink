@@ -125,13 +125,19 @@ function initDB() {
     CREATE TABLE IF NOT EXISTS topic_members (
       topic_id INTEGER NOT NULL,
       user_id INTEGER NOT NULL,
-      role TEXT NOT NULL DEFAULT 'member', -- 'owner' | 'member'
+      role TEXT NOT NULL DEFAULT 'member', -- 'owner' | 'member' | 'admin'
       joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_read_id INTEGER DEFAULT 0,      -- 每个用户在该话题读到的最后一条消息 id
       PRIMARY KEY (topic_id, user_id),
       FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
+  // 兼容旧库：已有 topic_members 表但无 last_read_id 列时补上
+  const tmMemberCols = db.pragma("table_info(topic_members)").map((c) => c.name);
+  if (!tmMemberCols.includes("last_read_id")) {
+    db.exec("ALTER TABLE topic_members ADD COLUMN last_read_id INTEGER DEFAULT 0");
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS topic_join_requests (

@@ -138,6 +138,9 @@ class TopicFragment : Fragment() {
                                 try { ApiClient.markMessagesRead(topic, listOf(msg.id)) } catch (_: Exception) {}
                             }
                         }
+                    } else {
+                        // 新消息来自其他会话 → 刷新列表未读数气泡
+                        refreshTopicListBadges()
                     }
                 }
             }
@@ -444,6 +447,22 @@ class TopicFragment : Fragment() {
         backCallback.isEnabled = true
         WebSocketClient.sendSubscribe(topic.name)
         loadMessages()
+        // 进入会话后标记已读，未读气泡清零
+        markCurrentTopicRead(topic.name)
+    }
+
+    private fun markCurrentTopicRead(topicName: String) {
+        lifecycleScope.launch {
+            try {
+                ApiClient.markTopicRead(topicName)
+                // 本地把该话题未读数清零并刷新列表
+                val idx = myTopics.indexOfFirst { it.name == topicName }
+                if (idx >= 0 && myTopics[idx].unreadCount > 0) {
+                    myTopics[idx] = myTopics[idx].copy(unreadCount = 0)
+                    listAdapter.setItems(myTopics)
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     // ===== 悬浮加号菜单：新建 / 发现话题（与好友页统一，见 Dialogs.kt） =====

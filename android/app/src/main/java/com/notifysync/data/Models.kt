@@ -171,14 +171,15 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
 // 我参与的话题
 data class MyTopic(
     val name: String,
-    val myRole: String,        // "owner" | "member"
+    val myRole: String,        // "owner" | "member" | "admin"
     val messageCount: Int,
     val pendingRequests: Int,   // 仅创建者可见：待审批数量
     val ownerName: String?,
     val lastMessage: String? = null,
     val kind: String = "normal",        // "normal" | "devices"（我的设备）| "dm"（好友私聊）
     val displayName: String? = null,     // 展示名：设备会话=我的设备，私聊=对方用户名，普通=话题名
-    val avatarUrl: String? = null        // dm 会话=好友头像（其余为 null）
+    val avatarUrl: String? = null,        // dm 会话=好友头像（其余为 null）
+    val unreadCount: Int = 0             // 未读消息数
 )
 
 // 可发现（非成员）的话题
@@ -221,7 +222,8 @@ fun parseMyTopics(jsonArray: JSONArray): List<MyTopic> {
                 lastMessage = obj.optNullable("last_message"),
                 kind = obj.optString("kind", "normal"),
                 displayName = obj.optNullable("display_name"),
-                avatarUrl = obj.optNullable("avatar")
+                avatarUrl = obj.optNullable("avatar"),
+                unreadCount = obj.optInt("unread_count", 0)
             )
         )
     }

@@ -120,7 +120,9 @@ router.get("/", authMiddleware, (req, res) => {
               (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name) as message_count,
               (SELECT MAX(timestamp) FROM topic_messages tm WHERE tm.topic = t.name) as last_message_at,
               (SELECT text FROM topic_messages tm WHERE tm.topic = t.name ORDER BY id DESC LIMIT 1) as last_message,
-              (SELECT COUNT(*) FROM topic_join_requests jr WHERE jr.topic_id = t.id AND jr.status='pending') as pending_requests
+              (SELECT COUNT(*) FROM topic_join_requests jr WHERE jr.topic_id = t.id AND jr.status='pending') as pending_requests,
+              COALESCE((SELECT mbr.last_read_id FROM topic_members mbr WHERE mbr.topic_id = t.id AND mbr.user_id = ?), 0) as last_read_id,
+              (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name AND tm.id > COALESCE((SELECT mbr.last_read_id FROM topic_members mbr WHERE mbr.topic_id = t.id AND mbr.user_id = ?), 0) AND tm.user_id != ?) as unread_count
        FROM topics t
        ${isAdmin ? "LEFT" : "INNER"} JOIN topic_members m ON m.topic_id = t.id
        LEFT JOIN users u ON t.owner_id = u.id
@@ -128,7 +130,7 @@ router.get("/", authMiddleware, (req, res) => {
        ORDER BY CASE t.kind WHEN 'devices' THEN 0 WHEN 'dm' THEN 1 ELSE 2 END, last_message_at DESC, t.created_at DESC
        LIMIT 100`
     )
-    .all(req.userId, req.userId, ...(isAdmin ? [] : [req.userId]));
+    .all(req.userId, req.userId, req.userId, req.userId, req.userId, ...(isAdmin ? [] : [req.userId]));
   res.json({ topics });
 });
 
@@ -302,10 +304,15 @@ router.post("/:topic/leave", authMiddleware, (req, res) => {
   if (!topic) return res.status(404).json({ error: "Topic not found" });
   // 设备会话为默认会话，不可退出；私聊会话允许从列表移除（仅删除自己的 membership，不删好友关系）
   if (topic.kind === "devices") return res.status(400).json({ error: "设备会话不可退出" });
+  // 管理员不是普通 member，但从列表移除/关闭普通话题时不应报错；按 delete 权限处理
   const mem = getMembership(topic.id, req.userId);
-  if (!mem) return res.status(404).json({ error: "You are not a member" });
-  if (mem.role === "owner") return res.status(400).json({ error: "Owner cannot leave; delete the topic instead" });
-  db.prepare("DELETE FROM topic_members WHERE topic_id = ? AND user_id = ?").run(topic.id, req.userId);
+  const isAdmin = req.role === "admin";
+  if (!mem && !isAdmin) return res.status(404).json({ error: "You are not a member" });
+  if (mem && mem.role === "owner") return res.status(400).json({ error: "Owner cannot leave; delete the topic instead" });
+  // 管理员或非 owner 成员：从自己的 membership 移除（管理员本来就没有 membership 时直接成功）
+  if (mem) {
+    db.prepare("DELETE FROM topic_members WHERE topic_id = ? AND user_id = ?").run(topic.id, req.userId);
+  }
   res.json({ message: "Left topic" });
 });
 
@@ -471,6 +478,30 @@ router.get("/:topic/messages", authMiddleware, (req, res) => {
   }
 
   res.json({ topic: name, messages });
+});
+
+// 标记进入话题：把当前用户在该话题的 last_read_id 设为最新消息 id，用于未读数清零。
+// 所有话题类型通用（devices / normal / dm）。
+// POST /api/topics/:topic/read
+router.post("/:topic/read", authMiddleware, (req, res) => {
+  const name = normalizeTopic(req.params.topic);
+  if (!name) return res.status(400).json({ error: "Invalid topic name" });
+  const db = getDB();
+  const topic = getTopic(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  const mem = getMembership(topic.id, req.userId);
+  if (!mem && req.role !== "admin") return res.status(403).json({ error: "Not a member of this topic" });
+  const maxId = db.prepare("SELECT COALESCE(MAX(id), 0) as max_id FROM topic_messages WHERE topic = ?").get(name);
+  if (mem) {
+    db.prepare("UPDATE topic_members SET last_read_id = ? WHERE topic_id = ? AND user_id = ?")
+      .run(maxId.max_id || 0, topic.id, req.userId);
+  }
+  // dm 同时保持旧的 read 列已读回执（通知对方）
+  if (topic.kind === "dm") {
+    const unread = db.prepare("SELECT id FROM topic_messages WHERE topic = ? AND user_id != ? AND read = 0").all(name, req.userId).map((r) => r.id);
+    if (unread.length) markDmRead(name, unread, req.userId);
+  }
+  res.json({ ok: true, last_read_id: maxId.max_id || 0 });
 });
 
 // 显式标记消息已读（已读回执）。仅 dm 私聊；只影响「对方发来的」消息。

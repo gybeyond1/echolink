@@ -27,17 +27,28 @@ private fun inflaterOf(owner: LifecycleOwner): LayoutInflater =
     (owner as? Fragment)?.layoutInflater ?: (owner as AppCompatActivity).layoutInflater
 
 /**
- * 创建弹窗并强制设置 0.5 遮罩（windowDimAmount 在当前 compileSdk 的 AAPT2 下无法解析，
- * 故改在代码里 setDimAmount，效果等价且稳定）。满足 #201「白底菜单 + 周围遮罩」。
+ * 强制把 AlertDialog 窗口背景设成聊天页背景色（不再依赖 theme colorSurface，
+ * 因为系统/Material 对 colorSurface 的解析在不同 ROM 上不稳定，导致菜单反复白底）。
  */
-private fun AlertDialog.Builder.buildDimmed(): AlertDialog =
-    create().apply { window?.setDimAmount(0.5f) }
+private fun AlertDialog.forceChatBg() {
+    window?.setBackgroundDrawableResource(R.drawable.bg_dialog)
+}
 
 /**
- * 一键创建 + 0.5 遮罩 + 显示。所有 AlertDialog 统一入口，避免每个调用处重复 create/show。
+ * 创建弹窗并强制设置 0.5 遮罩 + chat_bg 背景。
+ */
+private fun AlertDialog.Builder.buildDimmed(): AlertDialog =
+    create().apply {
+        forceChatBg()
+        window?.setDimAmount(0.5f)
+    }
+
+/**
+ * 一键创建 + chat_bg 背景 + 0.5 遮罩 + 显示。所有 AlertDialog 统一入口。
  */
 fun AlertDialog.Builder.showDimmed(): AlertDialog {
     val dialog = create()
+    dialog.forceChatBg()
     dialog.window?.setDimAmount(0.5f)
     dialog.show()
     return dialog
