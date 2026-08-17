@@ -16,7 +16,7 @@
         android:layout_width="36dp"
         android:layout_height="36dp"
         android:layout_marginStart="0dp"
-        android:layout_marginEnd="8dp"
+        android:layout_marginEnd="10dp"
         android:layout_marginTop="2dp"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_default_avatar"
@@ -44,7 +44,7 @@
                 android:id="@+id/tvSender"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/purple_500"
+                android:textColor="@color/brand_primary"
                 android:textSize="13sp"
                 android:textStyle="bold" />
 

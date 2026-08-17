@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 头像底：品牌渐变圆，更立体 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
-    <solid android:color="@color/purple_500" />
+    <gradient
+        android:angle="315"
+        android:startColor="@color/brand_gradient_start"
+        android:endColor="@color/brand_gradient_end" />
 </shape>
