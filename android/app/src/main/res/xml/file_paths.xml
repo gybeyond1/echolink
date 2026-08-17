@@ -2,4 +2,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- P2P 接收的文件（filesDir/p2p/） -->
     <files-path name="p2p" path="p2p/" />
+    <!-- 拍照临时文件（cacheDir/） -->
+    <cache-path name="cache" path="." />
 </paths>

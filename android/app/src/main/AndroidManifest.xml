@@ -17,6 +17,11 @@
     <!-- 录音（话题语音消息） -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- 拍照（附件菜单相机功能） -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
     <!-- 保存图片到相册：API 29+ 用 MediaStore RELATIVE_PATH 免权限；API ≤28 需写存储权限（运行时申请） -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"

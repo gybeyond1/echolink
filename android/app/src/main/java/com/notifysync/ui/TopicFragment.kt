@@ -129,8 +129,28 @@ class TopicFragment : Fragment() {
         }
     }
 
-    private val getContent = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) handlePickedFile(uri)
+    // 多选文件/图片（替代原单选 GetContent）
+    private val getMultipleContent = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) handlePickedFiles(uris)
+    }
+
+    // 拍照
+    private var cameraPhotoFile: File? = null
+    private val takePicture = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) {
+            val file = cameraPhotoFile
+            val topic = currentTopic
+            if (file != null && topic != null && file.exists()) {
+                sendMediaSmart(topic, file, "image", "photo_${System.currentTimeMillis()}.jpg")
+            }
+        }
+        cameraPhotoFile = null
+    }
+
+    // 相机权限请求
+    private val requestCameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) launchCamera()
+        else Toast.makeText(requireContext(), "需要相机权限才能拍照", Toast.LENGTH_SHORT).show()
     }
 
     private val requestRecordPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -219,7 +239,7 @@ class TopicFragment : Fragment() {
         binding.btnSend.setOnClickListener { sendText() }
         binding.btnVoiceToggle.setOnClickListener { toggleVoiceMode() }
         binding.btnEmoji.setOnClickListener { togglePanel() }
-        binding.btnPlus.setOnClickListener { hidePanels(); pickFile() }
+        binding.btnPlus.setOnClickListener { hidePanels(); showAttachMenu() }
         binding.btnHoldTalk.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> { ensureRecordPermission(); true }
@@ -638,7 +658,95 @@ class TopicFragment : Fragment() {
         }
     }
 
-    private fun pickImage() { getContent.launch("image/*") }
+    // ===== 附件（拍照/相册/文件） =====
+
+    /** 附件菜单：拍照 / 相册（多选）/ 文件（多选） */
+    private fun showAttachMenu() {
+        val items = arrayOf("📷  拍照", "🖼️  从相册选择", "📁  选择文件")
+        AlertDialog.Builder(requireContext())
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> ensureCameraPermission()
+                    1 -> getMultipleContent.launch("image/*")
+                    2 -> getMultipleContent.launch("*/*")
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun ensureCameraPermission() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            launchCamera()
+        } else {
+            requestCameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun launchCamera() {
+        try {
+            val photoFile = File(requireContext().cacheDir, "photo_${System.currentTimeMillis()}.jpg")
+            cameraPhotoFile = photoFile
+            val photoUri = androidx.core.content.FileProvider.getUriForFile(
+                requireContext(),
+                "${requireContext().packageName}.fileprovider",
+                photoFile
+            )
+            takePicture.launch(photoUri)
+        } catch (e: Exception) {
+            Toast.makeText(requireContext(), "无法启动相机: ${e.message}", Toast.LENGTH_SHORT).show()
+            cameraPhotoFile = null
+        }
+    }
+
+    /** 多文件处理：单个走 P2P 智能发送；多个顺序 HTTP 上传 */
+    private fun handlePickedFiles(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        val topic = currentTopic ?: return
+
+        if (uris.size == 1) {
+            // 单文件：保留 P2P 智能路径
+            handlePickedFile(uris[0])
+            return
+        }
+
+        // 多文件：顺序上传
+        lifecycleScope.launch {
+            binding.progressBar.visibility = View.VISIBLE
+            var success = 0
+            for (uri in uris) {
+                val mime = try { requireContext().contentResolver.getType(uri) } catch (_: Exception) { null }
+                val kind = if (mime?.startsWith("image/") == true) "image" else "file"
+                val file = withContext(Dispatchers.IO) { copyUriToFile(uri) } ?: continue
+                val displayName = withContext(Dispatchers.IO) { queryDisplayName(uri) } ?: file.name
+                try {
+                    val json = ApiClient.uploadTopicMedia(topic, file, kind)
+                    val url = json.getString("url")
+                    val size = json.optLong("size", file.length())
+                    val pubJson = ApiClient.publishTopicMessage(topic, "", "", kind, url, displayName, size)
+                    val msg = parseTopicMessage(pubJson.getJSONObject("topic_message"))
+                    withContext(Dispatchers.Main) {
+                        chatAdapter.appendItems(listOf(msg))
+                        binding.tvEmptyChat.visibility = View.GONE
+                        binding.recyclerView.visibility = View.VISIBLE
+                        scrollToBottom()
+                    }
+                    success++
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "发送「$displayName」失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                try { file.delete() } catch (_: Exception) {}
+            }
+            withContext(Dispatchers.Main) {
+                binding.progressBar.visibility = View.GONE
+                if (success > 0) {
+                    Toast.makeText(requireContext(), "已发送 $success 个文件", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     // ===== 头像点击（群聊中加好友/发起私聊） =====
 
@@ -769,10 +877,6 @@ class TopicFragment : Fragment() {
 
     // ===== 附件（图片/文件） =====
 
-    private fun pickFile() {
-        getContent.launch("*/*")
-    }
-
     private fun handlePickedFile(uri: Uri) {
         val topic = currentTopic ?: return
         val mime = try { requireContext().contentResolver.getType(uri) } catch (_: Exception) { null }
@@ -834,10 +938,28 @@ class TopicFragment : Fragment() {
 
     private fun copyUriToFile(uri: Uri): File? {
         return try {
-            val ext = when (requireContext().contentResolver.getType(uri)) {
-                "image/jpeg" -> ".jpg"; "image/png" -> ".png"; "image/gif" -> ".gif"; "audio/mpeg" -> ".mp3"; "audio/amr" -> ".amr"; "application/pdf" -> ".pdf"; else -> ".bin"
-            }
-            val f = File(requireContext().cacheDir, "attach_${System.currentTimeMillis()}$ext")
+            // 优先从原始文件名提取扩展名
+            val displayName = queryDisplayName(uri)
+            val ext = displayName?.substringAfterLast('.', missingDelimiterValue = "")?.lowercase()
+                ?.takeIf { it.length in 1..5 && it.matches(Regex("[a-z0-9]+")) }
+                ?: when (requireContext().contentResolver.getType(uri)) {
+                    "image/jpeg" -> "jpg"; "image/png" -> "png"; "image/gif" -> "gif"
+                    "image/webp" -> "webp"; "image/bmp" -> "bmp"
+                    "audio/mpeg" -> "mp3"; "audio/amr" -> "amr"; "audio/mp4" -> "m4a"
+                    "audio/ogg" -> "ogg"; "audio/aac" -> "aac"
+                    "video/mp4" -> "mp4"; "video/3gpp" -> "3gp"
+                    "application/pdf" -> "pdf"
+                    "application/zip" -> "zip"; "application/x-rar-compressed" -> "rar"
+                    "application/msword" -> "doc"
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx"
+                    "application/vnd.ms-excel" -> "xls"
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx"
+                    "application/vnd.ms-powerpoint" -> "ppt"
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx"
+                    "text/plain" -> "txt"; "text/csv" -> "csv"
+                    else -> "bin"
+                }
+            val f = File(requireContext().cacheDir, "attach_${System.currentTimeMillis()}.$ext")
             requireContext().contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { out -> input.copyTo(out) } }
             f
         } catch (e: Exception) { null }
