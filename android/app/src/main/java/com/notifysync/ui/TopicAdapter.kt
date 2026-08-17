@@ -362,13 +362,17 @@ class TopicAdapter(
         if (holder.lastMine == isMine) return
         holder.lastMine = isMine
         val root = holder.itemView as android.widget.LinearLayout
-        val avatarIdx = root.indexOfChild(holder.ivAvatar)
-        if (isMine && avatarIdx == 0) {
-            root.removeView(holder.ivAvatar)
+        // 重排子视图：自己的消息 [已读回执, 气泡, 头像]，他人的消息 [头像, 气泡, 已读回执]
+        // 已读回执仅在 dm 私聊自己消息时显示，要放在消息气泡左侧，不要卡在头像和气泡之间。
+        root.removeAllViews()
+        if (isMine) {
+            root.addView(holder.tvStatus)
+            root.addView(holder.llContent)
             root.addView(holder.ivAvatar)
-        } else if (!isMine && avatarIdx == root.childCount - 1 && root.childCount > 1) {
-            root.removeView(holder.ivAvatar)
-            root.addView(holder.ivAvatar, 0)
+        } else {
+            root.addView(holder.ivAvatar)
+            root.addView(holder.llContent)
+            root.addView(holder.tvStatus)
         }
         val g = if (isMine) Gravity.END else Gravity.START
         root.gravity = g or Gravity.CENTER_VERTICAL
