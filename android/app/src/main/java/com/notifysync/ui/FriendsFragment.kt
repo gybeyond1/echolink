@@ -221,7 +221,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                     }
                 }
             }
-            .setNegativeButton("取消", null).show()
+            .setNegativeButton("取消", null).showDimmed()
     }
 
     // ===== 新的朋友（好友申请） =====
@@ -249,7 +249,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                     if (which < pending.size) showHandleRequestDialog(pending[which])
                 }
                 .setNegativeButton("关闭", null)
-                .show()
+                .showDimmed()
         }
     }
 
@@ -267,7 +267,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
             .setPositiveButton("同意") { _, _ -> handleFriendRequest(req, "accept") }
             .setNegativeButton("拒绝") { _, _ -> handleFriendRequest(req, "reject") }
             .setNeutralButton("忽略") { _, _ -> handleFriendRequest(req, "ignore") }
-            .show()
+            .showDimmed()
     }
 
     private fun handleFriendRequest(req: FriendRequest, action: String) {
@@ -320,7 +320,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                     }
                 }
                 .setNegativeButton("关闭", null)
-                .show()
+                .showDimmed()
         }
     }
 
@@ -344,7 +344,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                 }
             }
             .setNegativeButton("取消", null)
-            .show()
+            .showDimmed()
     }
 
     // ===== 大「+」菜单：与消息页统一（创建话题 / 发现·加入话题 / 添加好友 / 设置） =====

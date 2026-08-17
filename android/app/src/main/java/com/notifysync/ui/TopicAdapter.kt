@@ -426,6 +426,8 @@ class TopicAdapter(
     val isAllSelected: Boolean
         get() = items.filter { it.id > 0 }.let { it.isNotEmpty() && it.all { selected.contains(it.id) } }
 
+    fun copyMessage(context: Context, item: TopicMessage) = copyText(context, item)
+
     private fun copyText(context: Context, item: TopicMessage) {
         val text = listOf(item.title, item.text)
             .filter { it.isNotBlank() }

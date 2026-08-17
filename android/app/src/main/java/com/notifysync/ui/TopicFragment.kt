@@ -220,9 +220,9 @@ class TopicFragment : Fragment() {
 
         chatAdapter = TopicAdapter(
             onItemLongClick = { msg ->
-                // 已处于多选：长按 = 选中/取消该条（不震动）；否则长按进入多选并选中（震动反馈）
+                // 已处于多选：长按 = 选中/取消该条；否则弹出消息操作菜单（复制 / 删除 / 多选）
                 if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
-                else { enterSelection(msg); vibrate() }
+                else { showMessageActionDialog(msg) }
             },
             onItemClick = { msg ->
                 if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
@@ -532,7 +532,7 @@ class TopicFragment : Fragment() {
                     else showHandleTopicRequest(tr[which - fr.size])
                 }
                 .setNegativeButton("关闭", null)
-                .show()
+                .showDimmed()
         }
     }
 
@@ -543,7 +543,7 @@ class TopicFragment : Fragment() {
             .setPositiveButton("同意") { _, _ -> handleFriendRequest(req, "accept") }
             .setNegativeButton("拒绝") { _, _ -> handleFriendRequest(req, "reject") }
             .setNeutralButton("忽略") { _, _ -> handleFriendRequest(req, "ignore") }
-            .show()
+            .showDimmed()
     }
 
     private fun handleFriendRequest(req: FriendRequest, action: String) {
@@ -578,7 +578,7 @@ class TopicFragment : Fragment() {
                     }
                 }
             }
-            .show()
+            .showDimmed()
     }
 
     private fun handleTopicRequest(req: UnifiedTopicRequest, approve: Boolean) {
@@ -630,7 +630,7 @@ class TopicFragment : Fragment() {
                     0 -> showChatMode(topic)
                     1 -> if (owner) confirmCloseTopic(topic) else confirmLeaveTopic(topic)
                 }
-            }.show()
+            }.showDimmed()
     }
 
     private fun swipeDelete(topic: MyTopic) {
@@ -651,7 +651,7 @@ class TopicFragment : Fragment() {
                     try { ApiClient.leaveTopic(topic.name); AuthManager.removeTopic(topic.name); Toast.makeText(requireContext(), "已移除", Toast.LENGTH_SHORT).show(); showListMode() }
                     catch (e: Exception) { Toast.makeText(requireContext(), "失败: ${e.message}", Toast.LENGTH_SHORT).show(); loadTopicList() }
                 }
-            }.setNegativeButton("取消") { _, _ -> loadTopicList() }.show()
+            }.setNegativeButton("取消") { _, _ -> loadTopicList() }.showDimmed()
     }
 
     private fun confirmCloseTopic(topic: MyTopic) {
@@ -663,7 +663,7 @@ class TopicFragment : Fragment() {
                     try { ApiClient.deleteTopic(topic.name); AuthManager.removeTopic(topic.name); Toast.makeText(requireContext(), "话题已关闭", Toast.LENGTH_SHORT).show(); showListMode() }
                     catch (e: Exception) { Toast.makeText(requireContext(), "失败: ${e.message}", Toast.LENGTH_SHORT).show(); loadTopicList() }
                 }
-            }.setNegativeButton("取消") { _, _ -> loadTopicList() }.show()
+            }.setNegativeButton("取消") { _, _ -> loadTopicList() }.showDimmed()
     }
 
     // ===== 聊天 =====
@@ -797,7 +797,7 @@ class TopicFragment : Fragment() {
                 }
             }
             .setNegativeButton("取消", null)
-            .show()
+            .showDimmed()
     }
 
     private fun ensureCameraPermission() {
@@ -929,7 +929,7 @@ class TopicFragment : Fragment() {
                                 }
                             }
                             .setNegativeButton("取消", null)
-                            .show()
+                            .showDimmed()
                     }
                 }
             } catch (e: Exception) {
@@ -967,7 +967,43 @@ class TopicFragment : Fragment() {
                     try { ids.forEach { ApiClient.deleteTopicMessage(topic, it) }; Toast.makeText(requireContext(), "已删除 ${ids.size} 条", Toast.LENGTH_SHORT).show(); chatAdapter.clearSelection(); loadMessages() }
                     catch (e: Exception) { Toast.makeText(requireContext(), "删除失败: ${e.message}", Toast.LENGTH_SHORT).show() }
                 }
-            }.setNegativeButton("取消", null).show()
+            }.setNegativeButton("取消", null).showDimmed()
+    }
+
+    /** 长按单条消息：复制 / 删除 / 多选 */
+    private fun showMessageActionDialog(msg: TopicMessage) {
+        val topic = currentTopic ?: return
+        val options = arrayOf("复制", "删除", "多选")
+        AlertDialog.Builder(requireContext())
+            .setTitle("消息操作")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> chatAdapter.copyMessage(requireContext(), msg)
+                    1 -> confirmDeleteMessage(topic, msg)
+                    2 -> { enterSelection(msg); vibrate() }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .showDimmed()
+    }
+
+    private fun confirmDeleteMessage(topic: String, msg: TopicMessage) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("删除消息")
+            .setMessage("确定删除这条消息吗？")
+            .setPositiveButton("删除") { _, _ ->
+                lifecycleScope.launch {
+                    try {
+                        ApiClient.deleteTopicMessage(topic, msg.id)
+                        Toast.makeText(requireContext(), "已删除", Toast.LENGTH_SHORT).show()
+                        loadMessages()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "删除失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .showDimmed()
     }
 
     // ===== 待审批（创建者） =====
@@ -984,7 +1020,7 @@ class TopicFragment : Fragment() {
                     .setMultiChoiceItems(names, checked) { _, which, isChecked -> checked[which] = isChecked }
                     .setPositiveButton("通过选中") { _, _ -> handleRequests(topic, list, checked, true) }
                     .setNeutralButton("拒绝选中") { _, _ -> handleRequests(topic, list, checked, false) }
-                    .setNegativeButton("取消", null).show()
+                    .setNegativeButton("取消", null).showDimmed()
             } catch (e: Exception) { Toast.makeText(requireContext(), "加载失败: ${e.message}", Toast.LENGTH_SHORT).show() }
         }
     }
