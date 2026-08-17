@@ -23,6 +23,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.Gravity
 import android.view.inputmethod.InputMethodManager
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -260,8 +261,10 @@ class TopicFragment : Fragment() {
         binding.btnSelectAll.setOnClickListener { if (chatAdapter.isAllSelected) chatAdapter.clearSelection() else chatAdapter.selectAll(); updateSelectionUI() }
         binding.btnDeleteSel.setOnClickListener { confirmDeleteSelected() }
 
-        // 下拉刷新（保留）
+        // 下拉刷新（保留）：聊天消息
         binding.swipeRefresh.setOnRefreshListener { loadMessages() }
+        // 列表页下拉刷新：重新拉取会话列表
+        binding.swipeListRefresh.setOnRefreshListener { loadTopicList() }
 
         // ===== 微信式输入栏 =====
         binding.btnSend.setOnClickListener { sendText() }
@@ -317,13 +320,15 @@ class TopicFragment : Fragment() {
                 try {
                     val t = myTopics.find { it.name == argTopic }
                         ?: ApiClient.getMyTopics().find { it.name == argTopic }
-                    if (t != null) showChatMode(t)
-                    else if (argTitle != null) {
+                    // 优先用外部传入的展示名（好友页私聊回传的是对方昵称），覆盖服务端可能返回的纯用户名
+                    val disp = argTitle ?: t?.displayName
+                    if (t != null) showChatMode(t.copy(displayName = disp))
+                    else if (disp != null) {
                         // 服务器暂无该会话（极少）：用展示名兜底构造
                         showChatMode(
                             MyTopic(argTopic, "member", 0, 0, null, null,
                                 kind = if (argTopic.startsWith("dm-")) "dm" else "normal",
-                                displayName = argTitle)
+                                displayName = disp)
                         )
                     }
                 } catch (_: Exception) {}
@@ -346,8 +351,6 @@ class TopicFragment : Fragment() {
             Context.RECEIVER_NOT_EXPORTED
         )
         currentTopic?.let { WebSocketClient.sendSubscribe(it) }
-        // 回到本页时按日期检查：跨天则自动刷新壁纸（BingWallpaper 内部按日期缓存）
-        applyListBackground()
     }
 
     override fun onPause() {
@@ -381,27 +384,14 @@ class TopicFragment : Fragment() {
         // 设置已移入「+」FAB，顶栏齿轮保持隐藏
         binding.fabAddTopic.visibility = View.VISIBLE
         loadTopicList()
-        applyListBackground()
-    }
-
-    private fun applyListBackground() {
-        lifecycleScope.launch {
-            try {
-                val bmp = BingWallpaper.load(requireContext())
-                if (bmp != null) {
-                    // 整页（含顶栏）统一铺这张壁纸，作为整体背景
-                    binding.root.background = BitmapDrawable(resources, bmp)
-                }
-            } catch (_: Exception) {
-                // 拉取失败时保持原背景（根布局已设 brand_primary 兜底）
-            }
-        }
     }
 
     private fun showChatMode(topic: MyTopic) {
         chatTopic = topic
         currentTopic = topic.name
+        // 聊天标题显示昵称（优先外部传入的展示名），并强制水平居中
         binding.tvChatTitle.text = topic.displayName ?: topic.name
+        binding.tvChatTitle.gravity = Gravity.CENTER
         binding.btnPending.visibility = if (topic.myRole == "owner" && topic.pendingRequests > 0) View.VISIBLE else View.GONE
         // 平板且非仅聊天模式 → 左列表 + 右聊天并排；其余（手机 / 仅聊天模式）→ 聊天占满
         val dual = isWide && !chatOnly
@@ -424,8 +414,6 @@ class TopicFragment : Fragment() {
         }
         backCallback.isEnabled = true
         WebSocketClient.sendSubscribe(topic.name)
-        // 进入聊天也确保整页（含状态栏）铺上统一壁纸
-        applyListBackground()
         loadMessages()
     }
 
@@ -548,17 +536,29 @@ class TopicFragment : Fragment() {
     // ===== 话题列表 =====
 
     private fun loadTopicList() {
+        // 先展示本地内存缓存，避免切换 tab 时空列表闪烁/消失
+        ApiClient.cachedTopics?.let { cached ->
+            if (_binding != null) {
+                myTopics.clear(); myTopics.addAll(cached)
+                listAdapter.setItems(myTopics)
+                binding.tvEmptyTopics.visibility = if (myTopics.isEmpty()) View.VISIBLE else View.GONE
+            }
+        }
         lifecycleScope.launch {
             try {
                 val list = ApiClient.getMyTopics()
+                if (_binding == null) return@launch
                 myTopics.clear()
                 myTopics.addAll(list)
                 AuthManager.subscribedTopics = myTopics.map { it.name }.toSet()
                 listAdapter.setItems(myTopics)
                 binding.tvEmptyTopics.visibility = if (myTopics.isEmpty()) View.VISIBLE else View.GONE
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), "话题列表加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                if (ApiClient.cachedTopics == null) {
+                    Toast.makeText(requireContext(), "话题列表加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
+            if (_binding != null) binding.swipeListRefresh.isRefreshing = false
             loadRequests()
         }
     }

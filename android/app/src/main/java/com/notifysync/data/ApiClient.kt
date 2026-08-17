@@ -21,6 +21,12 @@ object ApiClient {
 
     private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
 
+    // 本地内存缓存：第一次拉取后缓存，切换 tab / 重进页面即时显示，无需重新联网
+    var cachedTopics: List<MyTopic>? = null
+        private set
+    var cachedFriends: List<Friend>? = null
+        private set
+
     private fun buildRequest(path: String, method: String, body: JSONObject? = null, withAuth: Boolean = true): Request {
         val url = "${AuthManager.serverUrl}$path"
         val builder = Request.Builder().url(url)
@@ -267,7 +273,9 @@ object ApiClient {
     // 我参与的话题列表
     suspend fun getMyTopics(): List<MyTopic> {
         val json = execute(buildRequest("/api/topics", "GET"))
-        return parseMyTopics(json.getJSONArray("topics"))
+        val list = parseMyTopics(json.getJSONArray("topics"))
+        cachedTopics = list
+        return list
     }
 
     // 可发现（非成员）的话题列表
@@ -344,7 +352,9 @@ object ApiClient {
     // 好友列表
     suspend fun getFriends(): List<Friend> {
         val json = execute(buildRequest("/api/friends", "GET"))
-        return parseFriends(json.getJSONArray("friends"))
+        val list = parseFriends(json.getJSONArray("friends"))
+        cachedFriends = list
+        return list
     }
 
     // 删除好友（双向）

@@ -194,12 +194,18 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvTopics"
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipeListRefresh"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingBottom="8dp" />
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvTopics"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingBottom="8dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
             <TextView
                 android:id="@+id/tvEmptyTopics"
@@ -303,14 +309,13 @@
                 android:visibility="gone" />
         </FrameLayout>
 
-        <!-- 底部输入栏（微信式） -->
+        <!-- 底部输入栏（微信式）：背景透明，让全局壁纸（含输入框区域）整页覆盖 -->
         <LinearLayout
             android:id="@+id/inputBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:background="@color/surface"
-            android:elevation="6dp"
+            android:background="@android:color/transparent"
             android:paddingStart="6dp"
             android:paddingEnd="6dp"
             android:paddingTop="8dp"
@@ -398,7 +403,7 @@
             android:id="@+id/panelContainer"
             android:layout_width="match_parent"
             android:layout_height="220dp"
-            android:background="@color/surface_variant"
+            android:background="@android:color/transparent"
             android:visibility="gone">
 
             <GridView

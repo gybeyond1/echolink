@@ -4,14 +4,13 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- 标题栏（作为通知详情页打开时显示） -->
+    <!-- 标题栏：背景透明，让全局壁纸（含顶栏）整页覆盖，与消息/好友页一致 -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:background="@color/brand_primary"
-        android:elevation="4dp"
+        android:background="@android:color/transparent"
         android:padding="12dp"
         android:gravity="center_vertical">
 
@@ -23,7 +22,7 @@
             android:gravity="center"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/on_primary" />
+            android:textColor="@color/on_wallpaper" />
     </LinearLayout>
 
     <!-- 多选操作栏（默认隐藏）：与话题页一致——右上角两个等大图标（全选 / 删除）；
