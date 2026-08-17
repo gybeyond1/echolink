@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: windows/NotifySync
@@ -50,10 +52,10 @@ jobs:
         shell: bash
         run: |
           ls -la src-tauri/target/release/bundle/ 2>&1 | head
-          mkdir -p ../out
-          cp -v src-tauri/target/release/bundle/nsis/*.exe ../out/ 2>/dev/null || true
-          cp -v src-tauri/target/release/bundle/msi/*.msi ../out/ 2>/dev/null || true
-          ls -la ../out/
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp -v src-tauri/target/release/bundle/nsis/*.exe "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
+          cp -v src-tauri/target/release/bundle/msi/*.msi "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
+          ls -la "$GITHUB_WORKSPACE/out/"
 
       - name: Upload installer as workflow artifact
         uses: actions/upload-artifact@v4
@@ -62,13 +64,16 @@ jobs:
           path: out/*
 
       - name: Update "Windows Desktop (latest)" release
+        if: always()
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: windows-desktop-latest
           name: Windows Desktop (latest)
           generate_release_notes: true
+          overwrite: true
           files: |
-            out/*.exe
-            out/*.msi
+            ${{ github.workspace }}/out/*.exe
+            ${{ github.workspace }}/out/*.msi
         env:
           GITHUB_TOKEN=***REDACTED*** secrets.GITHUB_TOKEN }}
