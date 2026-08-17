@@ -11,6 +11,7 @@ import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.VibrationEffect
@@ -135,6 +136,16 @@ class TopicFragment : Fragment() {
     private val requestRecordPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) startRecording() else Toast.makeText(requireContext(), "需要录音权限才能发送语音", Toast.LENGTH_SHORT).show()
     }
+
+    // 保存图片到相册：仅 API ≤28 需要 WRITE_EXTERNAL_STORAGE 运行时权限（29+ 走 MediaStore 免权限）
+    private val requestStoragePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val bmp = pendingSaveBitmap
+        pendingSaveBitmap = null
+        if (granted && bmp != null) saveImageToGallery(requireContext(), bmp)
+        else if (!granted) Toast.makeText(requireContext(), "未授予存储权限，无法保存图片", Toast.LENGTH_SHORT).show()
+    }
+
+    private var pendingSaveBitmap: android.graphics.Bitmap? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentTopicBinding.inflate(inflater, container, false)
@@ -876,43 +887,149 @@ class TopicFragment : Fragment() {
         mediaRecorder = null
     }
 
-    // ===== 图片全屏查看 =====
+    // ===== 图片全屏查看 + 长按保存到相册 =====
 
     private fun showImageFullscreen(url: String) {
-        val dialog = AlertDialog.Builder(requireContext()).create()
-        val iv = android.widget.ImageView(requireContext())
+        val ctx = requireContext()
+        val dialog = AlertDialog.Builder(ctx).create()
+        val root = android.widget.FrameLayout(ctx)
+        root.setBackgroundColor(0xFF000000.toInt())
+
+        val iv = android.widget.ImageView(ctx)
         iv.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         iv.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-        iv.setBackgroundColor(0xFF000000.toInt())
         iv.setOnClickListener { dialog.dismiss() }
-        dialog.setView(iv)
+
+        // 长按保存图片到相册
+        iv.setOnLongClickListener {
+            val bmp = pendingSaveBitmap
+            if (bmp == null) {
+                Toast.makeText(ctx, "图片尚未加载完成，请稍候", Toast.LENGTH_SHORT).show()
+            } else {
+                vibrate()
+                trySaveImage(bmp)
+            }
+            true
+        }
+
+        val progress = android.widget.ProgressBar(ctx)
+        progress.layoutParams = android.widget.FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { gravity = android.view.Gravity.CENTER }
+        root.addView(iv)
+        root.addView(progress)
+
+        dialog.setView(root)
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
+
         lifecycleScope.launch {
             try {
                 val bmp = if (url.startsWith("p2p:")) {
-                    val local = P2pManager.localP2pFile(requireContext(), url)
+                    val local = P2pManager.localP2pFile(ctx, url)
                     if (local == null) {
-                        Toast.makeText(requireContext(), "该图片经 P2P 直连传输，未落地本设备", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, "该图片经 P2P 直连传输，未落地本设备", Toast.LENGTH_SHORT).show()
                         null
-                    } else withContext(Dispatchers.IO) { android.graphics.BitmapFactory.decodeFile(local.absolutePath) }
-                } else downloadBitmap(url)
-                if (bmp != null) iv.setImageBitmap(bmp)
-            } catch (_: Exception) {}
+                    } else withContext(Dispatchers.IO) { decodeSampledBitmap(local.absolutePath) }
+                } else downloadSampledBitmap(url)
+                progress.visibility = View.GONE
+                if (bmp != null) {
+                    iv.setImageBitmap(bmp)
+                    pendingSaveBitmap = bmp
+                } else if (dialog.isShowing) {
+                    Toast.makeText(ctx, "图片加载失败", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                progress.visibility = View.GONE
+                if (dialog.isShowing) Toast.makeText(ctx, "图片加载失败", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    private suspend fun downloadBitmap(url: String): android.graphics.Bitmap? = withContext(Dispatchers.IO) {
+    /** 长按保存入口：API 29+ 免权限直存 MediaStore；API ≤28 先查/申请写存储权限 */
+    private fun trySaveImage(bmp: android.graphics.Bitmap) {
+        val ctx = requireContext()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            saveImageToGallery(ctx, bmp)
+        } else if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            == PackageManager.PERMISSION_GRANTED) {
+            saveImageToGallery(ctx, bmp)
+        } else {
+            pendingSaveBitmap = bmp
+            requestStoragePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }
+
+    /** 保存到相册（IO 线程执行，主线程 Toast 结果） */
+    private fun saveImageToGallery(ctx: Context, bmp: android.graphics.Bitmap) {
+        val name = "notifysync_${System.currentTimeMillis()}.jpg"
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        // API 29+：MediaStore + RELATIVE_PATH，无需权限
+                        val values = android.content.ContentValues().apply {
+                            put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/NotifySync")
+                            put(MediaStore.Images.Media.IS_PENDING, 1)
+                        }
+                        val resolver = ctx.contentResolver
+                        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                        if (uri == null) return@withContext false
+                        resolver.openOutputStream(uri)?.use { out ->
+                            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+                        }
+                        resolver.update(uri, android.content.ContentValues().apply {
+                            put(MediaStore.Images.Media.IS_PENDING, 0)
+                        }, null, null)
+                        true
+                    } else {
+                        // API ≤28：写入公共 Pictures/NotifySync 并广播扫描，让相册立即可见
+                        @Suppress("DEPRECATION")
+                        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                        val file = java.io.File(dir, "NotifySync/$name")
+                        file.parentFile?.mkdirs()
+                        file.outputStream().use { out ->
+                            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+                        }
+                        ctx.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)))
+                        true
+                    }
+                } catch (_: Exception) { false }
+            }
+            Toast.makeText(ctx, if (ok) "已保存到相册" else "保存失败", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** 大图采样解码：先读尺寸，按目标上限(2048px)算 inSampleSize，防全屏大图 OOM */
+    private fun decodeSampledBitmap(path: String, maxSize: Int = 2048): android.graphics.Bitmap? {
+        val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        android.graphics.BitmapFactory.decodeFile(path, opts)
+        if (opts.outWidth <= 0 || opts.outHeight <= 0) return null
+        var sample = 1
+        while (opts.outWidth / sample > maxSize || opts.outHeight / sample > maxSize) sample *= 2
+        val real = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+        return android.graphics.BitmapFactory.decodeFile(path, real)
+    }
+
+    private suspend fun downloadSampledBitmap(url: String): android.graphics.Bitmap? = withContext(Dispatchers.IO) {
         try {
             val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
                 connectTimeout = 10000
                 readTimeout = 15000
                 doInput = true
             }
-            conn.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) }
-        } catch (_: Exception) {
-            null
-        }
+            val bytes = conn.inputStream.use { it.readBytes() }
+            val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+            if (opts.outWidth <= 0 || opts.outHeight <= 0) return@withContext null
+            var sample = 1
+            while (opts.outWidth / sample > 2048 || opts.outHeight / sample > 2048) sample *= 2
+            val real = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, real)
+        } catch (_: Exception) { null }
     }
 }
