@@ -128,10 +128,18 @@ router.get("/", authMiddleware, (req, res) => {
        LEFT JOIN users u ON t.owner_id = u.id
        WHERE ${isAdmin ? "1=1" : "m.user_id = ?"}
          AND (t.kind != 'devices' OR u.id IS NOT NULL)
+         AND (
+           t.kind = 'devices'
+           OR EXISTS (
+             SELECT 1 FROM topic_messages tm
+             WHERE tm.topic = t.name
+               AND tm.id NOT IN (SELECT message_id FROM topic_message_deletes WHERE user_id = ?)
+           )
+         )
        ORDER BY CASE t.kind WHEN 'devices' THEN 0 WHEN 'dm' THEN 1 ELSE 2 END, last_message_at DESC, t.created_at DESC
        LIMIT 100`
     )
-    .all(req.userId, req.userId, req.userId, req.userId, req.userId, ...(isAdmin ? [] : [req.userId]));
+    .all(req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, ...(isAdmin ? [] : [req.userId]));
   res.json({ topics });
 });
 

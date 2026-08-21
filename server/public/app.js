@@ -417,7 +417,7 @@
       const name = t.display_name || t.name;
       const active = state.chat && state.chat.topic === t.name;
       let av;
-      if (kind === "devices") av = `<div class="avatar avatar-txt devices-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M10.5 6.5l1-1a3.5 3.5 0 0 1 5 5l-1 1"/><path d="M13.5 17.5l-1 1a3.5 3.5 0 0 1-5-5l1-1"/></svg></div>`;
+      if (kind === "devices") av = `<img class="avatar" style="width:46px;height:46px" src="devices_avatar.png" onerror="this.style.display='none'" />`;
       else if (kind === "dm") av = avatarHtml(name, null, 46);
       else av = avatarHtml("#" + t.name, null, 46, 205);
       const preview = t.last_message || mediaLabel(t) || (kind === "devices" ? "我的设备同步会话" : "暂无消息");
