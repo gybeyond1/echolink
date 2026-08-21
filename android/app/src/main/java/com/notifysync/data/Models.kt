@@ -66,6 +66,7 @@ data class TopicMessage(
     val senderUserId: Long = 0,
     val senderAvatar: String? = null,
     val senderDisplayName: String? = null,
+    val peerAvatar: String? = null,
     val read: Boolean = false
 )
 
@@ -138,6 +139,7 @@ fun parseTopicMessages(jsonArray: JSONArray): List<TopicMessage> {
                 senderUserId = obj.optLong("user_id", 0),
                 senderAvatar = obj.optNullable("sender_avatar"),
                 senderDisplayName = obj.optNullable("sender_display_name"),
+                peerAvatar = obj.optNullable("peer_avatar"),
                 read = obj.optInt("read", 0) == 1
             )
         )
@@ -162,6 +164,7 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
         senderUserId = json.optLong("user_id", 0),
         senderAvatar = json.optNullable("sender_avatar"),
         senderDisplayName = json.optNullable("sender_display_name"),
+        peerAvatar = json.optNullable("peer_avatar"),
         read = json.optInt("read", 0) == 1
     )
 }

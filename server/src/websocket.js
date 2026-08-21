@@ -187,14 +187,28 @@ function handleTopicPublish(ws, data) {
               VALUES (?, ?, ?, ?, ?, ?, ?)`)
     .run(name, ws.userId, ws.deviceId, sender, title, text, ts);
 
+  // 取发送者头像 + 对方头像，随广播一并下发，避免客户端实时消息缺头像（首条/对方消息不显示）
+  const senderRow = db.prepare("SELECT avatar FROM users WHERE id = ?").get(ws.userId);
+  let peerAvatar = null;
+  const topicRow = db.prepare("SELECT id, kind FROM topics WHERE name = ?").get(name);
+  if (topicRow && topicRow.kind === "dm") {
+    const peerRow = db
+      .prepare(`SELECT u2.avatar FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id WHERE m2.topic_id = ? AND m2.user_id != ? LIMIT 1`)
+      .get(topicRow.id, ws.userId);
+    peerAvatar = peerRow?.avatar || null;
+  }
+
   const message = {
     id: result.lastInsertRowid,
     topic: name,
     title,
     text,
     sender_name: sender,
+    sender_avatar: senderRow?.avatar || null,
+    user_id: ws.userId,
     timestamp: ts,
     device_id: ws.deviceId,
+    peer_avatar: peerAvatar,
   };
 
   // 推送给订阅者，排除发送者本人连接（本机去重）
