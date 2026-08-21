@@ -1,5 +1,7 @@
 // EchoLink Desktop —— Slint 原生界面（对齐 Android / WebUI 逻辑，原生控件，无网页）
 
+import { Button, LineEdit, ScrollView, Switch, CheckBox, TextEdit } from "std-widgets.slint";
+
 export struct TopicItem {
     name: string,
     display: string,
@@ -75,10 +77,10 @@ component MessageBox {
                 if !mine: Text { text: sender; font-size: 12px; color: #3390ec; }
                 VerticalLayout {
                     spacing: 2px;
-                    Text { text: text; font-size: 14px; color: #1a1a1a; wrap: word; }
+                    Text { text: text; font-size: 14px; color: #1a1a1a; wrap: word-wrap; }
                     if media != "": Text { text: media; font-size: 12px; color: #2aabee; }
                     HorizontalLayout {
-                        alignment: right;
+                        alignment: end;
                         Text { text: time; font-size: 10px; color: #999; }
                     }
                 }
@@ -92,12 +94,10 @@ component MessageBox {
     }
 }
 
-export MainWindow := Window {
+component MainWindow inherits Window {
     title: "EchoLink";
     width: 1040px;
     height: 680px;
-    min-width: 720px;
-    min-height: 480px;
     background: #f0f2f5;
 
     // ---- callbacks invoked from Rust ----
@@ -143,6 +143,14 @@ export MainWindow := Window {
     in-out property <string> status: "";
     in-out property <bool> sync-enabled: false;
     in-out property <string> input-text: "";
+    in-out property <string> login-user: "";
+    in-out property <string> login-pass: "";
+    in-out property <bool> reg-mode: false;
+    in-out property <string> friend-query: "";
+    in-out property <string> settings-url: "";
+    in-out property <string> nickname: "";
+    in-out property <string> old-pass: "";
+    in-out property <string> new-pass: "";
 
     if !logged-in: Rectangle {
         background: #3390ec;
@@ -156,33 +164,30 @@ export MainWindow := Window {
                 padding: 26px;
                 VerticalLayout {
                     spacing: 12px;
-                    Text { text: "EchoLink"; font-size: 26px; font-weight: bold; color: #3390ec; horizontal-align: center; }
-                    Text { text: "跨设备消息互联 · 通知同步"; font-size: 13px; color: #888; horizontal-align: center; }
+                    Text { text: "EchoLink"; font-size: 26px; font-weight: 700; color: #3390ec; horizontal-alignment: center; }
+                    Text { text: "跨设备消息互联 · 通知同步"; font-size: 13px; color: #888; horizontal-alignment: center; }
                     Text { text: "服务器地址"; font-size: 13px; color: #555; }
                     LineEdit {
                         text <=> server-url;
                         placeholder-text: "https://你的服务器";
                     }
                     Text { text: "用户名"; font-size: 13px; color: #555; }
-                    in-out property <string> lu: "";
-                    LineEdit { text <=> lu; placeholder-text: "3-32 个字符"; }
+                    LineEdit { text <=> login-user; placeholder-text: "3-32 个字符"; }
                     Text { text: "密码"; font-size: 13px; color: #555; }
-                    in-out property <string> lp: "";
-                    LineEdit { text <=> lp; placeholder-text: "至少 6 位"; echo-mode: Password; }
-                    in-out property <bool> reg-mode: false;
+                    LineEdit { text <=> login-pass; placeholder-text: "至少 6 位"; input-type: password; }
                     Button {
                         text: reg-mode ? "注册并进入" : "登录";
                         clicked => {
-                            if reg-mode { do-register(server-url, lu, lp); }
-                            else { do-login(server-url, lu, lp); }
+                            if reg-mode { do-register(server-url, login-user, login-pass); }
+                            else { do-login(server-url, login-user, login-pass); }
                         }
                     }
                     Text {
                         text: reg-mode ? "已有账号？去登录" : "还没有账号？注册一个";
-                        font-size: 12px; color: #3390ec; horizontal-align: center;
+                        font-size: 12px; color: #3390ec; horizontal-alignment: center;
                         TouchArea { clicked => { reg-mode = !reg-mode; } }
                     }
-                    Text { text: status; color: #e74c3c; font-size: 12px; horizontal-align: center; wrap: word; }
+                    Text { text: status; color: #e74c3c; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
                 }
             }
         }
@@ -199,7 +204,7 @@ export MainWindow := Window {
                 Rectangle {
                     height: 56px;
                     VerticalLayout {
-                        Text { text: "EchoLink"; font-size: 18px; font-weight: bold; color: #3390ec; }
+                        Text { text: "EchoLink"; font-size: 18px; font-weight: 700; color: #3390ec; }
                         Text { text: display-name + " @" + username; font-size: 11px; color: #888; }
                     }
                 }
@@ -212,7 +217,6 @@ export MainWindow := Window {
                 Rectangle { height: 20px; }
                 Button {
                     text: "退出登录"; width: 200px;
-                    background: #fdecea;
                     clicked => { do-logout(); }
                 }
             }
@@ -228,7 +232,7 @@ export MainWindow := Window {
                         background: #ffffff;
                         width: 300px;
                         VerticalLayout {
-                            Text { text: "消息"; font-size: 16px; font-weight: bold; padding: 10px; }
+                            Text { text: "消息"; font-size: 16px; font-weight: 700; padding: 10px; }
                             ScrollView {
                                 VerticalLayout {
                                     spacing: 2px;
@@ -245,14 +249,14 @@ export MainWindow := Window {
                                                     background: #3390ec;
                                                 }
                                                 VerticalLayout {
-                                                    Text { text: (t.kind == "normal" ? "#" : "") + t.display; font-size: 14px; font-weight: bold; }
-                                                    Text { text: t.preview; font-size: 12px; color: #888; elide: right; }
+                                                    Text { text: (t.kind == "normal" ? "#" : "") + t.display; font-size: 14px; font-weight: 700; }
+                                                    Text { text: t.preview; font-size: 12px; color: #888; }
                                                 }
                                                 VerticalLayout {
-                                                    Text { text: t.time; font-size: 10px; color: #aaa; horizontal-align: right; }
+                                                    Text { text: t.time; font-size: 10px; color: #aaa; horizontal-alignment: right; }
                                                     if t.unread > 0: Rectangle {
                                                         width: 18px; height: 18px; border-radius: 9px; background: #e74c3c;
-                                                        Text { text: t.unread; color: white; font-size: 11px; horizontal-align: center; vertical-align: center; }
+                                                        Text { text: t.unread; color: white; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
                                                     }
                                                 }
                                             }
@@ -271,7 +275,7 @@ export MainWindow := Window {
                                 HorizontalLayout {
                                     padding: 10px;
                                     VerticalLayout {
-                                        Text { text: chat-title; font-size: 15px; font-weight: bold; }
+                                        Text { text: chat-title; font-size: 15px; font-weight: 700; }
                                         Text { text: chat-sub; font-size: 11px; color: #888; }
                                     }
                                 }
@@ -300,7 +304,7 @@ export MainWindow := Window {
                                 }
                                 Button { text: "发送"; clicked => { send-message(input-text); } }
                             }
-                            if !chat-open: Text { text: "选择一个会话开始聊天"; color: #888; horizontal-align: center; padding: 40px; }
+                            if !chat-open: Text { text: "选择一个会话开始聊天"; color: #888; horizontal-alignment: center; padding: 40px; }
                         }
                     }
                 }
@@ -308,18 +312,17 @@ export MainWindow := Window {
                 if current-tab == "friends": ScrollView {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
-                        Text { text: "好友"; font-size: 18px; font-weight: bold; }
+                        Text { text: "好友"; font-size: 18px; font-weight: 700; }
                         HorizontalLayout {
                             spacing: 6px;
-                            in-out property <string> fq: "";
-                            LineEdit { text <=> fq; placeholder-text: "输入对方用户名"; }
-                            Button { text: "加好友"; clicked => { add-friend(fq); } }
+                            LineEdit { text <=> friend-query; placeholder-text: "输入对方用户名"; }
+                            Button { text: "加好友"; clicked => { add-friend(friend-query); } }
                         }
                         for f in friends: Rectangle {
                             height: 50px; background: white; border-radius: 8px;
                             HorizontalLayout {
                                 padding: 8px; spacing: 8px;
-                                Text { text: f.display; font-size: 14px; font-weight: bold; }
+                                Text { text: f.display; font-size: 14px; font-weight: 700; }
                                 Rectangle { width: 1px; }
                                 Button { text: "私聊"; clicked => { friend-chat(f.username); } }
                             }
@@ -330,13 +333,13 @@ export MainWindow := Window {
                 if current-tab == "notifications": ScrollView {
                     VerticalLayout {
                         padding: 16px; spacing: 8px;
-                        Text { text: "通知（来自其他设备的同步通知）"; font-size: 18px; font-weight: bold; }
+                        Text { text: "通知（来自其他设备的同步通知）"; font-size: 18px; font-weight: 700; }
                         for n in notifs: Rectangle {
                             background: white; border-radius: 8px; padding: 10px;
                             VerticalLayout {
                                 Text { text: n.app + " · " + n.time; font-size: 12px; color: #888; }
-                                Text { text: n.title; font-size: 14px; font-weight: bold; }
-                                if n.text != "": Text { text: n.text; font-size: 13px; color: #444; wrap: word; }
+                                Text { text: n.title; font-size: 14px; font-weight: 700; }
+                                if n.text != "": Text { text: n.text; font-size: 13px; color: #444; wrap: word-wrap; }
                             }
                         }
                     }
@@ -345,12 +348,12 @@ export MainWindow := Window {
                 if current-tab == "devices": ScrollView {
                     VerticalLayout {
                         padding: 16px; spacing: 8px;
-                        Text { text: "设备"; font-size: 18px; font-weight: bold; }
+                        Text { text: "设备"; font-size: 18px; font-weight: 700; }
                         for d in devices: Rectangle {
                             background: white; border-radius: 8px; padding: 10px;
                             HorizontalLayout {
                                 Text { text: d.name + "  (" + d.platform + ")"; font-size: 14px; }
-                                Text { text: d.last; font-size: 11px; color: #888; horizontal-align: right; }
+                                Text { text: d.last; font-size: 11px; color: #888; horizontal-alignment: right; }
                             }
                         }
                     }
@@ -359,11 +362,10 @@ export MainWindow := Window {
                 if current-tab == "settings": ScrollView {
                     VerticalLayout {
                         padding: 16px; spacing: 12px;
-                        Text { text: "设置"; font-size: 18px; font-weight: bold; }
+                        Text { text: "设置"; font-size: 18px; font-weight: 700; }
                         Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
                             Text { text: "服务器地址"; font-size: 13px; color: #555; }
-                            in-out property <string> su: server-url;
-                            LineEdit { text <=> su; }
+                            LineEdit { text <=> server-url; }
                         } }
                         Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
                             HorizontalLayout {
@@ -372,7 +374,7 @@ export MainWindow := Window {
                             }
                         } }
                         Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
-                            Text { text: "应用过滤（仅勾选的应用通知会被同步）"; font-size: 13px; font-weight: bold; }
+                            Text { text: "应用过滤（仅勾选的应用通知会被同步）"; font-size: 13px; font-weight: 700; }
                             Button { text: "刷新本机应用列表"; clicked => { refresh-apps(); } }
                             ScrollView {
                                 height: 200px;
@@ -383,7 +385,7 @@ export MainWindow := Window {
                                             CheckBox {
                                                 text: a.name + (a.exe != "" ? "  (" + a.exe + ")" : "");
                                                 checked: a.checked;
-                                                toggled(checked) => { save-filter(a.exe, checked); }
+                                                toggled => { save-filter(a.exe, a.checked); }
                                             }
                                         }
                                     }
@@ -392,22 +394,21 @@ export MainWindow := Window {
                         } }
                         Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
                             Text { text: "昵称"; font-size: 13px; color: #555; }
-                            in-out property <string> nn: display-name;
-                            LineEdit { text <=> nn; }
-                            Button { text: "保存昵称"; clicked => { save-nickname(nn); } }
+                            LineEdit { text <=> nickname; }
+                            Button { text: "保存昵称"; clicked => { save-nickname(nickname); } }
                         } }
                         Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
                             Text { text: "修改密码"; font-size: 13px; color: #555; }
-                            in-out property <string> op: "";
-                            in-out property <string> np: "";
-                            LineEdit { text <=> op; placeholder-text: "当前密码"; echo-mode: Password; }
-                            LineEdit { text <=> np; placeholder-text: "新密码（≥6位）"; echo-mode: Password; }
-                            Button { text: "修改密码"; clicked => { change-pass(op, np); } }
+                            LineEdit { text <=> old-pass; placeholder-text: "当前密码"; input-type: password; }
+                            LineEdit { text <=> new-pass; placeholder-text: "新密码（≥6位）"; input-type: password; }
+                            Button { text: "修改密码"; clicked => { change-pass(old-pass, new-pass); } }
                         } }
-                        Text { text: status; color: #e74c3c; font-size: 12px; wrap: word; }
+                        Text { text: status; color: #e74c3c; font-size: 12px; wrap: word-wrap; }
                     }
                 }
             }
         }
     }
 }
+
+export { MainWindow }
