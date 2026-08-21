@@ -493,10 +493,12 @@ router.get("/:topic/messages", authMiddleware, (req, res) => {
     peerAvatar = peerRow?.avatar || null;
   }
 
+  // 过滤掉「本用户已软删除」的消息（单向隐藏，不影响他人）
+  const hiddenSql = `tm.id NOT IN (SELECT message_id FROM topic_message_deletes WHERE user_id = ?)`;
   const messages =
     since > 0
-      ? db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? AND tm.timestamp > ? ORDER BY tm.id ASC LIMIT ?`).all(name, since, limit)
-      : db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? ORDER BY tm.id DESC LIMIT ?`).all(name, limit).reverse();
+      ? db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? AND ${hiddenSql} AND tm.timestamp > ? ORDER BY tm.id ASC LIMIT ?`).all(name, req.userId, since, limit)
+      : db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? AND ${hiddenSql} ORDER BY tm.id DESC LIMIT ?`).all(name, req.userId, limit).reverse();
 
   // 给每条消息补上 peer_avatar（dm 才有意义），客户端用于兜底头像
   messages.forEach((m) => { m.peer_avatar = peerAvatar; });
@@ -565,8 +567,11 @@ router.post("/:topic/messages/read", authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
-// 删除单条话题消息（成员可删自己的；管理员可删任意）
+// 删除单条话题消息（软删除，单向本侧隐藏）
 // DELETE /api/topics/:topic/messages/:id
+// 规则：会话内任何成员（或管理员）都可在「自己这一侧」删除任意消息——仅插入一条
+// (user_id, message_id) 软删除标记，对方视图不受影响、消息仍存于服务器。
+// 当该话题「全部成员」都已软删除同一条消息时，才物理清除该消息（双方都删 → 服务器删除）。
 router.delete("/:topic/messages/:id", authMiddleware, (req, res) => {
   const name = normalizeTopic(req.params.topic);
   if (!name) return res.status(400).json({ error: "Invalid topic name" });
@@ -576,26 +581,36 @@ router.delete("/:topic/messages/:id", authMiddleware, (req, res) => {
   if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
     return res.status(403).json({ error: "Not a member of this topic" });
   }
-  // 删除权限：
-  //  - 管理员：可删任意消息
-  //  - 私聊(dm)：会话仅两人，成员可删会话内任意消息（自己或对面的，仅影响本侧记录）
-  //  - 群聊/设备会话：仅能删自己发的消息
-  let condition;
-  if (req.role === "admin") {
-    condition = "id = ? AND topic = ?";
-  } else if (topic.kind === "dm") {
-    condition = "id = ? AND topic = ?";
-  } else {
-    condition = "id = ? AND topic = ? AND user_id = ?";
+  const msgId = parseInt(req.params.id);
+  // 确认消息确实存在（否则报 not found）
+  const msg = db.prepare("SELECT id, topic FROM topic_messages WHERE id = ? AND topic = ?").get(msgId, name);
+  if (!msg) return res.status(404).json({ error: "Message not found or no permission" });
+
+  // 软删除：本用户标记删除（幂等）
+  db.prepare("INSERT OR IGNORE INTO topic_message_deletes (user_id, message_id) VALUES (?, ?)")
+    .run(req.userId, msgId);
+
+  // 判断该话题全部成员是否都已软删除此消息 → 物理清除
+  const memberCount = db.prepare(
+    "SELECT COUNT(*) AS c FROM topic_members WHERE topic_id = ?"
+  ).get(topic.id).c;
+  const deletedByCount = db.prepare(
+    "SELECT COUNT(DISTINCT user_id) AS c FROM topic_message_deletes WHERE message_id = ?"
+  ).get(msgId).c;
+  let purged = false;
+  if (memberCount > 0 && deletedByCount >= memberCount) {
+    db.prepare("DELETE FROM topic_message_deletes WHERE message_id = ?").run(msgId);
+    db.prepare("DELETE FROM topic_messages WHERE id = ?").run(msgId);
+    purged = true;
   }
-  const params = req.role === "admin" || topic.kind === "dm"
-    ? [parseInt(req.params.id), name]
-    : [parseInt(req.params.id), name, req.userId];
-  const result = db
-    .prepare(`DELETE FROM topic_messages WHERE ${condition}`)
-    .run(...params);
-  if (result.changes === 0) return res.status(404).json({ error: "Message not found or no permission" });
-  res.json({ message: "Topic message deleted" });
+
+  // 仅通知「删除者本人」的其他设备隐藏该消息（不影响对方）
+  try {
+    const { broadcastToUser } = require("../websocket");
+    broadcastToUser(req.userId, { type: "message_deleted", topic: name, message_id: msgId });
+  } catch (e) { /* WS 模块不可用时忽略 */ }
+
+  res.json({ message: "Message deleted on your side", purged });
 });
 
 // 删除整个话题（owner/管理员；同时清理消息）

@@ -112,6 +112,14 @@ class TopicFragment : Fragment() {
                         chatAdapter.markRead(ids)
                     }
                 }
+                "com.notifysync.MESSAGE_DELETED" -> {
+                    // 本账号在另一台设备软删除了某条消息 → 本地同步移除
+                    val t = intent?.getStringExtra("topic") ?: return
+                    if (t == currentTopic) {
+                        val mid = intent.getLongExtra("message_id", -1)
+                        if (mid > 0) chatAdapter.removeMessage(mid)
+                    }
+                }
                 else -> {
                     val topic = intent?.getStringExtra("topic") ?: return
                     if (topic == currentTopic) {

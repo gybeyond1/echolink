@@ -96,6 +96,18 @@ function initDB() {
     )
   `);
 
+  // 话题消息「软删除」标记表（per-user）：某用户删除某条消息只在本侧隐藏，不影响他人。
+  // 当该话题全部成员都软删除同一条消息时，由删除路由物理清除该消息。
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS topic_message_deletes (
+      user_id INTEGER NOT NULL,
+      message_id INTEGER NOT NULL,
+      PRIMARY KEY (user_id, message_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (message_id) REFERENCES topic_messages(id) ON DELETE CASCADE
+    )
+  `);
+
   // 通知按设备软删除表（同一账号多设备：某设备"清空/删除"只对该设备隐藏，不影响其他设备）
   db.exec(`
     CREATE TABLE IF NOT EXISTS notification_deletes (
