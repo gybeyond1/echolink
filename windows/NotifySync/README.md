@@ -48,7 +48,6 @@ npx tauri build
 
 产物路径：
 - `src-tauri/target/release/bundle/nsis/EchoLink_0.1.0_x64-setup.exe`
-- `src-tauri/target/release/bundle/msi/EchoLink_0.1.0_x64_en-US.msi`
 
 ## 服务器地址配置
 
@@ -61,7 +60,7 @@ npx tauri build
 `.github/workflows/windows.yml` 在 push 到 main 且 `windows/**` 变更时自动：
 1. 安装 Rust + Node + tauri CLI
 2. 跑 `tauri build`
-3. 上传 `out/*.exe` + `*.msi` 为 workflow artifact
+3. 上传 `out/*.exe` 为 workflow artifact
 4. 自动创建/更新 `windows-desktop-latest` Release
 
 手动触发：GitHub Actions → Build Windows Desktop → Run workflow
