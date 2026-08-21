@@ -322,6 +322,9 @@ class SettingsFragment : Fragment() {
                     if (!oldUrl.isNullOrBlank()) {
                         AvatarLoader.invalidate(ApiClient.fullAvatarUrl(oldUrl))
                     }
+                    // 本机改头像：主动广播 PROFILE_CHANGED，让正在打开的聊天页/列表立即
+                    // 重新绑定头像（否则自聊里「对面」气泡及自己发出的历史消息仍显示旧头像）。
+                    requireContext().sendBroadcast(Intent("com.notifysync.PROFILE_CHANGED"))
                     Toast.makeText(requireContext(), "头像已更新", Toast.LENGTH_SHORT).show()
                 }
                 tmpFile.delete()

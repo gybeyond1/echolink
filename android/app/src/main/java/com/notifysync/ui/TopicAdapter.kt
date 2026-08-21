@@ -68,6 +68,14 @@ class TopicAdapter(
         items.addAll(list)
         selected.clear()
         selectionMode = false
+        // DM 会话且 peerAvatarUrl 为空时，从已加载消息里自愈补全对方头像：
+        // 取第一条「非自己且自带头像」的消息，作为对方当前头像兜底，避免首条消息没头像。
+        if (peerAvatarUrl.isNullOrBlank()) {
+            val peer = items.firstOrNull { !it.senderAvatar.isNullOrBlank() && it.senderUserId != AuthManager.userId }
+            if (peer != null) {
+                peerAvatarUrl = ApiClient.fullAvatarUrl(peer.senderAvatar)
+            }
+        }
         notifyDataSetChanged()
     }
 
@@ -496,15 +504,14 @@ class TopicAdapter(
 
     /**
      * 头像加载策略（修复「对面/首条消息没头像」「改头像后对面不跟随」）：
-     *  - 是「我」发的消息（user_id 命中 或 用户名/昵称命中，覆盖自聊场景）→ 永远用
-     *    AuthManager.avatarUrl（当前实时头像），换头像后立即生效，不依赖历史存值；
+     *  - 是「我」发的消息（仅以 user_id 命中判定，最严谨）→ 永远用 AuthManager.avatarUrl
+     *    （当前实时头像），换头像后立即生效，不依赖历史存值；
      *  - 是他人消息 → 优先用消息自带的 sender_avatar；为空（历史消息在对方设头像前发出）
      *    则回退到会话对方头像 peerAvatarUrl，避免出现「没头像」的灰块。
+     *  注意：不再用 senderName/senderDisplayName 做「自己」判定，避免同名/昵称边界误判。
      */
     private fun loadAvatar(item: TopicMessage, iv: ImageView) {
-        val isSelf = (item.senderUserId > 0 && item.senderUserId == AuthManager.userId)
-            || item.senderName == AuthManager.username
-            || (item.senderDisplayName != null && item.senderDisplayName == AuthManager.displayName)
+        val isSelf = item.senderUserId > 0 && item.senderUserId == AuthManager.userId
         val url = if (isSelf) {
             ApiClient.fullAvatarUrl(AuthManager.avatarUrl)
         } else {
