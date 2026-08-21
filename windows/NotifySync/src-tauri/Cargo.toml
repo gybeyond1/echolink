@@ -12,6 +12,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+slint-build = "1.8"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }

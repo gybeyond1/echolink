@@ -419,7 +419,7 @@ struct PublishResp {
 struct FriendsResp {
     friends: Vec<Friend>,
 }
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct FilterEntry {
     pub package_name: String,
     pub app_name: String,
