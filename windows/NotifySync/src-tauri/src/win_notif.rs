@@ -1,6 +1,6 @@
 // EchoLink Desktop —— Windows 通知监听与上报（对齐 Android 端：过滤本机应用 + 上报服务器广播）
 #![cfg(target_os = "windows")]
-use crate::api::{Client, InstalledApp, Result};
+use crate::api::{InstalledApp, Result};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::Mutex;

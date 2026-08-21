@@ -5,7 +5,7 @@
   "identifier": "com.gybeyond.notifysync",
   "build": {
     "beforeDevCommand": "",
-    "devUrl": "",
+    "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "",
     "frontendDist": "../dist"
   },
