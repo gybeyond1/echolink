@@ -42,10 +42,10 @@ jobs:
       - name: Install Tauri CLI
         run: npm install
 
-      - name: Build release (NSIS + MSI)
+      - name: Build release (NSIS only)
         env:
           NOTIFYSYNC_SERVER: https://ntfy.225600.xyz:1314
-        run: npx tauri build --bundles nsis msi
+        run: npx tauri build --bundles nsis
 
       - name: Locate bundle output
         id: locate
@@ -54,7 +54,6 @@ jobs:
           ls -la src-tauri/target/release/bundle/ 2>&1 | head
           mkdir -p "$GITHUB_WORKSPACE/out"
           cp -v src-tauri/target/release/bundle/nsis/*.exe "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
-          cp -v src-tauri/target/release/bundle/msi/*.msi "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
           ls -la "$GITHUB_WORKSPACE/out/"
 
       - name: Upload installer as workflow artifact
@@ -73,6 +72,5 @@ jobs:
           overwrite_files: true
           files: |
             ${{ github.workspace }}/out/*.exe
-            ${{ github.workspace }}/out/*.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,413 @@
+// EchoLink Desktop —— Slint 原生界面（对齐 Android / WebUI 逻辑，原生控件，无网页）
+
+export struct TopicItem {
+    name: string,
+    display: string,
+    kind: string,
+    avatar: string,
+    preview: string,
+    count: int,
+    unread: int,
+    time: string,
+}
+
+export struct MsgItem {
+    id: int,
+    text: string,
+    mine: bool,
+    sender: string,
+    time: string,
+    media: string,
+}
+
+export struct FriendItem {
+    username: string,
+    display: string,
+}
+
+export struct FilterItem {
+    pkg: string,
+    name: string,
+    checked: bool,
+}
+
+export struct AppItem {
+    name: string,
+    exe: string,
+    checked: bool,
+}
+
+export struct NotifItem {
+    id: int,
+    app: string,
+    title: string,
+    text: string,
+    time: string,
+}
+
+export struct DeviceItem {
+    name: string,
+    platform: string,
+    last: string,
+}
+
+component MessageBox {
+    in-out property <string> text: "";
+    in-out property <bool> mine: false;
+    in-out property <string> sender: "";
+    in-out property <string> time: "";
+    in-out property <string> media: "";
+    in-out property <int> msg-id: 0;
+    callback delete;
+
+    VerticalLayout {
+        alignment: if mine { Right } else { Left };
+        padding: 4px;
+        spacing: 2px;
+        Rectangle {
+            background: mine ? #effdde : #ffffff;
+            border-radius: 12px;
+            padding: 8px;
+            min-width: 60px;
+            max-width: 420px;
+            HorizontalLayout {
+                spacing: 6px;
+                if !mine: Text { text: sender; font-size: 12px; color: #3390ec; }
+                VerticalLayout {
+                    spacing: 2px;
+                    Text { text: text; font-size: 14px; color: #1a1a1a; wrap: word; }
+                    if media != "": Text { text: media; font-size: 12px; color: #2aabee; }
+                    HorizontalLayout {
+                        alignment: Right;
+                        Text { text: time; font-size: 10px; color: #999; }
+                    }
+                }
+                TouchArea {
+                    clicked => { delete(msg-id); }
+                    Text { text: "🗑"; font-size: 12px; color: #bbb; }
+                }
+            }
+        }
+    }
+}
+
+export MainWindow := Window {
+    title: "EchoLink";
+    width: 1040px;
+    height: 680px;
+    min-width: 720px;
+    min-height: 480px;
+    background: #f0f2f5;
+
+    // ---- callbacks invoked from Rust ----
+    callback do-login(string, string, string); // server, user, pass
+    callback do-register(string, string, string);
+    callback load-topics();
+    callback open-topic(string);
+    callback send-message(string);
+    callback delete-msg(int);
+    callback delete-msg-topic(int, string);
+    callback switch-tab(string);
+    callback load-friends();
+    callback friend-chat(string);
+    callback add-friend(string);
+    callback load-notifications();
+    callback load-devices();
+    callback load-filters();
+    callback toggle-sync(bool);
+    callback save-filter(string, bool);
+    callback del-filter(string);
+    callback save-nickname(string);
+    callback change-pass(string, string);
+    callback do-logout();
+    callback refresh-apps();
+
+    // ---- state properties (Rust pushes data in) ----
+    in-out property <bool> logged-in: false;
+    in-out property <string> server-url: "";
+    in-out property <string> username: "";
+    in-out property <string> display-name: "";
+    in-out property <string> current-tab: "messages";
+    in-out property <string> chat-title: "";
+    in-out property <string> chat-sub: "";
+    in-out property <string> current-topic: "";
+    in-out property <bool> chat-open: false;
+    in-out property <[TopicItem]> topics: [];
+    in-out property <[MsgItem]> messages: [];
+    in-out property <[FriendItem]> friends: [];
+    in-out property <[FilterItem]> filters: [];
+    in-out property <[AppItem]> apps: [];
+    in-out property <[NotifItem]> notifs: [];
+    in-out property <[DeviceItem]> devices: [];
+    in-out property <string> status: "";
+    in-out property <bool> sync-enabled: false;
+    in-out property <string> input-text: "";
+
+    if !logged-in: Rectangle {
+        background: #3390ec;
+        VerticalLayout {
+            alignment: Center;
+            spacing: 14px;
+            Rectangle {
+                background: white;
+                border-radius: 16px;
+                width: 320px;
+                padding: 26px;
+                VerticalLayout {
+                    spacing: 12px;
+                    Text { text: "EchoLink"; font-size: 26px; font-weight: 700; color: #3390ec; horizontal-alignment: center; }
+                    Text { text: "跨设备消息互联 · 通知同步"; font-size: 13px; color: #888; horizontal-align: center; }
+                    Text { text: "服务器地址"; font-size: 13px; color: #555; }
+                    LineEdit {
+                        text <=> server-url;
+                        placeholder-text: "https://你的服务器";
+                    }
+                    Text { text: "用户名"; font-size: 13px; color: #555; }
+                    in-out property <string> lu: "";
+                    LineEdit { text <=> lu; placeholder-text: "3-32 个字符"; }
+                    Text { text: "密码"; font-size: 13px; color: #555; }
+                    in-out property <string> lp: "";
+                    LineEdit { text <=> lp; placeholder-text: "至少 6 位"; echo-mode: Password; }
+                    in-out property <bool> reg-mode: false;
+                    Button {
+                        text: reg-mode ? "注册并进入" : "登录";
+                        clicked => {
+                            if reg-mode { do-register(server-url, lu, lp); }
+                            else { do-login(server-url, lu, lp); }
+                        }
+                    }
+                    Text {
+                        text: reg-mode ? "已有账号？去登录" : "还没有账号？注册一个";
+                        font-size: 12px; color: #3390ec; horizontal-alignment: center;
+                        TouchArea { clicked => { reg-mode = !reg-mode; } }
+                    }
+                    Text { text: status; color: #e74c3c; font-size: 12px; horizontal-alignment: center; wrap: word; }
+                }
+            }
+        }
+    }
+
+    if logged-in: HorizontalLayout {
+        // 侧栏
+        Rectangle {
+            background: #ffffff;
+            width: 220px;
+            VerticalLayout {
+                spacing: 4px;
+                padding: 10px;
+                Rectangle {
+                    height: 56px;
+                    VerticalLayout {
+                        Text { text: "EchoLink"; font-size: 18px; font-weight: 700; color: #3390ec; }
+                        Text { text: display-name + " @" + username; font-size: 11px; color: #888; }
+                    }
+                }
+                in-out property <string> t: current-tab;
+                Button { text: "💬 消息"; width: 200px; clicked => { switch-tab("messages"); } }
+                Button { text: "👥 好友"; width: 200px; clicked => { switch-tab("friends"); } }
+                Button { text: "🔔 通知"; width: 200px; clicked => { switch-tab("notifications"); } }
+                Button { text: "📱 设备"; width: 200px; clicked => { switch-tab("devices"); } }
+                Button { text: "⚙️ 设置"; width: 200px; clicked => { switch-tab("settings"); } }
+                Rectangle { height: 20px; }
+                Button {
+                    text: "退出登录"; width: 200px;
+                    background: #fdecea;
+                    clicked => { do-logout(); }
+                }
+            }
+        }
+
+        // 主区
+        Rectangle {
+            background: #f0f2f5;
+            VerticalLayout {
+                if current-tab == "messages": HorizontalLayout {
+                    // 会话列表
+                    Rectangle {
+                        background: #ffffff;
+                        width: 300px;
+                        VerticalLayout {
+                            Text { text: "消息"; font-size: 16px; font-weight: 700; padding: 10px; }
+                            ScrollView {
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    for t in topics: Rectangle {
+                                        height: 60px;
+                                        TouchArea {
+                                            clicked => { open-topic(t.name); }
+                                            background: chat-open && chat-title == t.display ? #e7f0ff : #ffffff;
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                padding: 8px;
+                                                Rectangle {
+                                                    width: 44px; height: 44px; border-radius: 22px;
+                                                    background: #3390ec;
+                                                    Text { text: t.display[0]; color: white; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
+                                                }
+                                                VerticalLayout {
+                                                    Text { text: (t.kind == "normal" ? "#" : "") + t.display; font-size: 14px; font-weight: 600; }
+                                                    Text { text: t.preview; font-size: 12px; color: #888; elide: true; }
+                                                }
+                                                VerticalLayout {
+                                                    Text { text: t.time; font-size: 10px; color: #aaa; horizontal-alignment: Right; }
+                                                    if t.unread > 0: Rectangle {
+                                                        width: 18px; height: 18px; border-radius: 9px; background: #e74c3c;
+                                                        Text { text: t.unread; color: white; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // 聊天区
+                    Rectangle {
+                        background: #d6dde4;
+                        VerticalLayout {
+                            if chat-open: Rectangle {
+                                height: 52px; background: #ffffff;
+                                HorizontalLayout {
+                                    padding: 10px;
+                                    VerticalLayout {
+                                        Text { text: chat-title; font-size: 15px; font-weight: 700; }
+                                        Text { text: chat-sub; font-size: 11px; color: #888; }
+                                    }
+                                }
+                            }
+                            ScrollView {
+                                VerticalLayout {
+                                    spacing: 4px;
+                                    for m in messages: MessageBox {
+                                        text: m.text;
+                                        mine: m.mine;
+                                        sender: m.sender;
+                                        time: m.time;
+                                        media: m.media;
+                                        msg-id: m.id;
+                                        delete(msg-id) => { delete-msg-topic(msg-id, current-topic); }
+                                    }
+                                }
+                            }
+                            if chat-open: HorizontalLayout {
+                                padding: 8px;
+                                spacing: 6px;
+                                TextEdit {
+                                    text <=> input-text;
+                                    placeholder-text: "输入消息…";
+                                    height: 36px;
+                                }
+                                Button { text: "发送"; clicked => { send-message(input-text); } }
+                            }
+                            if !chat-open: Text { text: "选择一个会话开始聊天"; color: #888; horizontal-alignment: center; padding: 40px; }
+                        }
+                    }
+                }
+
+                if current-tab == "friends": ScrollView {
+                    VerticalLayout {
+                        padding: 16px; spacing: 10px;
+                        Text { text: "好友"; font-size: 18px; font-weight: 700; }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            in-out property <string> fq: "";
+                            LineEdit { text <=> fq; placeholder-text: "输入对方用户名"; }
+                            Button { text: "加好友"; clicked => { add-friend(fq); } }
+                        }
+                        for f in friends: Rectangle {
+                            height: 50px; background: white; border-radius: 8px;
+                            HorizontalLayout {
+                                padding: 8px; spacing: 8px;
+                                Text { text: f.display; font-size: 14px; font-weight: 600; }
+                                Rectangle { width: 1px; }
+                                Button { text: "私聊"; clicked => { friend-chat(f.username); } }
+                            }
+                        }
+                    }
+                }
+
+                if current-tab == "notifications": ScrollView {
+                    VerticalLayout {
+                        padding: 16px; spacing: 8px;
+                        Text { text: "通知（来自其他设备的同步通知）"; font-size: 18px; font-weight: 700; }
+                        for n in notifs: Rectangle {
+                            background: white; border-radius: 8px; padding: 10px;
+                            VerticalLayout {
+                                Text { text: n.app + " · " + n.time; font-size: 12px; color: #888; }
+                                Text { text: n.title; font-size: 14px; font-weight: 600; }
+                                if n.text != "": Text { text: n.text; font-size: 13px; color: #444; wrap: word; }
+                            }
+                        }
+                    }
+                }
+
+                if current-tab == "devices": ScrollView {
+                    VerticalLayout {
+                        padding: 16px; spacing: 8px;
+                        Text { text: "设备"; font-size: 18px; font-weight: 700; }
+                        for d in devices: Rectangle {
+                            background: white; border-radius: 8px; padding: 10px;
+                            HorizontalLayout {
+                                Text { text: d.name + "  (" + d.platform + ")"; font-size: 14px; }
+                                Text { text: d.last; font-size: 11px; color: #888; horizontal-alignment: Right; }
+                            }
+                        }
+                    }
+                }
+
+                if current-tab == "settings": ScrollView {
+                    VerticalLayout {
+                        padding: 16px; spacing: 12px;
+                        Text { text: "设置"; font-size: 18px; font-weight: 700; }
+                        Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
+                            Text { text: "服务器地址"; font-size: 13px; color: #555; }
+                            in-out property <string> su: server-url;
+                            LineEdit { text <=> su; }
+                        } }
+                        Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
+                            HorizontalLayout {
+                                Text { text: "通知同步（读取本机 Windows 通知并广播到其他设备）"; font-size: 13px; }
+                                Switch { checked <=> sync-enabled; toggled => { toggle-sync(sync-enabled); } }
+                            }
+                        } }
+                        Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
+                            Text { text: "应用过滤（仅勾选的应用通知会被同步）"; font-size: 13px; font-weight: 600; }
+                            Button { text: "刷新本机应用列表"; clicked => { refresh-apps(); } }
+                            ScrollView {
+                                height: 200px;
+                                VerticalLayout {
+                                    for a in apps: Rectangle {
+                                        height: 28px;
+                                        HorizontalLayout {
+                                            CheckBox {
+                                                text: a.name + (a.exe != "" ? "  (" + a.exe + ")" : "");
+                                                checked: a.checked;
+                                                toggled(checked) => { save-filter(a.exe, checked); }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } }
+                        Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
+                            Text { text: "昵称"; font-size: 13px; color: #555; }
+                            in-out property <string> nn: display-name;
+                            LineEdit { text <=> nn; }
+                            Button { text: "保存昵称"; clicked => { save-nickname(nn); } }
+                        } }
+                        Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
+                            Text { text: "修改密码"; font-size: 13px; color: #555; }
+                            in-out property <string> op: "";
+                            in-out property <string> np: "";
+                            LineEdit { text <=> op; placeholder-text: "当前密码"; echo-mode: Password; }
+                            LineEdit { text <=> np; placeholder-text: "新密码（≥6位）"; echo-mode: Password; }
+                            Button { text: "修改密码"; clicked => { change-pass(op, np); } }
+                        } }
+                        Text { text: status; color: #e74c3c; font-size: 12px; wrap: word; }
+                    }
+                }
+            }
+        }
+    }
+}
