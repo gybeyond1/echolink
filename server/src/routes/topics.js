@@ -309,7 +309,15 @@ router.post("/:topic/leave", authMiddleware, (req, res) => {
   const isAdmin = req.role === "admin";
   if (!mem && !isAdmin) return res.status(404).json({ error: "You are not a member" });
   if (mem && mem.role === "owner") return res.status(400).json({ error: "Owner cannot leave; delete the topic instead" });
-  // 管理员或非 owner 成员：从自己的 membership 移除（管理员本来就没有 membership 时直接成功）
+  if (isAdmin) {
+    // 管理员视角下所有话题始终可见（GET /api/topics 用 LEFT JOIN），「离开」对管理员无意义；
+    // 故管理员主动「移除」= 彻底关闭该话题（删除消息与话题本身），使其真正从列表消失。
+    db.prepare("DELETE FROM topic_messages WHERE topic = ?").run(name);
+    db.prepare("DELETE FROM topics WHERE id = ?").run(topic.id); // 级联删除 members/requests
+    res.json({ message: "Topic closed by admin" });
+    return;
+  }
+  // 普通成员：从自己的 membership 移除（保留话题与消息，对其他人仍可见）
   if (mem) {
     db.prepare("DELETE FROM topic_members WHERE topic_id = ? AND user_id = ?").run(topic.id, req.userId);
   }
@@ -492,7 +500,15 @@ router.post("/:topic/read", authMiddleware, (req, res) => {
   const mem = getMembership(topic.id, req.userId);
   if (!mem && req.role !== "admin") return res.status(403).json({ error: "Not a member of this topic" });
   const maxId = db.prepare("SELECT COALESCE(MAX(id), 0) as max_id FROM topic_messages WHERE topic = ?").get(name);
-  if (mem) {
+  // 管理员无普通 membership（GET 列表用 LEFT JOIN 可见全部），需先补一条再更新 last_read_id，
+  // 否则 last_read_id 永远为 0 → 未读数基于 0 永远 > 0 → 点进会话看过、刷新列表后红点又弹出。
+  let membership = mem;
+  if (!membership && req.role === "admin") {
+    db.prepare("INSERT OR IGNORE INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'admin')")
+      .run(topic.id, req.userId);
+    membership = getMembership(topic.id, req.userId);
+  }
+  if (membership) {
     db.prepare("UPDATE topic_members SET last_read_id = ? WHERE topic_id = ? AND user_id = ?")
       .run(maxId.max_id || 0, topic.id, req.userId);
   }
