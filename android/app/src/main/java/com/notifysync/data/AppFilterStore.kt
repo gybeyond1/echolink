@@ -28,6 +28,9 @@ object AppFilterStore {
     /** 该应用的通知是否允许被读取并上传 */
     fun isAllowed(packageName: String): Boolean {
         if (!enabled) return true
+        // 白名单为空时不拦截：避免「开了过滤但还没勾选任何应用」这种本地状态
+        // 把本设备所有通知静默吞掉（会导致单向同步失败）。空白名单视为尚未配置。
+        if (allowed.isEmpty()) return true
         return allowed.contains(packageName)
     }
 

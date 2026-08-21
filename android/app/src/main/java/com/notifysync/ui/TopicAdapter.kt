@@ -53,6 +53,12 @@ class TopicAdapter(
     /** 是否显示已读回执（仅 dm 私聊开启）：自己发出的消息显示单勾/双勾 */
     var showReadReceipts: Boolean = false
 
+    /**
+     * 会话「对方」头像 URL（仅私聊 dm 有意义）：当某条消息的 sender_avatar 为空
+     * （例如历史消息在对方设头像之前发出）时，回退到对方当前头像，避免出现「没头像」。
+     */
+    var peerAvatarUrl: String? = null
+
     var selectionMode = false
         private set
     private val selected = mutableSetOf<Long>()
@@ -125,7 +131,7 @@ class TopicAdapter(
         val llVoice: View = view.findViewById(R.id.llVoice)
         val llFile: View = view.findViewById(R.id.llFile)
         val tvFile: TextView = view.findViewById(R.id.tvFile)
-        val tvStatus: TextView = view.findViewById(R.id.tvStatus)
+        val ivStatus: ImageView = view.findViewById(R.id.ivStatus)
         var item: TopicMessage? = null
         private var selectionTapHandled = false
         var lastMine: Boolean? = null
@@ -329,20 +335,15 @@ class TopicAdapter(
             loadAvatar(item, holder.ivAvatar)
         }
 
-        // 已读回执（Telegram 式）：仅 dm 私聊里「自己发出的」消息显示
-        // 单勾=已送达，双勾=对方已读
+        // 已读回执（WhatsApp 风）：仅 dm 私聊里「自己发出的」消息显示
+        // 单勾（灰）= 已送达；重叠双勾（蓝）= 对方已读
         if (isMine && showReadReceipts) {
-            val ctx = holder.itemView.context
-            holder.tvStatus.visibility = View.VISIBLE
-            if (item.read) {
-                holder.tvStatus.text = "✓✓" // 双勾：已读
-                holder.tvStatus.setTextColor(ctx.getColor(R.color.brand_primary))
-            } else {
-                holder.tvStatus.text = "✓"   // 单勾：已送达
-                holder.tvStatus.setTextColor(ctx.getColor(R.color.on_surface_variant))
-            }
+            holder.ivStatus.visibility = View.VISIBLE
+            holder.ivStatus.setImageResource(
+                if (item.read) R.drawable.ic_double_check else R.drawable.ic_check_single
+            )
         } else {
-            holder.tvStatus.visibility = View.GONE
+            holder.ivStatus.visibility = View.GONE
         }
 
         // Selection visual
@@ -366,13 +367,13 @@ class TopicAdapter(
         // 已读回执仅在 dm 私聊自己消息时显示，要放在消息气泡左侧，不要卡在头像和气泡之间。
         root.removeAllViews()
         if (isMine) {
-            root.addView(holder.tvStatus)
+            root.addView(holder.ivStatus)
             root.addView(holder.llContent)
             root.addView(holder.ivAvatar)
         } else {
             root.addView(holder.ivAvatar)
             root.addView(holder.llContent)
-            root.addView(holder.tvStatus)
+            root.addView(holder.ivStatus)
         }
         val g = if (isMine) Gravity.END else Gravity.START
         root.gravity = g or Gravity.CENTER_VERTICAL
@@ -493,12 +494,21 @@ class TopicAdapter(
 
     // ===== Avatar loading =====
 
+    /**
+     * 头像加载策略（修复「对面/首条消息没头像」「改头像后对面不跟随」）：
+     *  - 是「我」发的消息（user_id 命中 或 用户名/昵称命中，覆盖自聊场景）→ 永远用
+     *    AuthManager.avatarUrl（当前实时头像），换头像后立即生效，不依赖历史存值；
+     *  - 是他人消息 → 优先用消息自带的 sender_avatar；为空（历史消息在对方设头像前发出）
+     *    则回退到会话对方头像 peerAvatarUrl，避免出现「没头像」的灰块。
+     */
     private fun loadAvatar(item: TopicMessage, iv: ImageView) {
-        // 自己的消息始终用当前头像（换头像后立即生效，不依赖历史消息里存的旧 URL）
-        val url = if (item.senderUserId > 0 && item.senderUserId == AuthManager.userId) {
+        val isSelf = (item.senderUserId > 0 && item.senderUserId == AuthManager.userId)
+            || item.senderName == AuthManager.username
+            || (item.senderDisplayName != null && item.senderDisplayName == AuthManager.displayName)
+        val url = if (isSelf) {
             ApiClient.fullAvatarUrl(AuthManager.avatarUrl)
         } else {
-            ApiClient.fullAvatarUrl(item.senderAvatar)
+            ApiClient.fullAvatarUrl(item.senderAvatar) ?: peerAvatarUrl
         }
         if (url.isNullOrBlank()) {
             iv.setImageResource(R.drawable.ic_default_avatar)
