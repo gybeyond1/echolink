@@ -60,10 +60,10 @@ component MessageBox {
     in-out property <int> msg-id: 0;
     callback delete(int);
 
-    VerticalLayout {
-        alignment: if mine { Right } else { Left };
+    HorizontalLayout {
         padding: 4px;
         spacing: 2px;
+        if mine: Rectangle { horizontal-stretch: 1; min-width: 0px; }
         Rectangle {
             background: mine ? #effdde : #ffffff;
             border-radius: 12px;
@@ -88,6 +88,7 @@ component MessageBox {
                 }
             }
         }
+        if !mine: Rectangle { horizontal-stretch: 1; min-width: 0px; }
     }
 }
 
