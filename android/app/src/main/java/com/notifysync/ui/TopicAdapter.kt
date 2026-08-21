@@ -125,6 +125,16 @@ class TopicAdapter(
         notifyDataSetChanged()
     }
 
+    /** 本地移除一条消息（软删除后在其他设备上同步隐藏，不影响数据源之外的逻辑） */
+    fun removeMessage(id: Long) {
+        if (id <= 0) return
+        val pos = items.indexOfFirst { it.id == id }
+        if (pos < 0) return
+        items.removeAt(pos)
+        selected.remove(id)
+        notifyItemRemoved(pos)
+    }
+
     fun getSelectedIds(): List<Long> = selected.filter { it > 0 }
     val selectedCount: Int get() = selected.size
 

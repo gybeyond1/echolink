@@ -244,6 +244,18 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
                 if (avatar != null) AuthManager.avatarUrl = avatar
                 sendBroadcast(Intent("com.notifysync.PROFILE_CHANGED"))
             }
+            // 本账号在另一台设备「软删除」了某条消息 → 通知正在打开对应会话的页面本地移除
+            "message_deleted" -> {
+                val t = topic ?: data?.optString("topic", "") ?: ""
+                val mid = data?.optLong("message_id", -1) ?: -1
+                if (t.isNotEmpty() && mid > 0) {
+                    val intent = Intent("com.notifysync.MESSAGE_DELETED").apply {
+                        putExtra("topic", t)
+                        putExtra("message_id", mid)
+                    }
+                    sendBroadcast(intent)
+                }
+            }
             "connected" -> {
                 connectionStatus = "已连接"
                 updateForegroundNotification("已连接 - 同步中")
