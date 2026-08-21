@@ -434,15 +434,21 @@ object ApiClient {
 
     // ===== 健康检查 =====
 
-    suspend fun checkHealth(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun checkHealth(): Boolean = checkHealthWithReason().first
+
+    /** 同 checkHealth，但额外返回失败原因（用于 UI 提示证书/网络/DNS 等具体问题） */
+    suspend fun checkHealthWithReason(): Pair<Boolean, String?> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
                 .url("${AuthManager.serverUrl}/health")
                 .get()
                 .build()
-            client.newCall(request).execute().use { it.isSuccessful }
+            client.newCall(request).execute().use { resp ->
+                if (resp.isSuccessful) true to null
+                else false to "HTTP ${resp.code}"
+            }
         } catch (e: Exception) {
-            false
+            false to (e.message ?: e.javaClass.simpleName)
         }
     }
 }

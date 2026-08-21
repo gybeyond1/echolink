@@ -165,13 +165,23 @@ class SettingsFragment : Fragment() {
             }
             binding.btnTestConnection.isEnabled = false
             lifecycleScope.launch {
-                val ok = ApiClient.checkHealth()
+                val (ok, reason) = ApiClient.checkHealthWithReason()
                 binding.btnTestConnection.isEnabled = true
-                Toast.makeText(
-                    requireContext(),
-                    if (ok) "连接成功" else "连接失败",
-                    Toast.LENGTH_SHORT
-                ).show()
+                if (ok) {
+                    Toast.makeText(requireContext(), "连接成功", Toast.LENGTH_SHORT).show()
+                } else {
+                    // 把真实失败原因暴露出来，方便排查（证书错误 / 网络不通 / 服务器无响应等）
+                    val tip = when {
+                        reason?.contains("SSL", true) == true || reason?.contains("cert", true) == true
+                            -> "连接失败：HTTPS 证书不被信任（Lucky 自签证书需换成受信任证书，或把 CA 装入 APP）"
+                        reason?.contains("Unable to resolve", true) == true || reason?.contains("Unknown host", true) == true
+                            -> "连接失败：域名无法解析（检查地址拼写 / DNS）"
+                        reason?.contains("timed out", true) == true || reason?.contains("timeout", true) == true
+                            -> "连接失败：连接超时（地址不可达或被反代拦截）"
+                        else -> "连接失败：${reason ?: "未知错误"}"
+                    }
+                    Toast.makeText(requireContext(), tip, Toast.LENGTH_LONG).show()
+                }
             }
         }
 
