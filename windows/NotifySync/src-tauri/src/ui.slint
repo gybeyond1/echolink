@@ -58,7 +58,7 @@ component MessageBox {
     in-out property <string> time: "";
     in-out property <string> media: "";
     in-out property <int> msg-id: 0;
-    callback delete;
+    callback delete(int);
 
     VerticalLayout {
         alignment: if mine { Right } else { Left };

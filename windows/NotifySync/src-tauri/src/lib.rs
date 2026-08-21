@@ -716,8 +716,8 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
             }
             update_persist_logout(&a);
             w.set_logged_in(false);
-            w.set_messages(slint::VecModel::new().into());
-            w.set_topics(slint::VecModel::new().into());
+            w.set_messages(slint::VecModel::default().into());
+            w.set_topics(slint::VecModel::default().into());
         });
     }
 }

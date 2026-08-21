@@ -180,8 +180,8 @@ fn enum_keys(hkey: windows_sys::Win32::System::Registry::HKEY, sub: &str, out: &
             }
             // 从 icon 路径推导 exe 名（如 "C:\...\app.exe,0"）
             let exe = icon
-                .split(',')
-                .next()
+                .as_ref()
+                .and_then(|i| i.split(',').next())
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
             let key = format!("{}|{}", name, exe.to_lowercase());
