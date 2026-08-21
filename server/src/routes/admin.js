@@ -69,14 +69,39 @@ router.post("/users", (req, res) => {
   res.status(201).json({ message: "User created", user: { id: info.lastInsertRowid, username, role: r } });
 });
 
-// 删除用户（不能删自己）
+// 删除用户（不能删自己）。
+// 开启 foreign_keys 后数据库会级联清理其 devices/topic_members/owned topics 等；
+// 这里显式清理设备会话与该用户作为 owner 的群聊消息，避免 topic_messages 等无主残留。
 router.delete("/users/:id", (req, res) => {
   const db = getDB();
   const id = parseInt(req.params.id);
   if (id === req.userId) return res.status(400).json({ error: "Cannot delete yourself" });
   const user = db.prepare("SELECT id FROM users WHERE id = ?").get(id);
   if (!user) return res.status(404).json({ error: "User not found" });
-  db.prepare("DELETE FROM users WHERE id = ?").run(id); // 级联删除其通知/设备/话题成员等
+
+  // 1. 清理默认设备会话 u{id}-devices
+  const deviceTopic = `u${id}-devices`;
+  db.prepare(
+    "DELETE FROM topic_message_deletes WHERE message_id IN (SELECT id FROM topic_messages WHERE topic = ?)"
+  ).run(deviceTopic);
+  db.prepare("DELETE FROM topic_messages WHERE topic = ?").run(deviceTopic);
+  db.prepare("DELETE FROM topic_members WHERE topic_id IN (SELECT id FROM topics WHERE name = ?)").run(deviceTopic);
+  db.prepare("DELETE FROM topics WHERE name = ?").run(deviceTopic);
+
+  // 2. 清理该用户作为 owner 的普通群聊（否则 topic_messages 会因 topic 被级联删除而残留）
+  const owned = db.prepare("SELECT name FROM topics WHERE owner_id = ?").all(id);
+  for (const t of owned) {
+    db.prepare(
+      "DELETE FROM topic_message_deletes WHERE message_id IN (SELECT id FROM topic_messages WHERE topic = ?)"
+    ).run(t.name);
+    db.prepare("DELETE FROM topic_messages WHERE topic = ?").run(t.name);
+    db.prepare("DELETE FROM topic_join_requests WHERE topic_id IN (SELECT id FROM topics WHERE name = ?)").run(t.name);
+    db.prepare("DELETE FROM topic_members WHERE topic_id IN (SELECT id FROM topics WHERE name = ?)").run(t.name);
+    db.prepare("DELETE FROM topics WHERE name = ?").run(t.name);
+  }
+
+  // 3. 删除用户本身（外键级联处理其余关联）
+  db.prepare("DELETE FROM users WHERE id = ?").run(id);
   res.json({ message: "User deleted" });
 });
 

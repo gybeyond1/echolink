@@ -107,7 +107,7 @@ router.get("/", authMiddleware, (req, res) => {
       `SELECT t.id, t.name, t.title, t.description, t.owner_id, t.kind, u.username as owner_name,
               ${isAdmin ? "'admin'" : "m.role"} as my_role,
               CASE t.kind
-                WHEN 'devices' THEN '我的设备'
+                WHEN 'devices' THEN '我的设备（' || COALESCE(NULLIF(u.display_name, ''), u.username, '未知') || '）'
                 WHEN 'dm' THEN (SELECT COALESCE(u2.display_name, u2.username) FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id
                                 WHERE m2.topic_id = t.id AND m2.user_id != ? LIMIT 1)
                 ELSE t.name
@@ -127,6 +127,7 @@ router.get("/", authMiddleware, (req, res) => {
        ${isAdmin ? "LEFT" : "INNER"} JOIN topic_members m ON m.topic_id = t.id
        LEFT JOIN users u ON t.owner_id = u.id
        WHERE ${isAdmin ? "1=1" : "m.user_id = ?"}
+         AND (t.kind != 'devices' OR u.id IS NOT NULL)
        ORDER BY CASE t.kind WHEN 'devices' THEN 0 WHEN 'dm' THEN 1 ELSE 2 END, last_message_at DESC, t.created_at DESC
        LIMIT 100`
     )
