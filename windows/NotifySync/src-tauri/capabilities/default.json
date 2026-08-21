@@ -1,17 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for EchoLink desktop",
-  "windows": ["main"],
+  "description": "Default capabilities for EchoLink desktop (Slint native UI)",
+  "windows": ["host"],
   "permissions": [
     "core:default",
     "core:window:allow-show",
     "core:window:allow-hide",
-    "core:window:allow-close",
     "core:window:allow-set-focus",
-    "core:window:allow-unminimize",
     "notification:default",
-    "opener:default",
     "autostart:default"
   ]
 }
