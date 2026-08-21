@@ -508,7 +508,7 @@
       !isSpecial ? `<button class="btn ghost sm" id="c-leave">退出</button>` : "",
       t.my_role === "owner" && !isSpecial ? `<button class="btn danger sm" id="c-del">删除</button>` : "",
     ].join("");
-    const sub = t.kind === "devices" ? "我的设备 · 本账号互通"
+    const sub = t.kind === "devices" ? "设备同步会话 · 本账号互通"
       : t.kind === "dm" ? "好友私聊"
       : `${t.my_role === "owner" ? "创建者" : "成员"} · #${esc(t.name)}`;
     col.innerHTML = chatHeader(

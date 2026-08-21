@@ -14,6 +14,7 @@ function initDB() {
 
   db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON"); // 启用外键级联（users 删除时自动清理其设备/话题/成员等）
 
   // 用户表
   db.exec(`
@@ -256,6 +257,38 @@ function initDB() {
     });
     db.prepare("INSERT INTO settings (key, value) VALUES ('migrated_unlimited_media', '1') ON CONFLICT(key) DO UPDATE SET value = '1'").run();
     console.log("[DB] Media size limits reset to 0 (unlimited); adjust in admin WebUI if needed");
+  }
+
+  // 启用外键后未来删除会自动级联；但历史上 foreign_keys 默认关闭，可能残留孤儿记录。
+  // 启动时做一次清理：删除 owner 已不存在的 topic（主要是 devices/dm 会话），
+  // 以及 user 已不存在的 members/devices/messages。
+  try {
+    const deletedTopics = db
+      .prepare("DELETE FROM topics WHERE owner_id NOT IN (SELECT id FROM users)")
+      .run();
+    const deletedMembers = db
+      .prepare("DELETE FROM topic_members WHERE user_id NOT IN (SELECT id FROM users)")
+      .run();
+    const deletedDevices = db
+      .prepare("DELETE FROM devices WHERE user_id NOT IN (SELECT id FROM users)")
+      .run();
+    const deletedMsgs = db
+      .prepare(
+        "DELETE FROM topic_messages WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM users)"
+      )
+      .run();
+    if (
+      deletedTopics.changes > 0 ||
+      deletedMembers.changes > 0 ||
+      deletedDevices.changes > 0 ||
+      deletedMsgs.changes > 0
+    ) {
+      console.log(
+        `[DB] Orphan cleanup: topics=${deletedTopics.changes}, members=${deletedMembers.changes}, devices=${deletedDevices.changes}, messages=${deletedMsgs.changes}`
+      );
+    }
+  } catch (e) {
+    console.error("[DB] Orphan cleanup error:", e);
   }
 
   console.log("[DB] SQLite initialized at", dbPath);
