@@ -5,8 +5,10 @@ mod api;
 mod win_notif;
 
 use api::{Client, FilterEntry, InstalledApp, Message, Topic};
+use slint::{Model, ModelRc, VecModel};
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 use tauri::{
     menu::{MenuItem, PredefinedMenuItem},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
@@ -15,6 +17,14 @@ use tauri::{
 use tauri_plugin_notification::NotificationExt;
 
 slint::include_modules!();
+
+// Slint 1.8 生成的 MainWindow 实现了 ComponentHandle（有 clone_strong），
+// 但未 derive Clone。这里手动实现，便于在闭包/线程间 clone 句柄。
+impl Clone for MainWindow {
+    fn clone(&self) -> Self {
+        self.clone_strong()
+    }
+}
 
 #[derive(Default)]
 struct AppState {
@@ -74,7 +84,7 @@ fn save_persist(app: &AppHandle, p: &Persist) {
 fn fmt_time(ts: Option<u64>) -> String {
     match ts {
         Some(t) => {
-            let secs = if t > 1e12 { t / 1000 } else { t };
+            let secs = if t > 1_000_000_000_000 { t / 1000 } else { t };
             let d = chrono_like(secs);
             d
         }
@@ -102,20 +112,20 @@ fn chrono_like(secs: u64) -> String {
 
 fn topic_to_item(t: &Topic) -> TopicItem {
     TopicItem {
-        name: t.name.clone(),
-        display: t.display_name.clone(),
-        kind: t.kind.clone(),
-        avatar: t.avatar.clone().unwrap_or_default(),
+        name: t.name.clone().into(),
+        display: t.display_name.clone().into(),
+        kind: t.kind.clone().into(),
+        avatar: t.avatar.clone().unwrap_or_default().into(),
         preview: t.last_message.clone().unwrap_or_else(|| {
             if t.kind == "devices" {
                 "我的设备同步会话".to_string()
             } else {
                 "暂无消息".to_string()
             }
-        }),
+        }).into(),
         count: t.message_count as i32,
         unread: t.unread_count as i32,
-        time: fmt_time(t.last_message_at),
+        time: fmt_time(t.last_message_at).into(),
     }
 }
 
@@ -130,21 +140,22 @@ fn msg_to_item(m: &Message, my_id: i64) -> MsgItem {
     };
     MsgItem {
         id: m.id as i32,
-        text: m.text.clone().unwrap_or_else(|| m.title.clone().unwrap_or_default()),
+        text: m.text.clone().unwrap_or_else(|| m.title.clone().unwrap_or_default()).into(),
         mine,
-        sender: m.sender_display_name.clone().unwrap_or(m.sender_name.clone()),
-        time: fmt_time(Some(m.timestamp)),
-        media,
+        sender: m.sender_display_name.clone().unwrap_or(m.sender_name.clone()).into(),
+        time: fmt_time(Some(m.timestamp)).into(),
+        media: media.into(),
     }
 }
 
-async fn spawn_ws(shared: Shared, _app: AppHandle, win: MainWindow) {
+async fn spawn_ws(shared: Shared, _app: AppHandle, win: slint::Weak<MainWindow>) {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let shared_rx = shared.clone();
     // 启动 WS 接收循环
     tokio::spawn(async move {
         loop {
             let (server, token) = {
-                let s = shared.lock().unwrap();
+                let s = shared.lock();
                 (s.client.server.clone(), s.client.token.clone())
             };
             if server.is_empty() || token.is_empty() {
@@ -164,14 +175,15 @@ async fn spawn_ws(shared: Shared, _app: AppHandle, win: MainWindow) {
                 }
             };
             let (mut write, mut read) = ws_stream.split();
-            // 订阅现有话题
-            {
-                let s = shared.lock().unwrap();
-                for t in &s.client.topics_cache {
-                    let _ = write.send(tokio_tungstenite::tungstenite::Message::Text(
-                        format!("{{\"type\":\"subscribe\",\"topic\":\"{}\"}}", t.name),
-                    )).await;
-                }
+            // 订阅现有话题（先收集，避免 MutexGuard 跨 await 导致 !Send）
+            let topics: Vec<String> = {
+                let s = shared.lock();
+                s.client.topics_cache.iter().map(|t| t.name.clone()).collect()
+            };
+            for name in topics {
+                let _ = write.send(tokio_tungstenite::tungstenite::Message::Text(
+                    format!("{{\"type\":\"subscribe\",\"topic\":\"{}\"}}", name),
+                )).await;
             }
             // 接收
             use futures_util::{StreamExt, SinkExt};
@@ -187,6 +199,7 @@ async fn spawn_ws(shared: Shared, _app: AppHandle, win: MainWindow) {
 
     // 处理收到的 WS 消息（在主 tokio 线程，通过 invoke_from_event_loop 更新 UI）
     tokio::spawn(async move {
+        let shared = shared_rx;
         while let Some(text) = rx.recv().await {
             let parsed: serde_json::Value = match serde_json::from_str(&text) {
                 Ok(v) => v,
@@ -200,15 +213,17 @@ async fn spawn_ws(shared: Shared, _app: AppHandle, win: MainWindow) {
                     Ok(m) => m,
                     Err(_) => continue,
                 };
-                let my_id = shared.lock().unwrap().client.user_id;
+                let my_id = shared.lock().client.user_id;
                 let item = msg_to_item(&msg, my_id);
-                let cur = shared.lock().unwrap().current_topic.clone();
+                let cur = shared.lock().current_topic.clone();
                 if cur == topic {
+                    let weak = win.clone();
                     slint::invoke_from_event_loop(move || {
-                        let current: Vec<MsgItem> = win.get_messages().iter().collect();
-                        let mut v = slint::VecModel::from(current);
-                        v.push(item);
-                        win.set_messages(v.into());
+                        if let Some(w) = weak.upgrade() {
+                            let mut current: Vec<MsgItem> = w.get_messages().iter().collect();
+                            current.push(item);
+                            w.set_messages(ModelRc::new(VecModel::from(current)));
+                        }
                     })
                     .ok();
                 }
@@ -217,13 +232,16 @@ async fn spawn_ws(shared: Shared, _app: AppHandle, win: MainWindow) {
             } else if mtype == "message_deleted" {
                 let topic = parsed["topic"].as_str().unwrap_or("").to_string();
                 let mid = parsed["message_id"].as_i64().unwrap_or(0);
-                let cur = shared.lock().unwrap().current_topic.clone();
+                let cur = shared.lock().current_topic.clone();
                 if cur == topic {
+                    let weak = win.clone();
                     slint::invoke_from_event_loop(move || {
-                        let current: Vec<MsgItem> = win.get_messages().iter().collect();
-                        let filtered: Vec<MsgItem> =
-                            current.into_iter().filter(|m| m.id as i64 != mid).collect();
-                        win.set_messages(slint::VecModel::from(filtered).into());
+                        if let Some(w) = weak.upgrade() {
+                            let current: Vec<MsgItem> = w.get_messages().iter().collect();
+                            let filtered: Vec<MsgItem> =
+                                current.into_iter().filter(|m| m.id as i64 != mid).collect();
+                            w.set_messages(ModelRc::new(VecModel::from(filtered)));
+                        }
                     })
                     .ok();
                 }
@@ -232,24 +250,30 @@ async fn spawn_ws(shared: Shared, _app: AppHandle, win: MainWindow) {
     });
 }
 
-async fn refresh_topics(shared: Shared, win: MainWindow) {
+async fn refresh_topics(shared: Shared, win: slint::Weak<MainWindow>) {
+    let authed = {
+        let s = shared.lock();
+        s.client.authed()
+    };
+    if !authed {
+        return;
+    }
     let topics = {
-        let mut s = shared.lock().unwrap();
-        if !s.client.authed() {
-            return;
-        }
-        match s.client.topics().await {
+        let mut client = shared.lock().client.clone();
+        match client.topics().await {
             Ok(t) => t,
             Err(_) => return,
         }
     };
     {
-        let mut s = shared.lock().unwrap();
+        let mut s = shared.lock();
         s.client.topics_cache = topics.clone();
     }
     let items: Vec<TopicItem> = topics.iter().map(topic_to_item).collect();
     slint::invoke_from_event_loop(move || {
-        win.set_topics(slint::VecModel::from(items).into());
+        if let Some(w) = win.upgrade() {
+            w.set_topics(ModelRc::new(VecModel::from(items)));
+        }
     })
     .ok();
 }
@@ -280,7 +304,7 @@ pub fn run() {
                 current_topic: String::new(),
             }));
             {
-                let mut s = shared.lock().unwrap();
+                let mut s = shared.lock();
                 s.client.token = persist.token.clone();
                 s.client.username = persist.username.clone();
                 s.client.user_id = persist.user_id;
@@ -300,21 +324,22 @@ pub fn run() {
             main_window.set_sync_enabled(persist.notification_sync_enabled);
 
             // 回调绑定
-            bind_callbacks(shared.clone(), handle.clone(), main_window.clone());
+            bind_callbacks(shared.clone(), handle.clone(), main_window.as_weak());
 
             // 若已有登录态，恢复会话
             if !persist.token.is_empty() && !persist.server_url.is_empty() {
                 let sh = shared.clone();
-                let mw = main_window.clone();
+                let mw = main_window.as_weak();
                 tauri::async_runtime::spawn(async move {
                     {
-                        let mut s = sh.lock().unwrap();
-                        let _ = s.client.me().await;
+                        let mut client = sh.lock().client.clone();
+                        let r = client.me().await;
+                        let _ = r;
                     }
-                    main_window_set_profile(&mw, &sh);
+                    main_window_set_profile(mw.clone(), &sh);
                     refresh_topics(sh.clone(), mw.clone()).await;
-                    // 启动 WS
-                    spawn_ws(sh.clone(), handle.clone(), mw.clone());
+                    // 启动 WS（内部自行 spawn 长连接，返回 future 丢弃即可）
+                    let _ = spawn_ws(sh.clone(), handle.clone(), mw.clone());
                 });
                 // 通知同步
                 if persist.notification_sync_enabled {
@@ -329,7 +354,7 @@ pub fn run() {
             main_window.show().expect("Slint 窗口显示失败");
 
             // 托盘
-            build_tray(app.handle(), shared.clone(), main_window.clone());
+            build_tray(app.handle(), shared.clone(), main_window.as_weak());
 
             app.manage(shared);
             Ok(())
@@ -338,17 +363,22 @@ pub fn run() {
         .expect("error while running EchoLink desktop");
 }
 
-fn main_window_set_profile(mw: &MainWindow, sh: &Shared) {
-    let s = sh.lock().unwrap();
-    mw.set_username(s.client.username.clone().into());
-    mw.set_display_name(s.client.display_name.clone().into());
+fn main_window_set_profile(mw: slint::Weak<MainWindow>, sh: &Shared) {
+    let s = sh.lock();
+    if let Some(w) = mw.upgrade() {
+        w.set_username(s.client.username.clone().into());
+        w.set_display_name(s.client.display_name.clone().into());
+    }
 }
 
-fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
+fn bind_callbacks(shared: Shared, app: AppHandle, win: slint::Weak<MainWindow>) {
+    // 回调注册方法在强引用 MainWindow 上；此处升级为强引用以注册，
+    // 各回调内部再 as_weak() 捕获 Weak 句柄供跨线程使用。
+    let win = win.upgrade().expect("主窗口在绑定回调时必须存活");
     // 登录
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         let a = app.clone();
         win.on_do_login(move |server, user, pass| {
             let sh = sh.clone();
@@ -356,15 +386,18 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
             let a = a.clone();
             tauri::async_runtime::spawn(async move {
                 let r = {
-                    let mut s = sh.lock().unwrap();
-                    s.client = Client::new(server.to_string());
-                    let r = s.client.login(&user, &pass).await;
-                    drop(s);
+                    let mut client = Client::new(server.to_string());
+                    let r = client.login(&user, &pass).await;
+                    // 写回登录态
+                    {
+                        let mut s = sh.lock();
+                        s.client = client;
+                    }
                     r
                 };
                 match r {
                     Ok(_) => {
-                        persist_and_apply(&a, &sh, &w, true, "").await;
+                        persist_and_apply(&a, &sh, w.clone(), true, "").await;
                     }
                     Err(e) => set_status(&w, &e),
                 }
@@ -374,7 +407,7 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     // 注册
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         let a = app.clone();
         win.on_do_register(move |server, user, pass| {
             let sh = sh.clone();
@@ -382,15 +415,17 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
             let a = a.clone();
             tauri::async_runtime::spawn(async move {
                 let r = {
-                    let mut s = sh.lock().unwrap();
-                    s.client = Client::new(server.to_string());
-                    let r = s.client.register(&user, &pass).await;
-                    drop(s);
+                    let mut client = Client::new(server.to_string());
+                    let r = client.register(&user, &pass).await;
+                    {
+                        let mut s = sh.lock();
+                        s.client = client;
+                    }
                     r
                 };
                 match r {
                     Ok(_) => {
-                        persist_and_apply(&a, &sh, &w, true, "").await;
+                        persist_and_apply(&a, &sh, w.clone(), true, "").await;
                     }
                     Err(e) => set_status(&w, &e),
                 }
@@ -400,7 +435,7 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     // 加载话题
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         win.on_load_topics(move || {
             let sh = sh.clone();
             let w = w.clone();
@@ -412,14 +447,14 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     // 打开话题
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         win.on_open_topic(move |name| {
             let name = name.to_string();
             let sh = sh.clone();
             let w = w.clone();
             tauri::async_runtime::spawn(async move {
                 let (topic, display, sub) = {
-                    let s = sh.lock().unwrap();
+                    let s = sh.lock();
                     let t = s.client.topics_cache_names().iter().find(|t| t.name == name).cloned();
                     let t = match t {
                         Some(t) => t,
@@ -438,31 +473,44 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
                     )
                 };
                 {
-                    let mut s = sh.lock().unwrap();
+                    let mut s = sh.lock();
                     s.current_topic = topic.clone();
                 }
-                w.set_current_topic(topic.clone().into());
-                w.set_chat_title(display.clone().into());
-                w.set_chat_sub(sub.into());
-                w.set_chat_open(true);
+                let weak = w.clone();
+                let topic_c = topic.clone();
+                let display_c = display.clone();
+                let sub_c = sub.clone();
+                slint::invoke_from_event_loop(move || {
+                    if let Some(win) = weak.upgrade() {
+                        win.set_current_topic(topic_c.clone().into());
+                        win.set_chat_title(display_c.clone().into());
+                        win.set_chat_sub(sub_c.into());
+                        win.set_chat_open(true);
+                    }
+                }).ok();
                 // 加载消息
                 let msgs = {
-                    let s = sh.lock().unwrap();
-                    match s.client.messages(&topic, 100).await {
+                    let client = sh.lock().client.clone();
+                    match client.messages(&topic, 100).await {
                         Ok(m) => m,
                         Err(_) => Vec::new(),
                     }
                 };
-                let my_id = sh.lock().unwrap().client.user_id;
+                let my_id = sh.lock().client.user_id;
                 let items: Vec<MsgItem> = msgs.iter().map(|m| msg_to_item(m, my_id)).collect();
-                w.set_messages(slint::VecModel::from(items).into());
+                let weak2 = w.clone();
+                slint::invoke_from_event_loop(move || {
+                    if let Some(win) = weak2.upgrade() {
+                        win.set_messages(ModelRc::new(VecModel::from(items)));
+                    }
+                }).ok();
             });
         });
     }
     // 发送消息
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         win.on_send_message(move |text| {
             let text = text.trim().to_string();
             if text.is_empty() {
@@ -471,25 +519,27 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
             let sh = sh.clone();
             let w = w.clone();
             tauri::async_runtime::spawn(async move {
-                let topic = sh.lock().unwrap().current_topic.clone();
+                let topic = sh.lock().current_topic.clone();
                 if topic.is_empty() {
                     return;
                 }
                 let r = {
-                    let s = sh.lock().unwrap();
-                    s.client.publish(&topic, &text).await
+                    let client = sh.lock().client.clone();
+                    client.publish(&topic, &text).await
                 };
                 if let Ok(m) = r {
-                    let my_id = sh.lock().unwrap().client.user_id;
+                    let my_id = sh.lock().client.user_id;
                     let item = msg_to_item(&m, my_id);
+                    let weak = w.clone();
                     slint::invoke_from_event_loop(move || {
-                        let current: Vec<MsgItem> = w.get_messages().iter().collect();
-                        let mut v = slint::VecModel::from(current);
-                        v.push(item);
-                        w.set_messages(v.into());
+                        if let Some(win) = weak.upgrade() {
+                            let mut current: Vec<MsgItem> = win.get_messages().iter().collect();
+                            current.push(item);
+                            win.set_messages(ModelRc::new(VecModel::from(current)));
+                            win.set_input_text("".into());
+                        }
                     })
                     .ok();
-                    w.set_input_text("".into());
                 }
             });
         });
@@ -501,11 +551,11 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
             let sh = sh.clone();
             tauri::async_runtime::spawn(async move {
                 let r = {
-                    let s = sh.lock().unwrap();
-                    s.client.delete_message(&topic, id as i64).await
+                    let client = sh.lock().client.clone();
+                    client.delete_message(&topic, id as i64).await
                 };
                 if r.is_ok() {
-                    let mut s = sh.lock().unwrap();
+                    let mut s = sh.lock();
                     s.client.topics_cache.clear();
                 }
             });
@@ -513,9 +563,12 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     }
     // 切换 tab
     {
-        let w = win.clone();
+        let sh = shared.clone();
+        let w = win.as_weak();
         win.on_switch_tab(move |tab| {
-            w.set_current_tab(tab.clone());
+            if let Some(win) = w.upgrade() {
+                win.set_current_tab(tab.clone());
+            }
             match tab.as_str() {
                 "friends" => {
                     let sh = sh.clone();
@@ -549,14 +602,14 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     // 好友私聊
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         win.on_friend_chat(move |username| {
             let sh = sh.clone();
             let w = w.clone();
             tauri::async_runtime::spawn(async move {
                 let topic = {
-                    let s = sh.lock().unwrap();
-                    match s.client.friend_chat(&username).await {
+                    let client = sh.lock().client.clone();
+                    match client.friend_chat(&username).await {
                         Ok(t) => t,
                         Err(e) => {
                             set_status(&w, &e);
@@ -565,8 +618,13 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
                     }
                 };
                 if !topic.is_empty() {
-                    w.set_current_tab("messages".into());
-                    w.invoke_open_topic(topic.into());
+                    let weak = w.clone();
+                    slint::invoke_from_event_loop(move || {
+                        if let Some(win) = weak.upgrade() {
+                            win.set_current_tab("messages".into());
+                            win.invoke_open_topic(topic.into());
+                        }
+                    }).ok();
                 }
             });
         });
@@ -574,16 +632,14 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     // 加好友
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         win.on_add_friend(move |username| {
             let sh = sh.clone();
             let w = w.clone();
             tauri::async_runtime::spawn(async move {
                 let r = {
-                    let s = sh.lock().unwrap();
-                    s.client
-                        .add_friend_req(&username)
-                        .await
+                    let client = sh.lock().client.clone();
+                    client.add_friend_req(&username).await
                 };
                 match r {
                     Ok(_) => set_status(&w, "好友申请已发送"),
@@ -600,7 +656,7 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
             let sh = sh.clone();
             let a = a.clone();
             let (server, token) = {
-                let s = sh.lock().unwrap();
+                let s = sh.lock();
                 (s.client.server.clone(), s.client.token.clone())
             };
             if on {
@@ -615,7 +671,7 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     // 刷新本机应用列表
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         win.on_refresh_apps(move || {
             let sh = sh.clone();
             let w = w.clone();
@@ -631,17 +687,17 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
             let sh = sh.clone();
             tauri::async_runtime::spawn(async move {
                 let r = {
-                    let s = sh.lock().unwrap();
+                    let client = sh.lock().client.clone();
                     if checked {
                         let name = exe.trim_end_matches(".exe").to_string();
-                        s.client.add_filter(&exe, &name).await
+                        client.add_filter(&exe, &name).await
                     } else {
-                        s.client.del_filter(&exe).await
+                        client.del_filter(&exe).await
                     }
                 };
                 if r.is_ok() {
                     let blocked: HashSet<String> = {
-                        let mut s = sh.lock().unwrap();
+                        let mut s = sh.lock();
                         if checked {
                             let name = exe.trim_end_matches(".exe").to_string();
                             if !s.client.filters_cache.iter().any(|f| f.package_name.as_str() == exe.as_str()) {
@@ -664,18 +720,28 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     // 保存昵称
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         win.on_save_nickname(move |name| {
             let sh = sh.clone();
             let w = w.clone();
             tauri::async_runtime::spawn(async move {
                 let r = {
-                    let mut s = sh.lock().unwrap();
-                    s.client.set_nickname(&name).await
+                    let mut client = sh.lock().client.clone();
+                    let r = client.set_nickname(&name).await;
+                    {
+                        let mut s = sh.lock();
+                        s.client = client;
+                    }
+                    r
                 };
                 match r {
                     Ok(_) => {
-                        w.set_display_name(name);
+                        let weak = w.clone();
+                        slint::invoke_from_event_loop(move || {
+                            if let Some(win) = weak.upgrade() {
+                                win.set_display_name(name);
+                            }
+                        }).ok();
                         set_status(&w, "昵称已保存");
                     }
                     Err(e) => set_status(&w, &e),
@@ -686,14 +752,14 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     // 改密码
     {
         let sh = shared.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         win.on_change_pass(move |old, new| {
             let sh = sh.clone();
             let w = w.clone();
             tauri::async_runtime::spawn(async move {
                 let r = {
-                    let s = sh.lock().unwrap();
-                    s.client.change_password(&old, &new).await
+                    let client = sh.lock().client.clone();
+                    client.change_password(&old, &new).await
                 };
                 match r {
                     Ok(_) => set_status(&w, "密码已修改"),
@@ -706,30 +772,34 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
     {
         let sh = shared.clone();
         let a = app.clone();
-        let w = win.clone();
+        let w = win.as_weak();
         win.on_do_logout(move || {
             win_notif::stop();
             {
-                let mut s = sh.lock().unwrap();
+                let mut s = sh.lock();
                 s.client = Client::new(s.client.server.clone());
                 s.current_topic = String::new();
             }
             update_persist_logout(&a);
-            w.set_logged_in(false);
-            w.set_messages(slint::VecModel::default().into());
-            w.set_topics(slint::VecModel::default().into());
+            if let Some(win) = w.upgrade() {
+                win.set_logged_in(false);
+                win.set_messages(ModelRc::new(VecModel::default()));
+                win.set_topics(ModelRc::new(VecModel::default()));
+            }
         });
     }
 }
 
-fn set_status(w: &MainWindow, msg: &str) {
-    w.set_status(msg.into());
+fn set_status(w: &slint::Weak<MainWindow>, msg: &str) {
+    if let Some(win) = w.upgrade() {
+        win.set_status(msg.into());
+    }
 }
 
-async fn load_friends(sh: Shared, w: MainWindow) {
+async fn load_friends(sh: Shared, w: slint::Weak<MainWindow>) {
     let fs = {
-        let s = sh.lock().unwrap();
-        match s.client.friends().await {
+        let client = sh.lock().client.clone();
+        match client.friends().await {
             Ok(f) => f,
             Err(_) => return,
         }
@@ -737,20 +807,22 @@ async fn load_friends(sh: Shared, w: MainWindow) {
     let items: Vec<FriendItem> = fs
         .iter()
         .map(|f| FriendItem {
-            username: f.username.clone(),
-            display: f.display_name.clone().unwrap_or(f.username.clone()),
+            username: f.username.clone().into(),
+            display: f.display_name.clone().unwrap_or(f.username.clone()).into(),
         })
         .collect();
     slint::invoke_from_event_loop(move || {
-        w.set_friends(slint::VecModel::from(items).into());
+        if let Some(win) = w.upgrade() {
+            win.set_friends(ModelRc::new(VecModel::from(items)));
+        }
     })
     .ok();
 }
 
-async fn load_notifs(sh: Shared, w: MainWindow) {
+async fn load_notifs(sh: Shared, w: slint::Weak<MainWindow>) {
     let ns = {
-        let s = sh.lock().unwrap();
-        match s.client.notifications(100).await {
+        let client = sh.lock().client.clone();
+        match client.notifications(100).await {
             Ok(n) => n,
             Err(_) => return,
         }
@@ -759,22 +831,24 @@ async fn load_notifs(sh: Shared, w: MainWindow) {
         .iter()
         .map(|n| NotifItem {
             id: n.id as i32,
-            app: n.app_name.clone().unwrap_or_default(),
-            title: n.title.clone().unwrap_or_default(),
-            text: n.text.clone().unwrap_or_default(),
-            time: fmt_time(n.timestamp),
+            app: n.app_name.clone().unwrap_or_default().into(),
+            title: n.title.clone().unwrap_or_default().into(),
+            text: n.text.clone().unwrap_or_default().into(),
+            time: fmt_time(n.timestamp).into(),
         })
         .collect();
     slint::invoke_from_event_loop(move || {
-        w.set_notifs(slint::VecModel::from(items).into());
+        if let Some(win) = w.upgrade() {
+            win.set_notifs(ModelRc::new(VecModel::from(items)));
+        }
     })
     .ok();
 }
 
-async fn load_devices(sh: Shared, w: MainWindow) {
+async fn load_devices(sh: Shared, w: slint::Weak<MainWindow>) {
     let ds = {
-        let s = sh.lock().unwrap();
-        match s.client.devices().await {
+        let client = sh.lock().client.clone();
+        match client.devices().await {
             Ok(d) => d,
             Err(_) => return,
         }
@@ -782,21 +856,23 @@ async fn load_devices(sh: Shared, w: MainWindow) {
     let items: Vec<DeviceItem> = ds
         .iter()
         .map(|d| DeviceItem {
-            name: d.device_name.clone(),
-            platform: d.platform.clone().unwrap_or_default(),
-            last: fmt_time(d.last_seen),
+            name: d.device_name.clone().into(),
+            platform: d.platform.clone().unwrap_or_default().into(),
+            last: fmt_time(d.last_seen).into(),
         })
         .collect();
     slint::invoke_from_event_loop(move || {
-        w.set_devices(slint::VecModel::from(items).into());
+        if let Some(win) = w.upgrade() {
+            win.set_devices(ModelRc::new(VecModel::from(items)));
+        }
     })
     .ok();
 }
 
-async fn load_filters(sh: Shared, w: MainWindow) {
+async fn load_filters(sh: Shared, w: slint::Weak<MainWindow>) {
     let (filters, apps) = {
-        let s = sh.lock().unwrap();
-        let f = s.client.filters().await.ok().unwrap_or_default();
+        let client = sh.lock().client.clone();
+        let f = client.filters().await.ok().unwrap_or_default();
         let a = win_notif::list_installed_apps();
         (f, a)
     };
@@ -806,39 +882,41 @@ async fn load_filters(sh: Shared, w: MainWindow) {
     let app_items: Vec<AppItem> = apps
         .into_iter()
         .map(|a: InstalledApp| AppItem {
-            name: a.name.clone(),
-            exe: a.exe.clone(),
+            name: a.name.clone().into(),
+            exe: a.exe.clone().into(),
             checked: checked_set.contains(&a.exe),
         })
         .collect();
     let filter_items: Vec<FilterItem> = filters
         .iter()
         .map(|f| FilterItem {
-            pkg: f.package_name.clone(),
-            name: f.app_name.clone(),
+            pkg: f.package_name.clone().into(),
+            name: f.app_name.clone().into(),
             checked: f.enabled,
         })
         .collect();
     {
-        let mut s = sh.lock().unwrap();
+        let mut s = sh.lock();
         s.client.filters_cache = filters;
     }
     slint::invoke_from_event_loop(move || {
-        w.set_apps(slint::VecModel::from(app_items).into());
-        w.set_filters(slint::VecModel::from(filter_items).into());
+        if let Some(win) = w.upgrade() {
+            win.set_apps(ModelRc::new(VecModel::from(app_items)));
+            win.set_filters(ModelRc::new(VecModel::from(filter_items)));
+        }
     })
     .ok();
 }
 
-async fn refresh_apps(sh: Shared, w: MainWindow) {
+async fn refresh_apps(sh: Shared, w: slint::Weak<MainWindow>) {
     // 重新拉取并保留当前勾选
     load_filters(sh, w).await;
 }
 
-async fn persist_and_apply(app: &AppHandle, sh: &Shared, w: &MainWindow, ok: bool, err: &str) {
+async fn persist_and_apply(app: &AppHandle, sh: &Shared, w: slint::Weak<MainWindow>, ok: bool, err: &str) {
     if ok {
         {
-            let s = sh.lock().unwrap();
+            let s = sh.lock();
             let p = Persist {
                 server_url: s.client.server.clone(),
                 token: s.client.token.clone(),
@@ -852,20 +930,24 @@ async fn persist_and_apply(app: &AppHandle, sh: &Shared, w: &MainWindow, ok: boo
             };
             save_persist(app, &p);
         }
-        w.set_logged_in(true);
-        w.set_status("".into());
-        main_window_set_profile(w, sh);
+        if let Some(win) = w.upgrade() {
+            win.set_logged_in(true);
+            win.set_status("".into());
+        }
+        main_window_set_profile(w.clone(), sh);
         refresh_topics(sh.clone(), w.clone()).await;
-        // 启动 WS
-        spawn_ws(sh.clone(), app.clone(), w.clone());
+        // 启动 WS（内部自行 spawn 长连接，返回 future 丢弃即可）
+        let _ = spawn_ws(sh.clone(), app.clone(), w.clone());
     } else {
-        w.set_status(err.into());
+        if let Some(win) = w.upgrade() {
+            win.set_status(err.into());
+        }
     }
 }
 
 fn update_persist_sync(app: &AppHandle, sh: &Shared, on: bool) {
     let p = {
-        let s = sh.lock().unwrap();
+        let s = sh.lock();
         Persist {
             server_url: s.client.server.clone(),
             token: s.client.token.clone(),
@@ -905,7 +987,7 @@ fn update_persist_logout(app: &AppHandle) {
     }
 }
 
-fn build_tray(app: &AppHandle, _sh: Shared, _win: MainWindow) {
+fn build_tray(app: &AppHandle, _sh: Shared, _win: slint::Weak<MainWindow>) {
     let show = MenuItem::with_id(app, "show", "打开", true, None::<&str>).unwrap();
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>).unwrap();
     let sep = PredefinedMenuItem::separator(app).unwrap();
