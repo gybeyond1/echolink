@@ -207,7 +207,7 @@ impl Client {
 
     pub async fn add_friend_req(&self, username: &str) -> Result<()> {
         let body = serde_json::json!({ "username": username, "message": "" });
-        self.post("/api/friends/requests", &body).await?;
+        self.post::<()>("/api/friends/requests", &body).await?;
         Ok(())
     }
 
@@ -236,7 +236,7 @@ impl Client {
             "app_name": app_name,
             "enabled": true
         });
-        self.post("/api/filters", &body).await?;
+        self.post::<()>("/api/filters", &body).await?;
         Ok(())
     }
 
@@ -248,14 +248,14 @@ impl Client {
     // ---- Profile ----
     pub async fn set_nickname(&mut self, name: &str) -> Result<()> {
         let body = serde_json::json!({ "display_name": name });
-        self.put("/api/user/nickname", &body).await?;
+        self.put::<()>("/api/user/nickname", &body).await?;
         self.display_name = name.to_string();
         Ok(())
     }
 
     pub async fn change_password(&self, old: &str, new: &str) -> Result<()> {
         let body = serde_json::json!({ "oldPassword": old, "newPassword": new });
-        self.put("/api/auth/change-password", &body).await?;
+        self.put::<()>("/api/auth/change-password", &body).await?;
         Ok(())
     }
 
@@ -281,7 +281,7 @@ impl Client {
             "text": text,
             "timestamp": now_ms()
         });
-        self.post("/api/notifications", &body).await?;
+        self.post::<()>("/api/notifications", &body).await?;
         Ok(())
     }
 }
