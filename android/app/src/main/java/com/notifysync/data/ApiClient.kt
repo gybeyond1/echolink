@@ -433,6 +433,16 @@ object ApiClient {
     }
 
     // ===== 健康检查 =====
+    //
+    // 用独立、短超时（5s）的 client，不复用常驻业务 client 的连接池：
+    //   - 否则切换服务器地址瞬间，旧的 WebSocket 重连可能占满同一 host 的连接槽，
+    //     导致测试请求排队「卡半天」才出结果；
+    //   - 短超时让「连不上」最多 5s 就明确反馈，而不是干等 15~30s。
+    private val healthClient = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .writeTimeout(5, TimeUnit.SECONDS)
+        .build()
 
     suspend fun checkHealth(): Boolean = checkHealthWithReason().first
 
@@ -443,7 +453,7 @@ object ApiClient {
                 .url("${AuthManager.serverUrl}/health")
                 .get()
                 .build()
-            client.newCall(request).execute().use { resp ->
+            healthClient.newCall(request).execute().use { resp ->
                 if (resp.isSuccessful) true to null
                 else false to "HTTP ${resp.code}"
             }
