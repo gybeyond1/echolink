@@ -1,6 +1,5 @@
 // EchoLink Desktop —— Tauri 2 + Slint 原生客户端入口
 // 界面全部为 Slint 原生控件（无 WebView 网页），Rust 直连 REST + WebSocket。
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod api;
 mod win_notif;
@@ -170,7 +169,7 @@ async fn spawn_ws(shared: Shared, _app: AppHandle, win: MainWindow) {
                 let s = shared.lock().unwrap();
                 for t in &s.client.topics_cache {
                     let _ = write.send(tokio_tungstenite::tungstenite::Message::Text(
-                        format!("{{\"type\":\"subscribe\",\"topic\":\"{}\"}}", t),
+                        format!("{{\"type\":\"subscribe\",\"topic\":\"{}\"}}", t.name),
                     )).await;
                 }
             }
@@ -294,9 +293,9 @@ pub fn run() {
             let main_window = MainWindow::new().expect("Slint 窗口创建失败");
 
             // 初始状态推送
-            main_window.set_server_url(persist.server_url.clone());
-            main_window.set_username(persist.username.clone());
-            main_window.set_display_name(persist.display_name.clone());
+            main_window.set_server_url(persist.server_url.clone().into());
+            main_window.set_username(persist.username.clone().into());
+            main_window.set_display_name(persist.display_name.clone().into());
             main_window.set_logged_in(!persist.token.is_empty());
             main_window.set_sync_enabled(persist.notification_sync_enabled);
 
@@ -341,8 +340,8 @@ pub fn run() {
 
 fn main_window_set_profile(mw: &MainWindow, sh: &Shared) {
     let s = sh.lock().unwrap();
-    mw.set_username(s.client.username.clone());
-    mw.set_display_name(s.client.display_name.clone());
+    mw.set_username(s.client.username.clone().into());
+    mw.set_display_name(s.client.display_name.clone().into());
 }
 
 fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
@@ -356,9 +355,13 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
             let w = w.clone();
             let a = a.clone();
             tauri::async_runtime::spawn(async move {
-                let mut s = sh.lock().unwrap();
-                s.client = Client::new(server.clone());
-                let r = s.client.login(&user, &pass).await;
+                let r = {
+                    let mut s = sh.lock().unwrap();
+                    s.client = Client::new(server.to_string());
+                    let r = s.client.login(&user, &pass).await;
+                    drop(s);
+                    r
+                };
                 match r {
                     Ok(_) => {
                         persist_and_apply(&a, &sh, &w, true, "").await;
@@ -378,9 +381,13 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
             let w = w.clone();
             let a = a.clone();
             tauri::async_runtime::spawn(async move {
-                let mut s = sh.lock().unwrap();
-                s.client = Client::new(server.clone());
-                let r = s.client.register(&user, &pass).await;
+                let r = {
+                    let mut s = sh.lock().unwrap();
+                    s.client = Client::new(server.to_string());
+                    let r = s.client.register(&user, &pass).await;
+                    drop(s);
+                    r
+                };
                 match r {
                     Ok(_) => {
                         persist_and_apply(&a, &sh, &w, true, "").await;
@@ -407,6 +414,7 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
         let sh = shared.clone();
         let w = win.clone();
         win.on_open_topic(move |name| {
+            let name = name.to_string();
             let sh = sh.clone();
             let w = w.clone();
             tauri::async_runtime::spawn(async move {
@@ -433,9 +441,9 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
                     let mut s = sh.lock().unwrap();
                     s.current_topic = topic.clone();
                 }
-                w.set_current_topic(topic.clone());
-                w.set_chat_title(display.clone());
-                w.set_chat_sub(sub);
+                w.set_current_topic(topic.clone().into());
+                w.set_chat_title(display.clone().into());
+                w.set_chat_sub(sub.into());
                 w.set_chat_open(true);
                 // 加载消息
                 let msgs = {
@@ -481,7 +489,7 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
                         w.set_messages(v.into());
                     })
                     .ok();
-                    w.set_input_text("".to_string());
+                    w.set_input_text("".into());
                 }
             });
         });
@@ -557,8 +565,8 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
                     }
                 };
                 if !topic.is_empty() {
-                    w.set_current_tab("messages".to_string());
-                    w.invoke_open_topic(topic);
+                    w.set_current_tab("messages".into());
+                    w.invoke_open_topic(topic.into());
                 }
             });
         });
@@ -636,15 +644,15 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
                         let mut s = sh.lock().unwrap();
                         if checked {
                             let name = exe.trim_end_matches(".exe").to_string();
-                            if !s.client.filters_cache.iter().any(|f| f.package_name == exe) {
+                            if !s.client.filters_cache.iter().any(|f| f.package_name.as_str() == exe.as_str()) {
                                 s.client.filters_cache.push(FilterEntry {
-                                    package_name: exe.clone(),
+                                    package_name: exe.to_string(),
                                     app_name: name,
                                     enabled: true,
                                 });
                             }
                         } else {
-                            s.client.filters_cache.retain(|f| f.package_name != exe);
+                            s.client.filters_cache.retain(|f| f.package_name.as_str() != exe.as_str());
                         }
                         s.client.filters_cache.iter().filter(|f| f.enabled).map(|f| f.package_name.clone()).collect()
                     };
@@ -715,7 +723,7 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: MainWindow) {
 }
 
 fn set_status(w: &MainWindow, msg: &str) {
-    w.set_status(msg.to_string());
+    w.set_status(msg.into());
 }
 
 async fn load_friends(sh: Shared, w: MainWindow) {
@@ -807,7 +815,7 @@ async fn load_filters(sh: Shared, w: MainWindow) {
         .iter()
         .map(|f| FilterItem {
             pkg: f.package_name.clone(),
-            name: f.name.clone(),
+            name: f.app_name.clone(),
             checked: f.enabled,
         })
         .collect();
@@ -845,13 +853,13 @@ async fn persist_and_apply(app: &AppHandle, sh: &Shared, w: &MainWindow, ok: boo
             save_persist(app, &p);
         }
         w.set_logged_in(true);
-        w.set_status("".to_string());
+        w.set_status("".into());
         main_window_set_profile(w, sh);
         refresh_topics(sh.clone(), w.clone()).await;
         // 启动 WS
         spawn_ws(sh.clone(), app.clone(), w.clone());
     } else {
-        w.set_status(err.to_string());
+        w.set_status(err.into());
     }
 }
 
