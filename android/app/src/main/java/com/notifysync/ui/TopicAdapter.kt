@@ -519,18 +519,20 @@ class TopicAdapter(
      * 头像加载策略（根治「首条/对方消息没头像」）：
      *  - 自己发的消息 → 永远用 AuthManager.avatarUrl（当前实时头像），换头像后立即生效；
      *  - 他人消息：
-     *      · DM 私聊 → 优先消息自带 sender_avatar，为空则无条件回退 peerAvatarUrl（对方实时头像），
-     *        确保哪怕历史消息没存头像，首条也一定显示对方头像；
+     *      · DM 私聊 → 优先消息自带 sender_avatar，为空则回退 item.peerAvatar（服务器给的对方实时头像，
+     *        每条消息自带、不依赖外部传入），再不行回退 peerAvatarUrl（showChatMode 传入），保证首条一定有头像；
      *      · 群聊/设备会话 → 优先消息自带 sender_avatar，为空则显示默认头像（群友没有统一头像）。
-     *  之前「首条没头像」的真正原因：历史消息 sender_avatar 为空，而旧逻辑只在 peerAvatarUrl
-     *  为空时才自愈、且 isSelf 仅用 user_id 判定（老消息 user_id=0 会被误判成他人），叠加导致首条丢失。
+     *  关键修复：peer_avatar 由服务器 /messages 在 dm 下直接返回并附在每条消息上，
+     *  彻底摆脱「peerAvatarUrl 外部未传/传空导致老消息无兜底」的隐患。
      */
     private fun loadAvatar(item: TopicMessage, iv: ImageView) {
         val url = if (isSelfMessage(item)) {
             ApiClient.fullAvatarUrl(AuthManager.avatarUrl)
         } else if (isDm) {
-            // DM：对方头像 = 消息自带优先，否则对方实时头像兜底（必不为空时一定显示）
-            ApiClient.fullAvatarUrl(item.senderAvatar) ?: peerAvatarUrl
+            // DM 对方头像兜底链：消息自带 → 服务器给的 peer_avatar → 外部传入 peerAvatarUrl
+            ApiClient.fullAvatarUrl(item.senderAvatar)
+                ?: ApiClient.fullAvatarUrl(item.peerAvatar)
+                ?: peerAvatarUrl
         } else {
             ApiClient.fullAvatarUrl(item.senderAvatar)
         }

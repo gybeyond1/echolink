@@ -428,6 +428,15 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
   // 查询发送者的头像和昵称（用于客户端聊天页头像渲染）
   const userRow = db.prepare("SELECT avatar, display_name FROM users WHERE id = ?").get(req.userId);
 
+  // dm 私聊：取对方头像作为 peer_avatar 随消息下发，彻底杜绝实时消息缺头像
+  let peerAvatarForPublish = null;
+  if (topic.kind === "dm") {
+    const peerRow = db
+      .prepare(`SELECT u2.avatar FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id WHERE m2.topic_id = ? AND m2.user_id != ? LIMIT 1`)
+      .get(topic.id, req.userId);
+    peerAvatarForPublish = peerRow?.avatar || null;
+  }
+
   const message = {
     id: result.lastInsertRowid,
     topic: name,
@@ -444,6 +453,7 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
     timestamp: ts,
     device_id: deviceId,
     device_name: deviceName || null,
+    peer_avatar: peerAvatarForPublish,
   };
 
   const sent = publishToTopic(name, message, { excludeDeviceId: deviceId });
@@ -472,10 +482,24 @@ router.get("/:topic/messages", authMiddleware, (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
   const since = parseInt(req.query.since) || 0;
 
+  // dm 私聊：预先取「对方」头像，作为每条消息的兜底头像（peer_avatar）。
+  // 客户端历史消息 sender_avatar 可能为空（对方设头像前发的），此时用 peer_avatar 兜底，
+  // 彻底杜绝「首条/老消息没头像」。群聊/设备会话无统一对方头像，peer_avatar 为 null。
+  let peerAvatar = null;
+  if (topic.kind === "dm") {
+    const peerRow = db
+      .prepare(`SELECT u2.avatar FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id WHERE m2.topic_id = ? AND m2.user_id != ? LIMIT 1`)
+      .get(topic.id, req.userId);
+    peerAvatar = peerRow?.avatar || null;
+  }
+
   const messages =
     since > 0
       ? db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? AND tm.timestamp > ? ORDER BY tm.id ASC LIMIT ?`).all(name, since, limit)
       : db.prepare(`SELECT tm.*, u.avatar as sender_avatar, u.display_name as sender_display_name FROM topic_messages tm LEFT JOIN users u ON tm.user_id = u.id WHERE tm.topic = ? ORDER BY tm.id DESC LIMIT ?`).all(name, limit).reverse();
+
+  // 给每条消息补上 peer_avatar（dm 才有意义），客户端用于兜底头像
+  messages.forEach((m) => { m.peer_avatar = peerAvatar; });
 
   // dm 私聊：把「对方发来且未读」的消息标记为已读，并通知对方（已读回执）
   if (topic.kind === "dm") {
@@ -552,9 +576,24 @@ router.delete("/:topic/messages/:id", authMiddleware, (req, res) => {
   if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
     return res.status(403).json({ error: "Not a member of this topic" });
   }
+  // 删除权限：
+  //  - 管理员：可删任意消息
+  //  - 私聊(dm)：会话仅两人，成员可删会话内任意消息（自己或对面的，仅影响本侧记录）
+  //  - 群聊/设备会话：仅能删自己发的消息
+  let condition;
+  if (req.role === "admin") {
+    condition = "id = ? AND topic = ?";
+  } else if (topic.kind === "dm") {
+    condition = "id = ? AND topic = ?";
+  } else {
+    condition = "id = ? AND topic = ? AND user_id = ?";
+  }
+  const params = req.role === "admin" || topic.kind === "dm"
+    ? [parseInt(req.params.id), name]
+    : [parseInt(req.params.id), name, req.userId];
   const result = db
-    .prepare("DELETE FROM topic_messages WHERE id = ? AND topic = ? AND (user_id = ? OR ? = 'admin')")
-    .run(parseInt(req.params.id), name, req.userId, req.role);
+    .prepare(`DELETE FROM topic_messages WHERE ${condition}`)
+    .run(...params);
   if (result.changes === 0) return res.status(404).json({ error: "Message not found or no permission" });
   res.json({ message: "Topic message deleted" });
 });
