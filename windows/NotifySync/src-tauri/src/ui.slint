@@ -78,7 +78,7 @@ component MessageBox {
                     Text { text: text; font-size: 14px; color: #1a1a1a; wrap: word; }
                     if media != "": Text { text: media; font-size: 12px; color: #2aabee; }
                     HorizontalLayout {
-                        alignment: Right;
+                        alignment: right;
                         Text { text: time; font-size: 10px; color: #999; }
                     }
                 }
@@ -147,7 +147,7 @@ export MainWindow := Window {
     if !logged-in: Rectangle {
         background: #3390ec;
         VerticalLayout {
-            alignment: Center;
+            alignment: center;
             spacing: 14px;
             Rectangle {
                 background: white;
@@ -156,7 +156,7 @@ export MainWindow := Window {
                 padding: 26px;
                 VerticalLayout {
                     spacing: 12px;
-                    Text { text: "EchoLink"; font-size: 26px; font-weight: 700; color: #3390ec; horizontal-alignment: center; }
+                    Text { text: "EchoLink"; font-size: 26px; font-weight: bold; color: #3390ec; horizontal-align: center; }
                     Text { text: "跨设备消息互联 · 通知同步"; font-size: 13px; color: #888; horizontal-align: center; }
                     Text { text: "服务器地址"; font-size: 13px; color: #555; }
                     LineEdit {
@@ -179,10 +179,10 @@ export MainWindow := Window {
                     }
                     Text {
                         text: reg-mode ? "已有账号？去登录" : "还没有账号？注册一个";
-                        font-size: 12px; color: #3390ec; horizontal-alignment: center;
+                        font-size: 12px; color: #3390ec; horizontal-align: center;
                         TouchArea { clicked => { reg-mode = !reg-mode; } }
                     }
-                    Text { text: status; color: #e74c3c; font-size: 12px; horizontal-alignment: center; wrap: word; }
+                    Text { text: status; color: #e74c3c; font-size: 12px; horizontal-align: center; wrap: word; }
                 }
             }
         }
@@ -199,7 +199,7 @@ export MainWindow := Window {
                 Rectangle {
                     height: 56px;
                     VerticalLayout {
-                        Text { text: "EchoLink"; font-size: 18px; font-weight: 700; color: #3390ec; }
+                        Text { text: "EchoLink"; font-size: 18px; font-weight: bold; color: #3390ec; }
                         Text { text: display-name + " @" + username; font-size: 11px; color: #888; }
                     }
                 }
@@ -228,32 +228,31 @@ export MainWindow := Window {
                         background: #ffffff;
                         width: 300px;
                         VerticalLayout {
-                            Text { text: "消息"; font-size: 16px; font-weight: 700; padding: 10px; }
+                            Text { text: "消息"; font-size: 16px; font-weight: bold; padding: 10px; }
                             ScrollView {
                                 VerticalLayout {
                                     spacing: 2px;
                                     for t in topics: Rectangle {
                                         height: 60px;
+                                        background: chat-open && chat-title == t.display ? #e7f0ff : #ffffff;
                                         TouchArea {
                                             clicked => { open-topic(t.name); }
-                                            background: chat-open && chat-title == t.display ? #e7f0ff : #ffffff;
                                             HorizontalLayout {
                                                 spacing: 8px;
                                                 padding: 8px;
                                                 Rectangle {
                                                     width: 44px; height: 44px; border-radius: 22px;
                                                     background: #3390ec;
-                                                    Text { text: t.display[0]; color: white; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
                                                 }
                                                 VerticalLayout {
-                                                    Text { text: (t.kind == "normal" ? "#" : "") + t.display; font-size: 14px; font-weight: 600; }
-                                                    Text { text: t.preview; font-size: 12px; color: #888; elide: true; }
+                                                    Text { text: (t.kind == "normal" ? "#" : "") + t.display; font-size: 14px; font-weight: bold; }
+                                                    Text { text: t.preview; font-size: 12px; color: #888; elide: right; }
                                                 }
                                                 VerticalLayout {
-                                                    Text { text: t.time; font-size: 10px; color: #aaa; horizontal-alignment: Right; }
+                                                    Text { text: t.time; font-size: 10px; color: #aaa; horizontal-align: right; }
                                                     if t.unread > 0: Rectangle {
                                                         width: 18px; height: 18px; border-radius: 9px; background: #e74c3c;
-                                                        Text { text: t.unread; color: white; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
+                                                        Text { text: t.unread; color: white; font-size: 11px; horizontal-align: center; vertical-align: center; }
                                                     }
                                                 }
                                             }
@@ -272,7 +271,7 @@ export MainWindow := Window {
                                 HorizontalLayout {
                                     padding: 10px;
                                     VerticalLayout {
-                                        Text { text: chat-title; font-size: 15px; font-weight: 700; }
+                                        Text { text: chat-title; font-size: 15px; font-weight: bold; }
                                         Text { text: chat-sub; font-size: 11px; color: #888; }
                                     }
                                 }
@@ -301,7 +300,7 @@ export MainWindow := Window {
                                 }
                                 Button { text: "发送"; clicked => { send-message(input-text); } }
                             }
-                            if !chat-open: Text { text: "选择一个会话开始聊天"; color: #888; horizontal-alignment: center; padding: 40px; }
+                            if !chat-open: Text { text: "选择一个会话开始聊天"; color: #888; horizontal-align: center; padding: 40px; }
                         }
                     }
                 }
@@ -309,7 +308,7 @@ export MainWindow := Window {
                 if current-tab == "friends": ScrollView {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
-                        Text { text: "好友"; font-size: 18px; font-weight: 700; }
+                        Text { text: "好友"; font-size: 18px; font-weight: bold; }
                         HorizontalLayout {
                             spacing: 6px;
                             in-out property <string> fq: "";
@@ -320,7 +319,7 @@ export MainWindow := Window {
                             height: 50px; background: white; border-radius: 8px;
                             HorizontalLayout {
                                 padding: 8px; spacing: 8px;
-                                Text { text: f.display; font-size: 14px; font-weight: 600; }
+                                Text { text: f.display; font-size: 14px; font-weight: bold; }
                                 Rectangle { width: 1px; }
                                 Button { text: "私聊"; clicked => { friend-chat(f.username); } }
                             }
@@ -331,12 +330,12 @@ export MainWindow := Window {
                 if current-tab == "notifications": ScrollView {
                     VerticalLayout {
                         padding: 16px; spacing: 8px;
-                        Text { text: "通知（来自其他设备的同步通知）"; font-size: 18px; font-weight: 700; }
+                        Text { text: "通知（来自其他设备的同步通知）"; font-size: 18px; font-weight: bold; }
                         for n in notifs: Rectangle {
                             background: white; border-radius: 8px; padding: 10px;
                             VerticalLayout {
                                 Text { text: n.app + " · " + n.time; font-size: 12px; color: #888; }
-                                Text { text: n.title; font-size: 14px; font-weight: 600; }
+                                Text { text: n.title; font-size: 14px; font-weight: bold; }
                                 if n.text != "": Text { text: n.text; font-size: 13px; color: #444; wrap: word; }
                             }
                         }
@@ -346,12 +345,12 @@ export MainWindow := Window {
                 if current-tab == "devices": ScrollView {
                     VerticalLayout {
                         padding: 16px; spacing: 8px;
-                        Text { text: "设备"; font-size: 18px; font-weight: 700; }
+                        Text { text: "设备"; font-size: 18px; font-weight: bold; }
                         for d in devices: Rectangle {
                             background: white; border-radius: 8px; padding: 10px;
                             HorizontalLayout {
                                 Text { text: d.name + "  (" + d.platform + ")"; font-size: 14px; }
-                                Text { text: d.last; font-size: 11px; color: #888; horizontal-alignment: Right; }
+                                Text { text: d.last; font-size: 11px; color: #888; horizontal-align: right; }
                             }
                         }
                     }
@@ -360,7 +359,7 @@ export MainWindow := Window {
                 if current-tab == "settings": ScrollView {
                     VerticalLayout {
                         padding: 16px; spacing: 12px;
-                        Text { text: "设置"; font-size: 18px; font-weight: 700; }
+                        Text { text: "设置"; font-size: 18px; font-weight: bold; }
                         Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
                             Text { text: "服务器地址"; font-size: 13px; color: #555; }
                             in-out property <string> su: server-url;
@@ -373,7 +372,7 @@ export MainWindow := Window {
                             }
                         } }
                         Rectangle { background: white; border-radius: 8px; padding: 12px; VerticalLayout {
-                            Text { text: "应用过滤（仅勾选的应用通知会被同步）"; font-size: 13px; font-weight: 600; }
+                            Text { text: "应用过滤（仅勾选的应用通知会被同步）"; font-size: 13px; font-weight: bold; }
                             Button { text: "刷新本机应用列表"; clicked => { refresh-apps(); } }
                             ScrollView {
                                 height: 200px;
