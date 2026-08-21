@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WhatsApp 风「已读」重叠双勾：两条对勾叠加，第二条略向右偏移并压在第一条之上 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="13dp"
+    android:viewportWidth="20"
+    android:viewportHeight="13">
+    <!-- 第一条对勾（底层） -->
+    <path
+        android:strokeColor="#3390EC"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M1.5,6.5 L5,10.5 L11,2.5" />
+    <!-- 第二条对勾（表层，向右偏移并与第一条重叠） -->
+    <path
+        android:strokeColor="#3390EC"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M6.5,6.5 L10,10.5 L16,2.5" />
+</vector>

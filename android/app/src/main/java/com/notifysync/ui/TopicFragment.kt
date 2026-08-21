@@ -76,6 +76,8 @@ class TopicFragment : Fragment() {
     private val myTopics = mutableListOf<MyTopic>()
     private var currentTopic: String? = null
     private var chatTopic: MyTopic? = null
+    /** 聊天界面未读消息计数：用户向上翻看历史时，新消息不自动滚动，改用气泡提示 */
+    private var unreadChatCount = 0
     // 仅聊天模式：由好友页在平板右侧以子 Fragment 方式承载，只显示聊天、不含左侧列表
     private var chatOnly = false
     private var unifiedRequests = UnifiedRequests(emptyList(), emptyList())
@@ -130,8 +132,16 @@ class TopicFragment : Fragment() {
                             senderAvatar = intent.getStringExtra("sender_avatar"),
                             senderDisplayName = intent.getStringExtra("sender_display_name")
                         )
+                        // 用户是否已经在底部：在追加前判断，避免新插入项导致判断失真
+                        val wasAtBottom = isAtBottom()
                         chatAdapter.appendItems(listOf(msg))
-                        scrollToBottom()
+                        if (wasAtBottom) {
+                            scrollToBottom()
+                        } else {
+                            // 用户已向上翻看历史 → 不强制滚动，弹未读气泡累计
+                            unreadChatCount++
+                            showUnreadPill()
+                        }
                         // dm 私聊：聊天页正打开对方发来的消息 → 标记已读并通知对方（实时双勾）
                         if (chatTopic?.kind == "dm" && msg.id > 0) {
                             lifecycleScope.launch {
@@ -235,6 +245,19 @@ class TopicFragment : Fragment() {
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = chatAdapter
+
+        // 滚动到聊天底部时自动隐藏未读气泡并清零
+        binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (isAtBottom()) resetUnreadPill()
+            }
+        })
+
+        // 未读气泡：点击跳到最新消息并清零
+        binding.unreadPill.setOnClickListener {
+            resetUnreadPill()
+            scrollToBottom()
+        }
 
         // 左滑删除（成员=从列表移除；创建者=彻底关闭）
         val touch = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
@@ -417,6 +440,9 @@ class TopicFragment : Fragment() {
     private fun showChatMode(topic: MyTopic) {
         chatTopic = topic
         currentTopic = topic.name
+        // 会话「对方」头像（私聊 dm 为好友头像），供历史消息 sender_avatar 缺失时回退，
+        // 避免「没头像」；也用于自聊场景让两侧都用当前实时头像
+        chatAdapter.peerAvatarUrl = topic.avatarUrl
         // 已读回执：仅 dm 私聊开启（通知/我的设备/群组不显示单双勾）
         chatAdapter.showReadReceipts = topic.kind == "dm"
         // 聊天标题显示昵称（优先外部传入的展示名），并强制水平居中
@@ -692,6 +718,7 @@ class TopicFragment : Fragment() {
 
     private fun loadMessages() {
         val topic = currentTopic ?: return
+        resetUnreadPill()
         binding.progressBar.visibility = View.VISIBLE
         lifecycleScope.launch {
             try {
@@ -735,6 +762,28 @@ class TopicFragment : Fragment() {
 
     private fun scrollToBottom() {
         if (chatAdapter.itemCount > 0) binding.recyclerView.scrollToPosition(chatAdapter.itemCount - 1)
+    }
+
+    /** 是否在聊天底部（最后一条消息基本可见）：用于决定是否自动滚动 / 显示未读气泡 */
+    private fun isAtBottom(): Boolean {
+        val rv = binding.recyclerView
+        val lm = rv.layoutManager as? LinearLayoutManager ?: return true
+        val count = chatAdapter.itemCount
+        if (count == 0) return true
+        val lastVisible = lm.findLastVisibleItemPosition()
+        if (lastVisible < count - 1) return false
+        val lastChild = rv.getChildAt(rv.childCount - 1)
+        return lastChild != null && lastChild.bottom <= rv.height + 40
+    }
+
+    private fun showUnreadPill() {
+        binding.tvUnreadCount.text = if (unreadChatCount > 99) "99+" else unreadChatCount.toString()
+        binding.unreadPill.visibility = View.VISIBLE
+    }
+
+    private fun resetUnreadPill() {
+        unreadChatCount = 0
+        binding.unreadPill.visibility = View.GONE
     }
 
     // ===== 微信式输入栏交互 =====

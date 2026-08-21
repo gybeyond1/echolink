@@ -123,15 +123,14 @@
 
     </LinearLayout>
 
-    <!-- 已读回执：放在气泡外侧右下角，避免撑高气泡 -->
-    <TextView
-        android:id="@+id/tvStatus"
+    <!-- 已读回执（WhatsApp 风重叠双勾）：放在气泡外侧，避免撑高气泡 -->
+    <ImageView
+        android:id="@+id/ivStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:layout_marginStart="4dp"
         android:layout_marginEnd="4dp"
         android:layout_marginBottom="6dp"
-        android:textSize="12sp"
         android:visibility="gone" />
 </LinearLayout>
