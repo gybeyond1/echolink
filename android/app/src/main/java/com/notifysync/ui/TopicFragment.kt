@@ -443,6 +443,8 @@ class TopicFragment : Fragment() {
         // 会话「对方」头像（私聊 dm 为好友头像），供历史消息 sender_avatar 缺失时回退，
         // 避免「没头像」；也用于自聊场景让两侧都用当前实时头像
         chatAdapter.peerAvatarUrl = topic.avatarUrl
+        // DM 标记：私聊里「非自己」消息头像一律回退到对方实时头像，根治首条没头像
+        chatAdapter.isDm = topic.kind == "dm"
         // 已读回执：仅 dm 私聊开启（通知/我的设备/群组不显示单双勾）
         chatAdapter.showReadReceipts = topic.kind == "dm"
         // 聊天标题显示昵称（优先外部传入的展示名），并强制水平居中
