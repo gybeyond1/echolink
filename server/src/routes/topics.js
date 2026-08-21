@@ -117,12 +117,16 @@ router.get("/", authMiddleware, (req, res) => {
                                 WHERE m2.topic_id = t.id AND m2.user_id != ? LIMIT 1)
                 ELSE NULL
               END as avatar,
-              (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name) as message_count,
-              (SELECT MAX(timestamp) FROM topic_messages tm WHERE tm.topic = t.name) as last_message_at,
-              (SELECT text FROM topic_messages tm WHERE tm.topic = t.name ORDER BY id DESC LIMIT 1) as last_message,
+              (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name
+                 AND tm.id NOT IN (SELECT message_id FROM topic_message_deletes WHERE user_id = ?)) as message_count,
+              (SELECT MAX(timestamp) FROM topic_messages tm WHERE tm.topic = t.name
+                 AND tm.id NOT IN (SELECT message_id FROM topic_message_deletes WHERE user_id = ?)) as last_message_at,
+              (SELECT text FROM topic_messages tm WHERE tm.topic = t.name
+                 AND tm.id NOT IN (SELECT message_id FROM topic_message_deletes WHERE user_id = ?)
+                 ORDER BY id DESC LIMIT 1) as last_message,
               (SELECT COUNT(*) FROM topic_join_requests jr WHERE jr.topic_id = t.id AND jr.status='pending') as pending_requests,
               COALESCE((SELECT mbr.last_read_id FROM topic_members mbr WHERE mbr.topic_id = t.id AND mbr.user_id = ?), 0) as last_read_id,
-              (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name AND tm.id > COALESCE((SELECT mbr.last_read_id FROM topic_members mbr WHERE mbr.topic_id = t.id AND mbr.user_id = ?), 0) AND tm.user_id != ?) as unread_count
+              (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name AND tm.id > COALESCE((SELECT mbr.last_read_id FROM topic_members mbr WHERE mbr.topic_id = t.id AND mbr.user_id = ?), 0) AND tm.user_id != ? AND tm.id NOT IN (SELECT message_id FROM topic_message_deletes WHERE user_id = ?)) as unread_count
        FROM topics t
        ${isAdmin ? "LEFT" : "INNER"} JOIN topic_members m ON m.topic_id = t.id
        LEFT JOIN users u ON t.owner_id = u.id
@@ -139,7 +143,7 @@ router.get("/", authMiddleware, (req, res) => {
        ORDER BY CASE t.kind WHEN 'devices' THEN 0 WHEN 'dm' THEN 1 ELSE 2 END, last_message_at DESC, t.created_at DESC
        LIMIT 100`
     )
-    .all(req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, ...(isAdmin ? [] : [req.userId]));
+    .all(req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, ...(isAdmin ? [] : [req.userId]));
   res.json({ topics });
 });
 
