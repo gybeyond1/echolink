@@ -8,6 +8,7 @@ use api::{Client, FilterEntry, InstalledApp, Message, Topic};
 use slint::{Model, ModelRc, VecModel};
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::thread;
 use parking_lot::Mutex;
 use tauri::{
     menu::{MenuItem, PredefinedMenuItem},
@@ -279,18 +280,34 @@ async fn refresh_topics(shared: Shared, win: slint::Weak<MainWindow>) {
 }
 
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(w) = app.get_webview_window("host") {
-                let _ = w.show();
-            }
+    // 主线程：创建 Slint 主窗口。Slint 的 winit 窗口必须由主线程的事件循环 pump，
+    // 否则窗口创建后永远不重绘 → 白屏。MainWindow 必须在主线程长期持有（不能进闭包后被 drop）。
+    let main_window = MainWindow::new().expect("Slint 窗口创建失败");
+    // slint::Weak 是 Send 但非 Sync；托盘/单实例回调要求 Sync，用 Arc<Mutex<>> 包裹以跨线程安全共享
+    let weak_holder: Arc<Mutex<slint::Weak<MainWindow>>> =
+        Arc::new(Mutex::new(main_window.as_weak()));
+    let weak_si = weak_holder.clone(); // 给 single-instance 回调用
+
+    let builder = tauri::Builder::default()
+        // 允许 Tauri 事件循环在后台线程运行（Windows/Linux），避免与 Slint 主线程 loop 争抢
+        .any_thread()
+        .plugin(tauri_plugin_single_instance::init(move |_app, _argv, _cwd| {
+            // 单实例激活：显示 Slint 主窗口（跨线程 → 派发到主线程事件循环）
+            let h = weak_si.clone();
+            slint::invoke_from_event_loop(move || {
+                let w = h.lock().clone();
+                if let Some(win) = w.upgrade() {
+                    let _ = win.show();
+                }
+            })
+            .ok();
         }))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .setup(|app| {
+        .setup(move |app| {
             let handle = app.handle().clone();
             let persist = load_persist(&handle);
 
@@ -313,33 +330,47 @@ pub fn run() {
                 s.client.avatar = persist.avatar.clone();
             }
 
-            // 构建 Slint 主窗口
-            let main_window = MainWindow::new().expect("Slint 窗口创建失败");
+            // 初始状态推送（Slint 属性必须在主线程设置，通过事件循环派发到主线程）
+            let wk = weak_holder.clone();
+            let p = persist.clone();
+            slint::invoke_from_event_loop(move || {
+                let w = wk.lock().clone();
+                if let Some(win) = w.upgrade() {
+                    win.set_server_url(p.server_url.clone().into());
+                    win.set_username(p.username.clone().into());
+                    win.set_display_name(p.display_name.clone().into());
+                    win.set_logged_in(!p.token.is_empty());
+                    win.set_sync_enabled(p.notification_sync_enabled);
+                }
+            })
+            .ok();
 
-            // 初始状态推送
-            main_window.set_server_url(persist.server_url.clone().into());
-            main_window.set_username(persist.username.clone().into());
-            main_window.set_display_name(persist.display_name.clone().into());
-            main_window.set_logged_in(!persist.token.is_empty());
-            main_window.set_sync_enabled(persist.notification_sync_enabled);
-
-            // 回调绑定
-            bind_callbacks(shared.clone(), handle.clone(), main_window.as_weak());
+            // 回调绑定（on_* 注册必须在主线程，通过事件循环派发）
+            let wk2 = weak_holder.clone();
+            let sh = shared.clone();
+            let hd = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                let w = wk2.lock().clone();
+                bind_callbacks(sh.clone(), hd.clone(), w);
+            })
+            .ok();
 
             // 若已有登录态，恢复会话
             if !persist.token.is_empty() && !persist.server_url.is_empty() {
                 let sh = shared.clone();
-                let mw = main_window.as_weak();
+                let mw = weak_holder.clone();
+                let hd = handle.clone();
                 tauri::async_runtime::spawn(async move {
                     {
                         let mut client = sh.lock().client.clone();
                         let r = client.me().await;
                         let _ = r;
                     }
-                    main_window_set_profile(mw.clone(), &sh);
-                    refresh_topics(sh.clone(), mw.clone()).await;
-                    // 启动 WS（内部自行 spawn 长连接，返回 future 丢弃即可）
-                    let _ = spawn_ws(sh.clone(), handle.clone(), mw.clone());
+                    let w = mw.lock().clone();
+                    main_window_set_profile(w.clone(), &sh);
+                    refresh_topics(sh.clone(), w.clone()).await;
+                    // 启动 WS（内部自行 spawn 长连接）
+                    let _ = spawn_ws(sh.clone(), hd.clone(), w.clone());
                 });
                 // 通知同步
                 if persist.notification_sync_enabled {
@@ -351,24 +382,35 @@ pub fn run() {
                 }
             }
 
-            main_window.show().expect("Slint 窗口显示失败");
-
-            // 托盘
-            build_tray(app.handle(), shared.clone(), main_window.as_weak());
+            // 托盘（仅注册；show 操作经事件循环在主线程执行）
+            build_tray(app.handle(), shared.clone(), weak_holder.clone());
 
             app.manage(shared);
             Ok(())
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running EchoLink desktop");
+        });
+
+    // Tauri 在后台线程跑（仅托盘/插件/事件；不参与 UI 渲染）
+    let context = tauri::generate_context!();
+    thread::spawn(move || {
+        let _ = builder.run(context);
+    });
+
+    // 主线程：Slint 主循环（拥有 MainWindow，正常渲染；与后台 Tauri loop 互不干扰）
+    main_window.run().expect("Slint 运行失败");
 }
 
 fn main_window_set_profile(mw: slint::Weak<MainWindow>, sh: &Shared) {
-    let s = sh.lock();
-    if let Some(w) = mw.upgrade() {
-        w.set_username(s.client.username.clone().into());
-        w.set_display_name(s.client.display_name.clone().into());
-    }
+    let (username, display_name) = {
+        let s = sh.lock();
+        (s.client.username.clone(), s.client.display_name.clone())
+    };
+    slint::invoke_from_event_loop(move || {
+        if let Some(w) = mw.upgrade() {
+            w.set_username(username.into());
+            w.set_display_name(display_name.into());
+        }
+    })
+    .ok();
 }
 
 fn bind_callbacks(shared: Shared, app: AppHandle, win: slint::Weak<MainWindow>) {
@@ -791,9 +833,14 @@ fn bind_callbacks(shared: Shared, app: AppHandle, win: slint::Weak<MainWindow>) 
 }
 
 fn set_status(w: &slint::Weak<MainWindow>, msg: &str) {
-    if let Some(win) = w.upgrade() {
-        win.set_status(msg.into());
-    }
+    let wk = w.clone();
+    let m = msg.to_string();
+    slint::invoke_from_event_loop(move || {
+        if let Some(win) = wk.upgrade() {
+            win.set_status(m.into());
+        }
+    })
+    .ok();
 }
 
 async fn load_friends(sh: Shared, w: slint::Weak<MainWindow>) {
@@ -930,18 +977,27 @@ async fn persist_and_apply(app: &AppHandle, sh: &Shared, w: slint::Weak<MainWind
             };
             save_persist(app, &p);
         }
-        if let Some(win) = w.upgrade() {
-            win.set_logged_in(true);
-            win.set_status("".into());
-        }
+        let wk = w.clone();
+        slint::invoke_from_event_loop(move || {
+            if let Some(win) = wk.upgrade() {
+                win.set_logged_in(true);
+                win.set_status("".into());
+            }
+        })
+        .ok();
         main_window_set_profile(w.clone(), sh);
         refresh_topics(sh.clone(), w.clone()).await;
         // 启动 WS（内部自行 spawn 长连接，返回 future 丢弃即可）
         let _ = spawn_ws(sh.clone(), app.clone(), w.clone());
     } else {
-        if let Some(win) = w.upgrade() {
-            win.set_status(err.into());
-        }
+        let wk = w.clone();
+        let e = err.to_string();
+        slint::invoke_from_event_loop(move || {
+            if let Some(win) = wk.upgrade() {
+                win.set_status(e.into());
+            }
+        })
+        .ok();
     }
 }
 
@@ -987,31 +1043,43 @@ fn update_persist_logout(app: &AppHandle) {
     }
 }
 
-fn build_tray(app: &AppHandle, _sh: Shared, _win: slint::Weak<MainWindow>) {
+fn build_tray(app: &AppHandle, _sh: Shared, win: Arc<Mutex<slint::Weak<MainWindow>>>) {
     let show = MenuItem::with_id(app, "show", "打开", true, None::<&str>).unwrap();
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>).unwrap();
     let sep = PredefinedMenuItem::separator(app).unwrap();
     let menu = tauri::menu::Menu::with_items(app, &[&show, &sep, &quit]).unwrap();
+    let win_for_tray = win.clone();
     TrayIconBuilder::with_id("main-tray")
         .icon(app.default_window_icon().cloned().expect("icon"))
         .menu(&menu)
         .show_menu_on_left_click(true)
-        .on_menu_event(|app, event| match event.id.as_ref() {
+        .on_menu_event(move |_app, event| match event.id.as_ref() {
             "show" => {
-                if let Some(w) = app.get_webview_window("host") {
-                    let _ = w.show();
-                }
+                let h = win.clone();
+                slint::invoke_from_event_loop(move || {
+                    let w = h.lock().clone();
+                    if let Some(win) = w.upgrade() {
+                        let _ = win.show();
+                    }
+                })
+                .ok();
             }
-            "quit" => app.exit(0),
+            "quit" => _app.exit(0),
             _ => {}
         })
-        .on_tray_icon_event(|tray, event| {
+        .on_tray_icon_event({
+            move |_tray, event| {
             if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
-                if let Some(w) = tray.app_handle().get_webview_window("host") {
-                    let _ = w.show();
-                }
+                let h = win_for_tray.clone();
+                slint::invoke_from_event_loop(move || {
+                    let w = h.lock().clone();
+                    if let Some(win) = w.upgrade() {
+                        let _ = win.show();
+                    }
+                })
+                .ok();
             }
-        })
+        }})
         .build(app)
         .ok();
 }
