@@ -111,12 +111,18 @@ fn chrono_like(secs: u64) -> String {
     }
 }
 
+fn first_letter(s: &str) -> String {
+    s.chars().next().map(|c| c.to_string()).unwrap_or_else(|| "?".to_string())
+}
+
 fn topic_to_item(t: &Topic) -> TopicItem {
+    let display = t.display_name.clone();
     TopicItem {
         name: t.name.clone().into(),
-        display: t.display_name.clone().into(),
+        display: display.clone().into(),
         kind: t.kind.clone().into(),
         avatar: t.avatar.clone().unwrap_or_default().into(),
+        avatar_letter: first_letter(&display).into(),
         preview: t.last_message.clone().unwrap_or_else(|| {
             if t.kind == "devices" {
                 "我的设备同步会话".to_string()
