@@ -123,93 +123,93 @@ component NavIcon {
     in property <color> tint: Colors.text-hint;
 
     Rectangle {
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
 
         if name == "messages": Rectangle {
-            width: 18px;
-            height: 14px;
-            border-radius: 5px;
-            background: root.tint;
-            y: (parent.height - self.height) / 2;
-            x: (parent.width - self.width) / 2;
-            Rectangle { y: 5px; x: 4px; width: 10px; height: 2px; background: white; border-radius: 1px; }
-            Rectangle { y: 9px; x: 4px; width: 6px; height: 2px; background: white; border-radius: 1px; }
-        }
-
-        if name == "friends": Rectangle {
-            width: 18px;
-            height: 16px;
-            y: (parent.height - self.height) / 2;
-            x: (parent.width - self.width) / 2;
-            Rectangle { width: 10px; height: 10px; border-radius: self.width / 2; background: root.tint; x: 0px; y: 0px; }
-            Rectangle { width: 10px; height: 10px; border-radius: self.width / 2; background: root.tint; x: 8px; y: 6px; opacity: 0.85; }
-        }
-
-        if name == "notifications": Rectangle {
-            width: 16px;
-            height: 14px;
+            width: 22px;
+            height: 17px;
             border-radius: 6px;
             background: root.tint;
             y: (parent.height - self.height) / 2;
             x: (parent.width - self.width) / 2;
-            Rectangle { y: -3px; x: (parent.width - self.width) / 2; width: 6px; height: 6px; border-radius: self.width / 2; background: root.tint; }
+            Rectangle { y: 6px; x: 5px; width: 12px; height: 2px; background: white; border-radius: 1px; }
+            Rectangle { y: 11px; x: 5px; width: 8px; height: 2px; background: white; border-radius: 1px; }
         }
 
-        if name == "devices": Rectangle {
-            width: 12px;
-            height: 18px;
-            border-radius: 3px;
+        if name == "friends": Rectangle {
+            width: 22px;
+            height: 19px;
+            y: (parent.height - self.height) / 2;
+            x: (parent.width - self.width) / 2;
+            Rectangle { width: 12px; height: 12px; border-radius: self.width / 2; background: root.tint; x: 0px; y: 0px; }
+            Rectangle { width: 12px; height: 12px; border-radius: self.width / 2; background: root.tint; x: 10px; y: 7px; opacity: 0.85; }
+        }
+
+        if name == "notifications": Rectangle {
+            width: 19px;
+            height: 17px;
+            border-radius: 7px;
             background: root.tint;
             y: (parent.height - self.height) / 2;
             x: (parent.width - self.width) / 2;
-            Rectangle { y: 15px; x: (parent.width - self.width) / 2; width: 4px; height: 1px; background: white; border-radius: 0.5px; }
+            Rectangle { y: -4px; x: (parent.width - self.width) / 2; width: 7px; height: 7px; border-radius: self.width / 2; background: root.tint; }
+        }
+
+        if name == "devices": Rectangle {
+            width: 14px;
+            height: 22px;
+            border-radius: 4px;
+            background: root.tint;
+            y: (parent.height - self.height) / 2;
+            x: (parent.width - self.width) / 2;
+            Rectangle { y: 18px; x: (parent.width - self.width) / 2; width: 4px; height: 1px; background: white; border-radius: 0.5px; }
         }
 
         if name == "settings": Rectangle {
-            width: 16px;
-            height: 16px;
+            width: 20px;
+            height: 20px;
             border-radius: self.width / 2;
             background: root.tint;
             y: (parent.height - self.height) / 2;
             x: (parent.width - self.width) / 2;
-            Rectangle { width: 6px; height: 6px; border-radius: self.width / 2; background: white; y: (parent.height - self.height) / 2; x: (parent.width - self.width) / 2; }
+            Rectangle { width: 8px; height: 8px; border-radius: self.width / 2; background: white; y: (parent.height - self.height) / 2; x: (parent.width - self.width) / 2; }
         }
 
         if name == "logout": Rectangle {
-            width: 16px;
-            height: 16px;
-            border-radius: 3px;
-            border-width: 2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border-width: 2.5px;
             border-color: root.tint;
             y: (parent.height - self.height) / 2;
             x: (parent.width - self.width) / 2;
-            Rectangle { width: 6px; height: 2px; background: root.tint; y: (parent.height - self.height) / 2; x: 6px; }
+            Rectangle { width: 8px; height: 2.5px; background: root.tint; y: (parent.height - self.height) / 2; x: 7px; }
         }
     }
 }
 
-component NavItem {
-    in property <string> label: "";
+component NavButton {
     in property <string> icon: "";
     in property <bool> active: false;
     callback clicked();
 
     Rectangle {
-        height: 40px;
-        background: active ? Colors.selected : transparent;
-        border-radius: 10px;
+        width: 48px;
+        height: 48px;
+        background: active ? #E3F0FF : transparent;
+        border-radius: 12px;
         touch := TouchArea { clicked => { root.clicked(); } }
         states [
-            hover when !active && touch.has-hover: { background: Colors.hover; }
+            hover when !active && touch.has-hover: { background: #F0F4F9; }
         ]
-        HorizontalLayout {
-            padding-left: 12px;
-            padding-right: 12px;
-            spacing: 10px;
-            alignment: start;
-            NavIcon { name: root.icon; tint: active ? Colors.primary : Colors.text-hint; y: (parent.height - self.height) / 2; }
-            Text { text: root.label; font-size: 14px; font-weight: active ? 600 : 400; color: active ? Colors.text-primary : Colors.text-secondary; y: (parent.height - self.height) / 2; }
+        NavIcon {
+            name: root.icon;
+            tint: active ? Colors.primary : #8A96A3;
+            width: 24px;
+            height: 24px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
         }
     }
 }
@@ -317,7 +317,7 @@ component TopicRow {
     callback clicked();
 
     Rectangle {
-        height: 64px;
+        height: 68px;
         background: selected ? Colors.selected : Colors.surface;
         touch := TouchArea { clicked => { root.clicked(); } }
         states [
@@ -332,6 +332,8 @@ component TopicRow {
             alignment: center;
             Avatar {
                 label: topic.avatar-letter;
+                width: 48px;
+                height: 48px;
             }
             VerticalLayout {
                 spacing: 4px;
@@ -339,12 +341,14 @@ component TopicRow {
                 alignment: center;
                 HorizontalLayout {
                     spacing: 6px;
+                    alignment: center;
                     Text { text: (topic.kind == "normal" ? "# " : "") + topic.display; font-size: 14px; font-weight: 600; color: Colors.text-primary; horizontal-stretch: 1; overflow: elide; }
                     Text { text: topic.time; font-size: 11px; color: Colors.text-hint; }
                 }
                 HorizontalLayout {
                     spacing: 6px;
-                    Text { text: topic.preview; font-size: 12px; color: topic.unread > 0 ? Colors.text-primary : Colors.text-secondary; font-weight: topic.unread > 0 ? 500 : 400; horizontal-stretch: 1; overflow: elide; }
+                    alignment: center;
+                    Text { text: topic.preview; font-size: 12px; color: topic.unread > 0 ? Colors.text-primary : Colors.text-secondary; font-weight: topic.unread > 0 ? 600 : 400; horizontal-stretch: 1; overflow: elide; }
                     Badge { count: topic.unread; }
                 }
             }
@@ -538,45 +542,35 @@ component MainWindow inherits Window {
 
     // ---- 主界面 ----
     if logged-in: HorizontalLayout {
-        // 侧栏
+        // 左侧图标导航条（紧凑，参考 Telegram/微信桌面版）
         Rectangle {
             background: Colors.surface;
-            width: 200px;
+            width: 64px;
             VerticalLayout {
-                spacing: 4px;
-                padding-left: 14px;
-                padding-right: 14px;
-                padding-top: 16px;
-                padding-bottom: 16px;
-                HorizontalLayout {
-                    spacing: 10px;
-                    padding-left: 4px;
-                    padding-bottom: 18px;
-                    Rectangle {
-                        width: 36px;
-                        height: 36px;
-                        border-radius: 10px;
-                        background: @linear-gradient(135deg, Colors.avatar-start, Colors.avatar-end);
-                        HorizontalLayout {
-                            alignment: center;
-                            Text { text: "E"; color: white; font-size: 17px; font-weight: 700; }
-                        }
-                    }
-                    VerticalLayout {
-                        spacing: 1px;
-                        y: (parent.height - self.height) / 2;
-                        horizontal-stretch: 1;
-                        Text { text: "EchoLink"; font-size: 15px; font-weight: 700; color: Colors.text-primary; }
-                        Text { text: display-name != "" ? display-name : username; font-size: 12px; color: Colors.text-secondary; overflow: elide; }
+                padding-top: 14px;
+                padding-bottom: 14px;
+                padding-left: 8px;
+                padding-right: 8px;
+                spacing: 8px;
+                alignment: start;
+                Rectangle {
+                    width: 48px;
+                    height: 48px;
+                    background: @linear-gradient(135deg, Colors.avatar-start, Colors.avatar-end);
+                    border-radius: 14px;
+                    HorizontalLayout {
+                        alignment: center;
+                        Text { text: "E"; color: white; font-size: 22px; font-weight: 700; }
                     }
                 }
-                NavItem { label: "消息"; icon: "messages"; active: current-tab == "messages"; clicked => { switch-tab("messages"); } }
-                NavItem { label: "好友"; icon: "friends"; active: current-tab == "friends"; clicked => { switch-tab("friends"); } }
-                NavItem { label: "通知"; icon: "notifications"; active: current-tab == "notifications"; clicked => { switch-tab("notifications"); } }
-                NavItem { label: "设备"; icon: "devices"; active: current-tab == "devices"; clicked => { switch-tab("devices"); } }
-                NavItem { label: "设置"; icon: "settings"; active: current-tab == "settings"; clicked => { switch-tab("settings"); } }
-                Rectangle { height: 10px; }
-                NavItem { label: "退出登录"; icon: "logout"; active: false; clicked => { do-logout(); } }
+                Rectangle { height: 12px; }
+                NavButton { icon: "messages"; active: current-tab == "messages"; clicked => { switch-tab("messages"); } }
+                NavButton { icon: "friends"; active: current-tab == "friends"; clicked => { switch-tab("friends"); } }
+                NavButton { icon: "notifications"; active: current-tab == "notifications"; clicked => { switch-tab("notifications"); } }
+                NavButton { icon: "devices"; active: current-tab == "devices"; clicked => { switch-tab("devices"); } }
+                NavButton { icon: "settings"; active: current-tab == "settings"; clicked => { switch-tab("settings"); } }
+                Rectangle { vertical-stretch: 1; }
+                NavButton { icon: "logout"; active: false; clicked => { do-logout(); } }
             }
             VDivider { x: parent.width - self.width; height: 100%; }
         }
@@ -588,20 +582,23 @@ component MainWindow inherits Window {
                 // 会话列表
                 Rectangle {
                     background: Colors.surface;
-                    width: 300px;
+                    width: 280px;
                     VerticalLayout {
                         Rectangle {
-                            height: 56px;
+                            height: 60px;
                             background: Colors.surface;
                             HorizontalLayout {
                                 padding-left: 16px;
                                 padding-right: 16px;
-                                Text { text: "消息"; font-size: 17px; font-weight: 700; color: Colors.text-primary; y: (parent.height - self.height) / 2; }
+                                alignment: center;
+                                Text { text: "消息"; font-size: 18px; font-weight: 700; color: Colors.text-primary; }
                             }
                             HDivider { y: parent.height - self.height; width: 100%; }
                         }
                         ScrollView {
+                            vertical-stretch: 1;
                             VerticalLayout {
+                                alignment: start;
                                 spacing: 0px;
                                 for t in topics: TopicRow {
                                     topic: t;
@@ -616,28 +613,34 @@ component MainWindow inherits Window {
                 // 聊天区
                 Rectangle {
                     background: Colors.chat-bg;
+                    horizontal-stretch: 1;
                     VerticalLayout {
                         if chat-open: Rectangle {
-                            height: 56px;
+                            height: 60px;
                             background: Colors.surface;
                             HorizontalLayout {
-                                padding-left: 16px;
-                                padding-right: 16px;
+                                padding-left: 18px;
+                                padding-right: 18px;
+                                alignment: center;
+                                spacing: 10px;
+                                Avatar { label: chat-title; width: 40px; height: 40px; }
                                 VerticalLayout {
                                     spacing: 1px;
-                                    y: (parent.height - self.height) / 2;
+                                    alignment: center;
+                                    horizontal-stretch: 1;
                                     Text { text: chat-title; font-size: 15px; font-weight: 700; color: Colors.text-primary; }
                                     Text { text: chat-sub; font-size: 12px; color: Colors.text-secondary; }
                                 }
                             }
                             HDivider { y: parent.height - self.height; width: 100%; }
                         }
-                        ScrollView {
+                        if chat-open: ScrollView {
+                            vertical-stretch: 1;
                             VerticalLayout {
-                                padding-left: 16px;
-                                padding-right: 16px;
-                                padding-top: 12px;
-                                padding-bottom: 12px;
+                                padding-left: 18px;
+                                padding-right: 18px;
+                                padding-top: 14px;
+                                padding-bottom: 14px;
                                 spacing: 6px;
                                 for m in messages: MessageBox {
                                     text: m.text;
@@ -651,21 +654,22 @@ component MainWindow inherits Window {
                             }
                         }
                         if chat-open: Rectangle {
-                            height: 64px;
+                            height: 68px;
                             background: Colors.surface;
                             HorizontalLayout {
-                                padding-left: 14px;
-                                padding-right: 14px;
+                                padding-left: 16px;
+                                padding-right: 16px;
                                 padding-top: 12px;
                                 padding-bottom: 12px;
-                                spacing: 10px;
+                                spacing: 12px;
+                                alignment: center;
                                 Rectangle {
                                     horizontal-stretch: 1;
                                     background: Colors.page-bg;
-                                    border-radius: 20px;
-                                    padding-left: 14px;
-                                    padding-right: 14px;
-                                    height: 40px;
+                                    border-radius: 22px;
+                                    padding-left: 16px;
+                                    padding-right: 16px;
+                                    height: 44px;
                                     HorizontalLayout {
                                         TextEdit { text <=> input-text; placeholder-text: "输入消息…"; font-size: 14px; height: 100%; width: 100%; }
                                     }
@@ -675,24 +679,31 @@ component MainWindow inherits Window {
                             HDivider { y: 0px; width: 100%; }
                         }
                         if !chat-open: Rectangle {
-                            horizontal-stretch: 1;
+                            vertical-stretch: 1;
                             background: Colors.chat-bg;
-                            VerticalLayout {
+                            HorizontalLayout {
                                 alignment: center;
-                                spacing: 12px;
-                                Rectangle {
-                                    width: 64px;
-                                    height: 64px;
-                                    border-radius: 20px;
-                                    background: @linear-gradient(135deg, Colors.avatar-start, Colors.avatar-end);
-                                    x: (parent.width - self.width) / 2;
-                                    HorizontalLayout {
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 16px;
+                                    Rectangle {
+                                        width: 72px;
+                                        height: 72px;
+                                        border-radius: 24px;
+                                        background: @linear-gradient(135deg, Colors.avatar-start, Colors.avatar-end);
+                                        HorizontalLayout {
+                                            alignment: center;
+                                            Text { text: "E"; color: white; font-size: 32px; font-weight: 700; }
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        spacing: 4px;
                                         alignment: center;
-                                        Text { text: "E"; color: white; font-size: 28px; font-weight: 700; }
+                                        Text { text: "EchoLink"; color: Colors.text-primary; font-size: 18px; font-weight: 600; }
+                                        Text { text: "选择一个会话开始聊天"; color: Colors.text-hint; font-size: 14px; }
+                                        Text { text: "消息会在所有登录设备间同步"; color: Colors.text-secondary; font-size: 12px; }
                                     }
                                 }
-                                Text { text: "选择一个会话开始聊天"; color: Colors.text-hint; font-size: 15px; horizontal-alignment: center; }
-                                Text { text: "消息会在所有登录设备间同步"; color: Colors.text-secondary; font-size: 13px; horizontal-alignment: center; }
                             }
                         }
                     }
