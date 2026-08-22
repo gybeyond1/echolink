@@ -5,28 +5,35 @@
   "identifier": "com.gybeyond.notifysync",
   "build": {
     "beforeDevCommand": "",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:3999",
     "beforeBuildCommand": "",
     "frontendDist": "../dist"
   },
   "app": {
-    "withGlobalTauri": false,
+    "withGlobalTauri": true,
     "windows": [
       {
-        "label": "host",
+        "label": "main",
         "url": "index.html",
         "title": "EchoLink",
-        "width": 1,
-        "height": 1,
-        "visible": false,
-        "skipTaskbar": true,
-        "decorations": false,
-        "resizable": false,
-        "fullscreen": false
+        "width": 1100,
+        "height": 720,
+        "minWidth": 720,
+        "minHeight": 480,
+        "resizable": true,
+        "fullscreen": false,
+        "visible": true,
+        "decorations": true
       }
     ],
     "security": {
       "csp": null
+    },
+    "trayIcon": {
+      "id": "main-tray",
+      "iconPath": "icons/tray.png",
+      "iconAsTemplate": false,
+      "tooltip": "EchoLink"
     }
   },
   "bundle": {

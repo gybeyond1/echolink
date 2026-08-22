@@ -198,6 +198,15 @@
     } else if (m.type === "notification") {
       state.notifCount++;
       if (state.tab === "messages") renderSessionList();
+    } else if (m.type === "message_deleted") {
+      // 服务端软删除广播：仅删除者本机其他设备需移除该气泡
+      if (m.topic && m.message_id != null) {
+        const body = document.getElementById("chatBody");
+        if (body && state.chat && state.chat.topic === m.topic) {
+          const el = body.querySelector(`[data-mid="${m.message_id}"]`);
+          if (el) el.remove();
+        }
+      }
     } else if (m.type === "profile_updated") {
       loadProfile();
     }
@@ -552,6 +561,25 @@
     document.getElementById("ci-file").onchange = sendFile;
     setupVoice();
 
+    // 软删除：点击气泡上的删除按钮 → 仅本机隐藏（单向），并通知服务端
+    const body = document.getElementById("chatBody");
+    if (body) {
+      body.onclick = (e) => {
+        const btn = e.target.closest(".bubble-del[data-del]");
+        if (!btn) return;
+        const mid = parseInt(btn.dataset.del, 10);
+        if (isNaN(mid)) return;
+        if (!confirm("删除这条消息？仅在你的设备上隐藏，对方不受影响。")) return;
+        api(`/api/topics/${encodeURIComponent(t.name)}/messages/${mid}`, { method: "DELETE" })
+          .then(() => {
+            const el = body.querySelector(`[data-mid="${mid}"]`);
+            if (el) el.remove();
+            toast("已删除（仅本机）", "ok");
+          })
+          .catch(err => toast(err.message, "err"));
+      };
+    }
+
     loadMessages(t.name);
     input.focus();
   }
@@ -590,13 +618,14 @@
         media = `<div class="bubble-media"><a class="btn ghost sm" href="${url}" target="_blank" download>📄 ${esc(m.media_name || "文件")}（${fmtSize(m.media_size)}）</a></div>`;
       }
     }
-    return `<div class="msg-row ${mine ? "mine" : ""}">
+    return `<div class="msg-row ${mine ? "mine" : ""}" data-mid="${m.id}">
       ${avatarHtml(senderName, m.sender_avatar, 34)}
       <div class="bubble ${mine ? "bubble-own" : "bubble-other"}">
         <div class="bubble-sender">${esc(senderName)}${m.device_name ? `<span class="bubble-dev"> · ${esc(m.device_name)}</span>` : ""}<span class="bubble-time">${time}</span></div>
         ${m.title ? `<div class="bubble-title">${esc(m.title)}</div>` : ""}
         ${m.text ? `<div class="bubble-text">${esc(m.text)}</div>` : ""}
         ${media}
+        <button class="bubble-del" data-del="${m.id}" title="删除（仅本机隐藏）">🗑</button>
       </div>
     </div>`;
   }
