@@ -461,6 +461,16 @@ tr:hover td { background: var(--hover); }
 .bubble-own .bubble-sender { color: inherit; opacity: .75; }
 .bubble-title { font-weight: 700; margin-top: 2px; }
 .bubble-text { margin-top: 2px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.bubble-del {
+  position: absolute; top: 4px; right: 4px;
+  border: none; background: transparent; cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: 6px;
+  opacity: 0; transition: opacity .15s;
+  color: var(--muted);
+}
+.bubble { position: relative; }
+.bubble:hover .bubble-del { opacity: .7; }
+.bubble-del:hover { opacity: 1 !important; background: rgba(0,0,0,.06); }
 .bubble-media { margin-top: 6px; }
 .bubble-media img { max-width: 100%; max-height: 320px; border-radius: 10px; display: block; }
 .bubble-media audio { max-width: 320px; width: 100%; }

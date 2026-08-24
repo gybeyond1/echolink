@@ -1,1091 +1,478 @@
-// EchoLink Desktop —— Tauri 2 + Slint 原生客户端入口
-// 界面全部为 Slint 原生控件（无 WebView 网页），Rust 直连 REST + WebSocket。
+// EchoLink Desktop —— Tauri 2 库入口
+// 功能：托盘菜单 / 单实例锁 / 关闭窗口隐藏到托盘 / 系统通知 / 未读计数提示 /
+//       开机自启 / 服务器地址配置 / Windows 系统通知监听同步
 
-mod api;
-mod win_notif;
-
-use api::{Client, FilterEntry, InstalledApp, Message, Topic};
-use slint::{Model, ModelRc, VecModel};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::sync::Arc;
-use std::thread;
-use parking_lot::Mutex;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 use tauri::{
-    menu::{MenuItem, PredefinedMenuItem},
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager,
 };
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_opener::OpenerExt;
 
-slint::include_modules!();
+// ============== 配置文件 ==============
 
-// Slint 1.8 生成的 MainWindow 实现了 ComponentHandle（有 clone_strong），
-// 但未 derive Clone。这里手动实现，便于在闭包/线程间 clone 句柄。
-impl Clone for MainWindow {
-    fn clone(&self) -> Self {
-        self.clone_strong()
-    }
-}
-
-#[derive(Default)]
-struct AppState {
-    client: Client,
-    current_topic: String,
-}
-
-type Shared = Arc<Mutex<AppState>>;
-
-fn config_path(app: &AppHandle) -> Option<std::path::PathBuf> {
-    app.path().app_data_dir().ok().map(|d| d.join("config.json"))
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
-struct Persist {
+#[derive(Serialize, Deserialize, Clone)]
+struct AppConfig {
     server_url: String,
-    token: String,
-    username: String,
-    user_id: i64,
-    role: String,
-    display_name: String,
-    avatar: String,
     notification_sync_enabled: bool,
     blocked_apps: Vec<String>,
 }
 
-fn load_persist(app: &AppHandle) -> Persist {
-    if let Some(p) = config_path(app) {
-        if let Ok(s) = std::fs::read_to_string(&p) {
-            if let Ok(v) = serde_json::from_str::<Persist>(&s) {
-                return v;
+impl Default for AppConfig {
+    fn default() -> Self {
+        AppConfig {
+            server_url: String::new(),
+            notification_sync_enabled: false,
+            blocked_apps: Vec::new(),
+        }
+    }
+}
+
+fn config_file_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_data_dir().ok().map(|d| d.join("config.json"))
+}
+
+fn read_config(app: &AppHandle) -> AppConfig {
+    if let Some(path) = config_file_path(app) {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(config) = serde_json::from_str::<AppConfig>(&content) {
+                return config;
             }
         }
     }
     if let Ok(v) = std::env::var("NOTIFYSYNC_SERVER") {
         if !v.trim().is_empty() {
-            return Persist {
+            return AppConfig {
                 server_url: v.trim().trim_end_matches('/').to_string(),
                 ..Default::default()
             };
         }
     }
-    Persist::default()
+    AppConfig::default()
 }
 
-fn save_persist(app: &AppHandle, p: &Persist) {
-    if let Some(dir) = app.path().app_data_dir().ok() {
-        let _ = std::fs::create_dir_all(&dir);
-        if let Some(path) = config_path(app) {
-            if let Ok(s) = serde_json::to_string_pretty(p) {
-                let _ = std::fs::write(path, s);
-            }
-        }
+fn write_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = config_file_path(app).ok_or("Cannot determine config path")?;
+    let json = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+// ============== Tauri 命令 ==============
+
+#[derive(Serialize)]
+struct AppInfo {
+    version: &'static str,
+    target: &'static str,
+    server_url: String,
+    notification_sync_enabled: bool,
+}
+
+#[tauri::command]
+fn app_info(app: AppHandle) -> AppInfo {
+    let config = read_config(&app);
+    AppInfo {
+        version: env!("CARGO_PKG_VERSION"),
+        target: std::env::consts::OS,
+        server_url: config.server_url.clone(),
+        notification_sync_enabled: config.notification_sync_enabled,
     }
 }
 
-fn fmt_time(ts: Option<u64>) -> String {
-    match ts {
-        Some(t) => {
-            let secs = if t > 1_000_000_000_000 { t / 1000 } else { t };
-            let d = chrono_like(secs);
-            d
-        }
-        None => String::new(),
-    }
+#[tauri::command]
+fn save_server_url(app: AppHandle, url: String) -> Result<(), String> {
+    let mut config = read_config(&app);
+    config.server_url = url.trim().trim_end_matches('/').to_string();
+    write_config(&app, &config)
 }
 
-fn chrono_like(secs: u64) -> String {
-    // 简单格式化：用 std 不依赖 chrono
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let diff = now.saturating_sub(secs);
-    if diff < 60 {
-        "刚刚".to_string()
-    } else if diff < 3600 {
-        format!("{} 分钟前", diff / 60)
-    } else if diff < 86400 {
-        format!("{} 小时前", diff / 3600)
+#[tauri::command]
+fn get_config(app: AppHandle) -> AppConfig {
+    read_config(&app)
+}
+
+#[tauri::command]
+fn set_notification_sync(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut config = read_config(&app);
+    config.notification_sync_enabled = enabled;
+    write_config(&app, &config)?;
+
+    // 更新托盘菜单勾选状态
+    if let Some(state) = app.try_state::<TrayState>() {
+        if let Some(item) = state.sync_check.lock().unwrap().as_ref() {
+            let _ = item.set_checked(enabled);
+        }
+    }
+
+    if enabled {
+        start_notification_listener(&app);
     } else {
-        format!("{} 天前", diff / 86400)
+        stop_notification_listener();
     }
+    Ok(())
 }
 
-fn first_letter(s: &str) -> String {
-    s.chars().next().map(|c| c.to_string()).unwrap_or_else(|| "?".to_string())
+#[tauri::command]
+fn set_blocked_apps(app: AppHandle, apps: Vec<String>) -> Result<(), String> {
+    let mut config = read_config(&app);
+    config.blocked_apps = apps;
+    write_config(&app, &config)
 }
 
-fn topic_to_item(t: &Topic) -> TopicItem {
-    let display = t.display_name.clone();
-    TopicItem {
-        name: t.name.clone().into(),
-        display: display.clone().into(),
-        kind: t.kind.clone().into(),
-        avatar: t.avatar.clone().unwrap_or_default().into(),
-        avatar_letter: first_letter(&display).into(),
-        preview: t.last_message.clone().unwrap_or_else(|| {
-            if t.kind == "devices" {
-                "我的设备同步会话".to_string()
-            } else {
-                "暂无消息".to_string()
-            }
-        }).into(),
-        count: t.message_count as i32,
-        unread: t.unread_count as i32,
-        time: fmt_time(t.last_message_at).into(),
-    }
+/// 触发 Windows 原生通知
+#[tauri::command]
+async fn show_notification(app: AppHandle, title: String, body: String) -> Result<(), String> {
+    app.notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()
+        .map_err(|e| e.to_string())
 }
 
-fn msg_to_item(m: &Message, my_id: i64) -> MsgItem {
-    let mine = (my_id > 0 && m.user_id == my_id)
-        || (my_id == 0 && m.sender_name == "");
-    let media = match m.media_type.as_deref() {
-        Some("image") => "[图片]".to_string(),
-        Some("voice") => "[语音]".to_string(),
-        Some("file") => format!("[文件] {}", m.media_name.clone().unwrap_or_default()),
-        _ => String::new(),
+/// 更新托盘悬浮提示（未读计数）
+#[tauri::command]
+async fn set_unread_count(app: AppHandle, count: u32) -> Result<(), String> {
+    let tip = if count > 0 {
+        format!("EchoLink · {} 条未读", count)
+    } else {
+        "EchoLink".to_string()
     };
-    MsgItem {
-        id: m.id as i32,
-        text: m.text.clone().unwrap_or_else(|| m.title.clone().unwrap_or_default()).into(),
-        mine,
-        sender: m.sender_display_name.clone().unwrap_or(m.sender_name.clone()).into(),
-        time: fmt_time(Some(m.timestamp)).into(),
-        media: media.into(),
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        tray.set_tooltip(Some(&tip)).map_err(|e| e.to_string())?;
     }
+    if let Some(win) = app.get_webview_window("main") {
+        let title = if count > 0 {
+            format!("EchoLink ({} 未读)", count)
+        } else {
+            "EchoLink".to_string()
+        };
+        win.set_title(&title).ok();
+    }
+    Ok(())
 }
 
-async fn spawn_ws(shared: Shared, _app: AppHandle, win: slint::Weak<MainWindow>) {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-    let shared_rx = shared.clone();
-    // 启动 WS 接收循环
-    tokio::spawn(async move {
-        loop {
-            let (server, token) = {
-                let s = shared.lock();
-                (s.client.server.clone(), s.client.token.clone())
-            };
-            if server.is_empty() || token.is_empty() {
-                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                continue;
-            }
-            let url = if server.starts_with("https") {
-                format!("wss://{}/ws?token={}", server.trim_start_matches("https://"), token)
-            } else {
-                format!("ws://{}/ws?token={}", server.trim_start_matches("http://"), token)
-            };
-            let (ws_stream, _) = match tokio_tungstenite::connect_async(&url).await {
-                Ok(v) => v,
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    continue;
-                }
-            };
-            let (mut write, mut read) = ws_stream.split();
-            // 订阅现有话题（先收集，避免 MutexGuard 跨 await 导致 !Send）
-            let topics: Vec<String> = {
-                let s = shared.lock();
-                s.client.topics_cache.iter().map(|t| t.name.clone()).collect()
-            };
-            for name in topics {
-                let _ = write.send(tokio_tungstenite::tungstenite::Message::Text(
-                    format!("{{\"type\":\"subscribe\",\"topic\":\"{}\"}}", name),
-                )).await;
-            }
-            // 接收
-            use futures_util::{StreamExt, SinkExt};
-            while let Some(msg) = read.next().await {
-                if let Ok(tokio_tungstenite::tungstenite::Message::Text(t)) = msg {
-                    let _ = tx.send(t);
-                }
-            }
-            // 断线重连
-            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-        }
+// ============== 托盘 ==============
+
+/// 托盘状态：保存 CheckMenuItem 引用以便运行时更新勾选
+struct TrayState {
+    sync_check: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
+}
+
+fn build_tray(app: &AppHandle) -> tauri::Result<()> {
+    let config = read_config(app);
+
+    let show = MenuItem::with_id(app, "show", "打开主页", true, None::<&str>)?;
+    let open_browser = MenuItem::with_id(app, "open_browser", "在浏览器中打开", true, None::<&str>)?;
+    let toggle_autostart = MenuItem::with_id(app, "toggle_autostart", "开机自启", true, None::<&str>)?;
+    let sync_notifications = CheckMenuItem::with_id(
+        app,
+        "sync_notifications",
+        "通知同步",
+        true,
+        config.notification_sync_enabled,
+        None::<&str>,
+    )?;
+    let switch_server = MenuItem::with_id(app, "switch_server", "切换服务器", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let sep1 = PredefinedMenuItem::separator(app)?;
+    let sep2 = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(
+        app,
+        &[&show, &open_browser, &sep1, &sync_notifications, &switch_server, &sep2, &toggle_autostart, &quit],
+    )?;
+
+    // 保存 CheckMenuItem 以便运行时更新勾选状态
+    app.manage(TrayState {
+        sync_check: Mutex::new(Some(sync_notifications.clone())),
     });
 
-    // 处理收到的 WS 消息（在主 tokio 线程，通过 invoke_from_event_loop 更新 UI）
-    tokio::spawn(async move {
-        let shared = shared_rx;
-        while let Some(text) = rx.recv().await {
-            let parsed: serde_json::Value = match serde_json::from_str(&text) {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-            let mtype = parsed["type"].as_str().unwrap_or("");
-            if mtype == "topic_message" {
-                let data = &parsed["data"];
-                let topic = parsed["topic"].as_str().unwrap_or("").to_string();
-                let msg: Message = match serde_json::from_value(data.clone()) {
-                    Ok(m) => m,
-                    Err(_) => continue,
-                };
-                let my_id = shared.lock().client.user_id;
-                let item = msg_to_item(&msg, my_id);
-                let cur = shared.lock().current_topic.clone();
-                if cur == topic {
-                    let weak = win.clone();
-                    slint::invoke_from_event_loop(move || {
-                        if let Some(w) = weak.upgrade() {
-                            let mut current: Vec<MsgItem> = w.get_messages().iter().collect();
-                            current.push(item);
-                            w.set_messages(ModelRc::new(VecModel::from(current)));
-                        }
-                    })
-                    .ok();
-                }
-                // 刷新会话列表
-                refresh_topics(shared.clone(), win.clone()).await;
-            } else if mtype == "message_deleted" {
-                let topic = parsed["topic"].as_str().unwrap_or("").to_string();
-                let mid = parsed["message_id"].as_i64().unwrap_or(0);
-                let cur = shared.lock().current_topic.clone();
-                if cur == topic {
-                    let weak = win.clone();
-                    slint::invoke_from_event_loop(move || {
-                        if let Some(w) = weak.upgrade() {
-                            let current: Vec<MsgItem> = w.get_messages().iter().collect();
-                            let filtered: Vec<MsgItem> =
-                                current.into_iter().filter(|m| m.id as i64 != mid).collect();
-                            w.set_messages(ModelRc::new(VecModel::from(filtered)));
-                        }
-                    })
-                    .ok();
+    TrayIconBuilder::with_id("main-tray")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => show_main(app),
+            "open_browser" => {
+                let config = read_config(app);
+                if !config.server_url.is_empty() {
+                    let _ = app.opener().open_url(config.server_url, None::<&str>);
                 }
             }
-        }
-    });
+            "sync_notifications" => {
+                let config = read_config(app);
+                let new_state = !config.notification_sync_enabled;
+                let _ = set_notification_sync(app.clone(), new_state);
+            }
+            "switch_server" => {
+                let mut config = read_config(app);
+                config.server_url = String::new();
+                let _ = write_config(app, &config);
+                stop_notification_listener();
+                // 清除本地登录态（token 属于旧服务器），回到本地地址输入页
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.eval("localStorage.removeItem('ns_token');localStorage.removeItem('ns_username');localStorage.removeItem('ns_role');localStorage.removeItem('ns_uid');window.location.reload()");
+                }
+            }
+            "toggle_autostart" => {
+                use tauri_plugin_autostart::ManagerExt;
+                let mgr = app.autolaunch();
+                let enabled = mgr.is_enabled().unwrap_or(false);
+                if enabled { let _ = mgr.disable(); } else { let _ = mgr.enable(); }
+            }
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
+                show_main(tray.app_handle());
+            }
+        })
+        .build(app)?;
+    Ok(())
 }
 
-async fn refresh_topics(shared: Shared, win: slint::Weak<MainWindow>) {
-    let authed = {
-        let s = shared.lock();
-        s.client.authed()
-    };
-    if !authed {
-        return;
+fn show_main(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
     }
-    let topics = {
-        let mut client = shared.lock().client.clone();
-        match client.topics().await {
-            Ok(t) => t,
-            Err(_) => return,
-        }
-    };
-    {
-        let mut s = shared.lock();
-        s.client.topics_cache = topics.clone();
-    }
-    let items: Vec<TopicItem> = topics.iter().map(topic_to_item).collect();
-    slint::invoke_from_event_loop(move || {
-        if let Some(w) = win.upgrade() {
-            w.set_topics(ModelRc::new(VecModel::from(items)));
-        }
-    })
-    .ok();
 }
 
+// ============== Windows 通知监听 ==============
+
+#[cfg(target_os = "windows")]
+mod win_notif {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+    use windows_sys::Win32::Foundation::{CloseHandle, HWND, HANDLE};
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        DispatchMessageW, GetClassNameW, GetMessageW, GetWindowThreadProcessId,
+        GetWindowTextLengthW, GetWindowTextW, MSG, EVENT_OBJECT_SHOW,
+    };
+
+    // WinEvent 常量（windows-sys 0.59 未导出，手动定义）
+    const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
+    const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;
+
+    static HOOK: AtomicIsize = AtomicIsize::new(0);
+    static SHOULD_RUN: AtomicBool = AtomicBool::new(false);
+
+    // 已见通知去重
+    struct SeenSet {
+        entries: HashSet<(isize, u32)>,
+        last_cleanup: u32,
+    }
+    static SEEN: Mutex<Option<SeenSet>> = Mutex::new(None);
+
+    fn get_class_name(hwnd: HWND) -> String {
+        unsafe {
+            let mut buf = [0u16; 512];
+            let len = GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
+            if len > 0 { String::from_utf16_lossy(&buf[..len as usize]) } else { String::new() }
+        }
+    }
+
+    fn get_window_text(hwnd: HWND) -> String {
+        unsafe {
+            let len = GetWindowTextLengthW(hwnd);
+            if len <= 0 { return String::new(); }
+            let mut buf = vec![0u16; (len + 1) as usize];
+            let actual = GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
+            if actual > 0 { String::from_utf16_lossy(&buf[..actual as usize]) } else { String::new() }
+        }
+    }
+
+    fn get_process_path(pid: u32) -> Option<String> {
+        unsafe {
+            let handle: HANDLE = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+            if handle.is_null() { return None; }
+            let mut buf = [0u16; 1024];
+            let mut len = buf.len() as u32;
+            let ok = QueryFullProcessImageNameW(handle, 0, buf.as_mut_ptr(), &mut len);
+            CloseHandle(handle);
+            if ok != 0 && len > 0 { Some(String::from_utf16_lossy(&buf[..len as usize])) } else { None }
+        }
+    }
+
+    fn extract_process_name(path: &str) -> String {
+        path.rsplit('\\').next().unwrap_or(path).to_string()
+    }
+
+    fn is_toast_window(class_name: &str) -> bool {
+        class_name.contains("Toast") || class_name.contains("Notification")
+            || class_name == "Windows.UI.Core.CoreWindow"
+    }
+
+    unsafe extern "system" fn win_event_callback(
+        _hook: HWINEVENTHOOK,
+        event: u32,
+        hwnd: HWND,
+        id_object: i32,
+        _id_child: i32,
+        _thread: u32,
+        event_time: u32,
+    ) {
+        if event != EVENT_OBJECT_SHOW || id_object != 0 || hwnd.is_null() {
+            return;
+        }
+        if !SHOULD_RUN.load(Ordering::SeqCst) { return; }
+
+        let class = get_class_name(hwnd);
+        if !is_toast_window(&class) { return; }
+
+        // 去重
+        {
+            let mut seen = SEEN.lock().unwrap();
+            let seen = seen.get_or_insert_with(|| SeenSet {
+                entries: HashSet::new(),
+                last_cleanup: event_time,
+            });
+            if event_time.wrapping_sub(seen.last_cleanup) > 60_000 {
+                seen.entries.retain(|(_, t)| event_time.wrapping_sub(*t) < 60_000);
+                seen.last_cleanup = event_time;
+            }
+            let key = (hwnd as isize, event_time);
+            if seen.entries.contains(&key) { return; }
+            seen.entries.insert(key);
+        }
+
+        // 等待通知内容渲染
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        let title = get_window_text(hwnd);
+        if title.is_empty() { return; }
+
+        let mut pid: u32 = 0;
+        let _ = GetWindowThreadProcessId(hwnd, &mut pid);
+        let process_name = if pid > 0 {
+            get_process_path(pid).map(|p| extract_process_name(&p)).unwrap_or_else(|| format!("pid:{}", pid))
+        } else { "unknown".to_string() };
+
+        // 跳过自身
+        if process_name.eq_ignore_ascii_case("echolink.exe") { return; }
+
+        if let Some(app) = super::APP_HANDLE.get() {
+            let config = read_config(app);
+            if config.blocked_apps.iter().any(|b| b.eq_ignore_ascii_case(&process_name)) { return; }
+            if config.server_url.is_empty() { return; }
+
+            if let Some(win) = app.get_webview_window("main") {
+                let esc = |s: &str| s.replace('\\', "\\\\").replace('\'', "\\'").replace('"', "\\\"");
+                let display = process_name.trim_end_matches(".exe").to_string();
+                let js = format!(
+                    r#"fetch('{srv}/api/notifications',{{method:'POST',headers:{{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('ns_token')||'')}},body:JSON.stringify({{package_name:'{pkg}',app_name:'{app}',title:'{title}',text:'',timestamp:Date.now()}})}}).catch(function(){{}})"#,
+                    srv = config.server_url,
+                    pkg = esc(&process_name),
+                    app = esc(&display),
+                    title = esc(&title),
+                );
+                let _ = win.eval(&js);
+            }
+        }
+    }
+
+    pub fn start(app: &AppHandle) {
+        if SHOULD_RUN.load(Ordering::SeqCst) { return; }
+        SHOULD_RUN.store(true, Ordering::SeqCst);
+        let _ = APP_HANDLE.set(app.clone());
+
+        std::thread::spawn(|| {
+            unsafe {
+                let hook = SetWinEventHook(
+                    EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW,
+                    core::ptr::null_mut(),
+                    Some(win_event_callback),
+                    0, 0,
+                    WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+                );
+                if !hook.is_null() {
+                    HOOK.store(hook as isize, Ordering::SeqCst);
+                    let mut msg: MSG = std::mem::zeroed();
+                    while GetMessageW(&mut msg, core::ptr::null_mut(), 0, 0) > 0 {
+                        DispatchMessageW(&msg);
+                    }
+                    UnhookWinEvent(hook);
+                    HOOK.store(0, Ordering::SeqCst);
+                }
+            }
+            SHOULD_RUN.store(false, Ordering::SeqCst);
+        });
+    }
+
+    pub fn stop() {
+        SHOULD_RUN.store(false, Ordering::SeqCst);
+        let hook = HOOK.swap(0, Ordering::SeqCst);
+        if hook != 0 {
+            unsafe { UnhookWinEvent(hook as HWINEVENTHOOK); }
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+mod win_notif {
+    use super::*;
+    pub fn start(_app: &AppHandle) {}
+    pub fn stop() {}
+}
+
+fn start_notification_listener(app: &AppHandle) {
+    win_notif::start(app);
+}
+
+fn stop_notification_listener() {
+    win_notif::stop();
+}
+
+static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+
+// ============== 应用入口 ==============
+
+pub struct ServerUrl(pub String);
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 主线程：创建 Slint 主窗口。Slint 的 winit 窗口必须由主线程的事件循环 pump，
-    // 否则窗口创建后永远不重绘 → 白屏。MainWindow 必须在主线程长期持有（不能进闭包后被 drop）。
-    let main_window = MainWindow::new().expect("Slint 窗口创建失败");
-    // slint::Weak 是 Send 但非 Sync；托盘/单实例回调要求 Sync，用 Arc<Mutex<>> 包裹以跨线程安全共享
-    let weak_holder: Arc<Mutex<slint::Weak<MainWindow>>> =
-        Arc::new(Mutex::new(main_window.as_weak()));
-    let weak_si = weak_holder.clone(); // 给 single-instance 回调用
-
-    let builder = tauri::Builder::default()
-        // 允许 Tauri 事件循环在后台线程运行（Windows/Linux），避免与 Slint 主线程 loop 争抢
-        .any_thread()
-        .plugin(tauri_plugin_single_instance::init(move |_app, _argv, _cwd| {
-            // 单实例激活：显示 Slint 主窗口（跨线程 → 派发到主线程事件循环）
-            let h = weak_si.clone();
-            slint::invoke_from_event_loop(move || {
-                let w = h.lock().clone();
-                if let Some(win) = w.upgrade() {
-                    let _ = win.show();
-                }
-            })
-            .ok();
+    tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            show_main(app);
         }))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .setup(move |app| {
-            let handle = app.handle().clone();
-            let persist = load_persist(&handle);
-
-            // 隐藏宿主 WebView 窗口（仅作进程宿主，不渲染任何网页）
-            if let Some(w) = app.get_webview_window("host") {
-                let _ = w.hide();
+        .manage(ServerUrl(String::new()))
+        .invoke_handler(tauri::generate_handler![
+            show_notification, set_unread_count, app_info, save_server_url,
+            get_config, set_notification_sync, set_blocked_apps
+        ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                api.prevent_close();
             }
-
-            let shared = Arc::new(Mutex::new(AppState {
-                client: Client::new(persist.server_url.clone()),
-                current_topic: String::new(),
-            }));
-            {
-                let mut s = shared.lock();
-                s.client.token = persist.token.clone();
-                s.client.username = persist.username.clone();
-                s.client.user_id = persist.user_id;
-                s.client.role = persist.role.clone();
-                s.client.display_name = persist.display_name.clone();
-                s.client.avatar = persist.avatar.clone();
+        })
+        .setup(|app| {
+            build_tray(app.handle())?;
+            let config = read_config(app.handle());
+            let _ = APP_HANDLE.set(app.handle().clone());
+            if config.notification_sync_enabled && !config.server_url.is_empty() {
+                start_notification_listener(app.handle());
             }
-
-            // 初始状态推送（Slint 属性必须在主线程设置，通过事件循环派发到主线程）
-            let wk = weak_holder.clone();
-            let p = persist.clone();
-            slint::invoke_from_event_loop(move || {
-                let w = wk.lock().clone();
-                if let Some(win) = w.upgrade() {
-                    win.set_server_url(p.server_url.clone().into());
-                    win.set_username(p.username.clone().into());
-                    win.set_display_name(p.display_name.clone().into());
-                    win.set_logged_in(!p.token.is_empty());
-                    win.set_sync_enabled(p.notification_sync_enabled);
-                }
-            })
-            .ok();
-
-            // 回调绑定（on_* 注册必须在主线程，通过事件循环派发）
-            let wk2 = weak_holder.clone();
-            let sh = shared.clone();
-            let hd = handle.clone();
-            slint::invoke_from_event_loop(move || {
-                let w = wk2.lock().clone();
-                bind_callbacks(sh.clone(), hd.clone(), w);
-            })
-            .ok();
-
-            // 若已有登录态，恢复会话
-            if !persist.token.is_empty() && !persist.server_url.is_empty() {
-                let sh = shared.clone();
-                let mw = weak_holder.clone();
-                let hd = handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    {
-                        let mut client = sh.lock().client.clone();
-                        let r = client.me().await;
-                        let _ = r;
-                    }
-                    let w = mw.lock().clone();
-                    main_window_set_profile(w.clone(), &sh);
-                    refresh_topics(sh.clone(), w.clone()).await;
-                    // 启动 WS（内部自行 spawn 长连接）
-                    let _ = spawn_ws(sh.clone(), hd.clone(), w.clone());
-                });
-                // 通知同步
-                if persist.notification_sync_enabled {
-                    win_notif::start(
-                        persist.server_url.clone(),
-                        persist.token.clone(),
-                        persist.blocked_apps.iter().cloned().collect(),
-                    );
-                }
-            }
-
-            // 托盘（仅注册；show 操作经事件循环在主线程执行）
-            build_tray(app.handle(), shared.clone(), weak_holder.clone());
-
-            app.manage(shared);
             Ok(())
-        });
-
-    // Tauri 在后台线程跑（仅托盘/插件/事件；不参与 UI 渲染）
-    let context = tauri::generate_context!();
-    thread::spawn(move || {
-        let _ = builder.run(context);
-    });
-
-    // 主线程：Slint 主循环（拥有 MainWindow，正常渲染；与后台 Tauri loop 互不干扰）
-    main_window.run().expect("Slint 运行失败");
-}
-
-fn main_window_set_profile(mw: slint::Weak<MainWindow>, sh: &Shared) {
-    let (username, display_name) = {
-        let s = sh.lock();
-        (s.client.username.clone(), s.client.display_name.clone())
-    };
-    slint::invoke_from_event_loop(move || {
-        if let Some(w) = mw.upgrade() {
-            w.set_username(username.into());
-            w.set_display_name(display_name.into());
-        }
-    })
-    .ok();
-}
-
-fn bind_callbacks(shared: Shared, app: AppHandle, win: slint::Weak<MainWindow>) {
-    // 回调注册方法在强引用 MainWindow 上；此处升级为强引用以注册，
-    // 各回调内部再 as_weak() 捕获 Weak 句柄供跨线程使用。
-    let win = win.upgrade().expect("主窗口在绑定回调时必须存活");
-    // 登录
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        let a = app.clone();
-        win.on_do_login(move |server, user, pass| {
-            let sh = sh.clone();
-            let w = w.clone();
-            let a = a.clone();
-            tauri::async_runtime::spawn(async move {
-                let r = {
-                    let mut client = Client::new(server.to_string());
-                    let r = client.login(&user, &pass).await;
-                    // 写回登录态
-                    {
-                        let mut s = sh.lock();
-                        s.client = client;
-                    }
-                    r
-                };
-                match r {
-                    Ok(_) => {
-                        persist_and_apply(&a, &sh, w.clone(), true, "").await;
-                    }
-                    Err(e) => set_status(&w, &e),
-                }
-            });
-        });
-    }
-    // 注册
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        let a = app.clone();
-        win.on_do_register(move |server, user, pass| {
-            let sh = sh.clone();
-            let w = w.clone();
-            let a = a.clone();
-            tauri::async_runtime::spawn(async move {
-                let r = {
-                    let mut client = Client::new(server.to_string());
-                    let r = client.register(&user, &pass).await;
-                    {
-                        let mut s = sh.lock();
-                        s.client = client;
-                    }
-                    r
-                };
-                match r {
-                    Ok(_) => {
-                        persist_and_apply(&a, &sh, w.clone(), true, "").await;
-                    }
-                    Err(e) => set_status(&w, &e),
-                }
-            });
-        });
-    }
-    // 加载话题
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        win.on_load_topics(move || {
-            let sh = sh.clone();
-            let w = w.clone();
-            tauri::async_runtime::spawn(async move {
-                refresh_topics(sh.clone(), w.clone()).await;
-            });
-        });
-    }
-    // 打开话题
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        win.on_open_topic(move |name| {
-            let name = name.to_string();
-            let sh = sh.clone();
-            let w = w.clone();
-            tauri::async_runtime::spawn(async move {
-                let (topic, display, sub) = {
-                    let s = sh.lock();
-                    let t = s.client.topics_cache_names().iter().find(|t| t.name == name).cloned();
-                    let t = match t {
-                        Some(t) => t,
-                        None => return,
-                    };
-                    (
-                        t.name.clone(),
-                        t.display_name.clone(),
-                        if t.kind == "devices" {
-                            "设备同步会话 · 本账号互通".to_string()
-                        } else if t.kind == "dm" {
-                            "好友私聊".to_string()
-                        } else {
-                            format!("成员 · #{}", t.name)
-                        },
-                    )
-                };
-                {
-                    let mut s = sh.lock();
-                    s.current_topic = topic.clone();
-                }
-                let weak = w.clone();
-                let topic_c = topic.clone();
-                let display_c = display.clone();
-                let sub_c = sub.clone();
-                slint::invoke_from_event_loop(move || {
-                    if let Some(win) = weak.upgrade() {
-                        win.set_current_topic(topic_c.clone().into());
-                        win.set_chat_title(display_c.clone().into());
-                        win.set_chat_sub(sub_c.into());
-                        win.set_chat_open(true);
-                    }
-                }).ok();
-                // 加载消息
-                let msgs = {
-                    let client = sh.lock().client.clone();
-                    match client.messages(&topic, 100).await {
-                        Ok(m) => m,
-                        Err(_) => Vec::new(),
-                    }
-                };
-                let my_id = sh.lock().client.user_id;
-                let items: Vec<MsgItem> = msgs.iter().map(|m| msg_to_item(m, my_id)).collect();
-                let weak2 = w.clone();
-                slint::invoke_from_event_loop(move || {
-                    if let Some(win) = weak2.upgrade() {
-                        win.set_messages(ModelRc::new(VecModel::from(items)));
-                    }
-                }).ok();
-            });
-        });
-    }
-    // 发送消息
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        win.on_send_message(move |text| {
-            let text = text.trim().to_string();
-            if text.is_empty() {
-                return;
-            }
-            let sh = sh.clone();
-            let w = w.clone();
-            tauri::async_runtime::spawn(async move {
-                let topic = sh.lock().current_topic.clone();
-                if topic.is_empty() {
-                    return;
-                }
-                let r = {
-                    let client = sh.lock().client.clone();
-                    client.publish(&topic, &text).await
-                };
-                if let Ok(m) = r {
-                    let my_id = sh.lock().client.user_id;
-                    let item = msg_to_item(&m, my_id);
-                    let weak = w.clone();
-                    slint::invoke_from_event_loop(move || {
-                        if let Some(win) = weak.upgrade() {
-                            let mut current: Vec<MsgItem> = win.get_messages().iter().collect();
-                            current.push(item);
-                            win.set_messages(ModelRc::new(VecModel::from(current)));
-                            win.set_input_text("".into());
-                        }
-                    })
-                    .ok();
-                }
-            });
-        });
-    }
-    // 删除消息（来自聊天气泡）
-    {
-        let sh = shared.clone();
-        win.on_delete_msg_topic(move |id, topic| {
-            let sh = sh.clone();
-            tauri::async_runtime::spawn(async move {
-                let r = {
-                    let client = sh.lock().client.clone();
-                    client.delete_message(&topic, id as i64).await
-                };
-                if r.is_ok() {
-                    let mut s = sh.lock();
-                    s.client.topics_cache.clear();
-                }
-            });
-        });
-    }
-    // 切换 tab
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        win.on_switch_tab(move |tab| {
-            if let Some(win) = w.upgrade() {
-                win.set_current_tab(tab.clone());
-            }
-            match tab.as_str() {
-                "friends" => {
-                    let sh = sh.clone();
-                    let w = w.clone();
-                    tauri::async_runtime::spawn(async move { load_friends(sh, w).await; });
-                }
-                "notifications" => {
-                    let sh = sh.clone();
-                    let w = w.clone();
-                    tauri::async_runtime::spawn(async move { load_notifs(sh, w).await; });
-                }
-                "devices" => {
-                    let sh = sh.clone();
-                    let w = w.clone();
-                    tauri::async_runtime::spawn(async move { load_devices(sh, w).await; });
-                }
-                "settings" => {
-                    let sh = sh.clone();
-                    let w = w.clone();
-                    tauri::async_runtime::spawn(async move { load_filters(sh, w).await; });
-                }
-                "messages" => {
-                    let sh = sh.clone();
-                    let w = w.clone();
-                    tauri::async_runtime::spawn(async move { refresh_topics(sh, w).await; });
-                }
-                _ => {}
-            }
-        });
-    }
-    // 好友私聊
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        win.on_friend_chat(move |username| {
-            let sh = sh.clone();
-            let w = w.clone();
-            tauri::async_runtime::spawn(async move {
-                let topic = {
-                    let client = sh.lock().client.clone();
-                    match client.friend_chat(&username).await {
-                        Ok(t) => t,
-                        Err(e) => {
-                            set_status(&w, &e);
-                            return;
-                        }
-                    }
-                };
-                if !topic.is_empty() {
-                    let weak = w.clone();
-                    slint::invoke_from_event_loop(move || {
-                        if let Some(win) = weak.upgrade() {
-                            win.set_current_tab("messages".into());
-                            win.invoke_open_topic(topic.into());
-                        }
-                    }).ok();
-                }
-            });
-        });
-    }
-    // 加好友
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        win.on_add_friend(move |username| {
-            let sh = sh.clone();
-            let w = w.clone();
-            tauri::async_runtime::spawn(async move {
-                let r = {
-                    let client = sh.lock().client.clone();
-                    client.add_friend_req(&username).await
-                };
-                match r {
-                    Ok(_) => set_status(&w, "好友申请已发送"),
-                    Err(e) => set_status(&w, &e),
-                }
-            });
-        });
-    }
-    // 通知同步开关
-    {
-        let sh = shared.clone();
-        let a = app.clone();
-        win.on_toggle_sync(move |on| {
-            let sh = sh.clone();
-            let a = a.clone();
-            let (server, token) = {
-                let s = sh.lock();
-                (s.client.server.clone(), s.client.token.clone())
-            };
-            if on {
-                win_notif::start(server, token, HashSet::new());
-            } else {
-                win_notif::stop();
-            }
-            // 持久化
-            update_persist_sync(&a, &sh, on);
-        });
-    }
-    // 刷新本机应用列表
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        win.on_refresh_apps(move || {
-            let sh = sh.clone();
-            let w = w.clone();
-            tauri::async_runtime::spawn(async move {
-                refresh_apps(sh, w).await;
-            });
-        });
-    }
-    // 保存过滤
-    {
-        let sh = shared.clone();
-        win.on_save_filter(move |exe, checked| {
-            let sh = sh.clone();
-            tauri::async_runtime::spawn(async move {
-                let r = {
-                    let client = sh.lock().client.clone();
-                    if checked {
-                        let name = exe.trim_end_matches(".exe").to_string();
-                        client.add_filter(&exe, &name).await
-                    } else {
-                        client.del_filter(&exe).await
-                    }
-                };
-                if r.is_ok() {
-                    let blocked: HashSet<String> = {
-                        let mut s = sh.lock();
-                        if checked {
-                            let name = exe.trim_end_matches(".exe").to_string();
-                            if !s.client.filters_cache.iter().any(|f| f.package_name.as_str() == exe.as_str()) {
-                                s.client.filters_cache.push(FilterEntry {
-                                    package_name: exe.to_string(),
-                                    app_name: name,
-                                    enabled: true,
-                                });
-                            }
-                        } else {
-                            s.client.filters_cache.retain(|f| f.package_name.as_str() != exe.as_str());
-                        }
-                        s.client.filters_cache.iter().filter(|f| f.enabled).map(|f| f.package_name.clone()).collect()
-                    };
-                    win_notif::update_blocked(blocked);
-                }
-            });
-        });
-    }
-    // 保存昵称
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        win.on_save_nickname(move |name| {
-            let sh = sh.clone();
-            let w = w.clone();
-            tauri::async_runtime::spawn(async move {
-                let r = {
-                    let mut client = sh.lock().client.clone();
-                    let r = client.set_nickname(&name).await;
-                    {
-                        let mut s = sh.lock();
-                        s.client = client;
-                    }
-                    r
-                };
-                match r {
-                    Ok(_) => {
-                        let weak = w.clone();
-                        slint::invoke_from_event_loop(move || {
-                            if let Some(win) = weak.upgrade() {
-                                win.set_display_name(name);
-                            }
-                        }).ok();
-                        set_status(&w, "昵称已保存");
-                    }
-                    Err(e) => set_status(&w, &e),
-                }
-            });
-        });
-    }
-    // 改密码
-    {
-        let sh = shared.clone();
-        let w = win.as_weak();
-        win.on_change_pass(move |old, new| {
-            let sh = sh.clone();
-            let w = w.clone();
-            tauri::async_runtime::spawn(async move {
-                let r = {
-                    let client = sh.lock().client.clone();
-                    client.change_password(&old, &new).await
-                };
-                match r {
-                    Ok(_) => set_status(&w, "密码已修改"),
-                    Err(e) => set_status(&w, &e),
-                }
-            });
-        });
-    }
-    // 登出
-    {
-        let sh = shared.clone();
-        let a = app.clone();
-        let w = win.as_weak();
-        win.on_do_logout(move || {
-            win_notif::stop();
-            {
-                let mut s = sh.lock();
-                s.client = Client::new(s.client.server.clone());
-                s.current_topic = String::new();
-            }
-            update_persist_logout(&a);
-            if let Some(win) = w.upgrade() {
-                win.set_logged_in(false);
-                win.set_messages(ModelRc::new(VecModel::default()));
-                win.set_topics(ModelRc::new(VecModel::default()));
-            }
-        });
-    }
-}
-
-fn set_status(w: &slint::Weak<MainWindow>, msg: &str) {
-    let wk = w.clone();
-    let m = msg.to_string();
-    slint::invoke_from_event_loop(move || {
-        if let Some(win) = wk.upgrade() {
-            win.set_status(m.into());
-        }
-    })
-    .ok();
-}
-
-async fn load_friends(sh: Shared, w: slint::Weak<MainWindow>) {
-    let fs = {
-        let client = sh.lock().client.clone();
-        match client.friends().await {
-            Ok(f) => f,
-            Err(_) => return,
-        }
-    };
-    let items: Vec<FriendItem> = fs
-        .iter()
-        .map(|f| FriendItem {
-            username: f.username.clone().into(),
-            display: f.display_name.clone().unwrap_or(f.username.clone()).into(),
         })
-        .collect();
-    slint::invoke_from_event_loop(move || {
-        if let Some(win) = w.upgrade() {
-            win.set_friends(ModelRc::new(VecModel::from(items)));
-        }
-    })
-    .ok();
-}
-
-async fn load_notifs(sh: Shared, w: slint::Weak<MainWindow>) {
-    let ns = {
-        let client = sh.lock().client.clone();
-        match client.notifications(100).await {
-            Ok(n) => n,
-            Err(_) => return,
-        }
-    };
-    let items: Vec<NotifItem> = ns
-        .iter()
-        .map(|n| NotifItem {
-            id: n.id as i32,
-            app: n.app_name.clone().unwrap_or_default().into(),
-            title: n.title.clone().unwrap_or_default().into(),
-            text: n.text.clone().unwrap_or_default().into(),
-            time: fmt_time(n.timestamp).into(),
-        })
-        .collect();
-    slint::invoke_from_event_loop(move || {
-        if let Some(win) = w.upgrade() {
-            win.set_notifs(ModelRc::new(VecModel::from(items)));
-        }
-    })
-    .ok();
-}
-
-async fn load_devices(sh: Shared, w: slint::Weak<MainWindow>) {
-    let ds = {
-        let client = sh.lock().client.clone();
-        match client.devices().await {
-            Ok(d) => d,
-            Err(_) => return,
-        }
-    };
-    let items: Vec<DeviceItem> = ds
-        .iter()
-        .map(|d| DeviceItem {
-            name: d.device_name.clone().into(),
-            platform: d.platform.clone().unwrap_or_default().into(),
-            last: fmt_time(d.last_seen).into(),
-        })
-        .collect();
-    slint::invoke_from_event_loop(move || {
-        if let Some(win) = w.upgrade() {
-            win.set_devices(ModelRc::new(VecModel::from(items)));
-        }
-    })
-    .ok();
-}
-
-async fn load_filters(sh: Shared, w: slint::Weak<MainWindow>) {
-    let (filters, apps) = {
-        let client = sh.lock().client.clone();
-        let f = client.filters().await.ok().unwrap_or_default();
-        let a = win_notif::list_installed_apps();
-        (f, a)
-    };
-    // 合并：apps 列表 + 已勾选状态
-    let checked_set: HashSet<String> =
-        filters.iter().filter(|f| f.enabled).map(|f| f.package_name.clone()).collect();
-    let app_items: Vec<AppItem> = apps
-        .into_iter()
-        .map(|a: InstalledApp| AppItem {
-            name: a.name.clone().into(),
-            exe: a.exe.clone().into(),
-            checked: checked_set.contains(&a.exe),
-        })
-        .collect();
-    let filter_items: Vec<FilterItem> = filters
-        .iter()
-        .map(|f| FilterItem {
-            pkg: f.package_name.clone().into(),
-            name: f.app_name.clone().into(),
-            checked: f.enabled,
-        })
-        .collect();
-    {
-        let mut s = sh.lock();
-        s.client.filters_cache = filters;
-    }
-    slint::invoke_from_event_loop(move || {
-        if let Some(win) = w.upgrade() {
-            win.set_apps(ModelRc::new(VecModel::from(app_items)));
-            win.set_filters(ModelRc::new(VecModel::from(filter_items)));
-        }
-    })
-    .ok();
-}
-
-async fn refresh_apps(sh: Shared, w: slint::Weak<MainWindow>) {
-    // 重新拉取并保留当前勾选
-    load_filters(sh, w).await;
-}
-
-async fn persist_and_apply(app: &AppHandle, sh: &Shared, w: slint::Weak<MainWindow>, ok: bool, err: &str) {
-    if ok {
-        {
-            let s = sh.lock();
-            let p = Persist {
-                server_url: s.client.server.clone(),
-                token: s.client.token.clone(),
-                username: s.client.username.clone(),
-                user_id: s.client.user_id,
-                role: s.client.role.clone(),
-                display_name: s.client.display_name.clone(),
-                avatar: s.client.avatar.clone(),
-                notification_sync_enabled: false,
-                blocked_apps: Vec::new(),
-            };
-            save_persist(app, &p);
-        }
-        let wk = w.clone();
-        slint::invoke_from_event_loop(move || {
-            if let Some(win) = wk.upgrade() {
-                win.set_logged_in(true);
-                win.set_status("".into());
-            }
-        })
-        .ok();
-        main_window_set_profile(w.clone(), sh);
-        refresh_topics(sh.clone(), w.clone()).await;
-        // 启动 WS（内部自行 spawn 长连接，返回 future 丢弃即可）
-        let _ = spawn_ws(sh.clone(), app.clone(), w.clone());
-    } else {
-        let wk = w.clone();
-        let e = err.to_string();
-        slint::invoke_from_event_loop(move || {
-            if let Some(win) = wk.upgrade() {
-                win.set_status(e.into());
-            }
-        })
-        .ok();
-    }
-}
-
-fn update_persist_sync(app: &AppHandle, sh: &Shared, on: bool) {
-    let p = {
-        let s = sh.lock();
-        Persist {
-            server_url: s.client.server.clone(),
-            token: s.client.token.clone(),
-            username: s.client.username.clone(),
-            user_id: s.client.user_id,
-            role: s.client.role.clone(),
-            display_name: s.client.display_name.clone(),
-            avatar: s.client.avatar.clone(),
-            notification_sync_enabled: on,
-            blocked_apps: s.client.filters_cache.iter().filter(|f| f.enabled).map(|f| f.package_name.clone()).collect(),
-        }
-    };
-    save_persist(app, &p);
-}
-
-fn update_persist_logout(app: &AppHandle) {
-    // 仅清空 token 等登录态，保留 server_url
-    let dir = match app.path().app_data_dir().ok() {
-        Some(d) => d,
-        None => return,
-    };
-    let path = dir.join("config.json");
-    if let Ok(s) = std::fs::read_to_string(&path) {
-        if let Ok(mut p) = serde_json::from_str::<Persist>(&s) {
-            p.token.clear();
-            p.username.clear();
-            p.user_id = 0;
-            p.role.clear();
-            p.display_name.clear();
-            p.avatar.clear();
-            p.notification_sync_enabled = false;
-            let _ = std::fs::create_dir_all(&dir);
-            if let Ok(j) = serde_json::to_string_pretty(&p) {
-                let _ = std::fs::write(path, j);
-            }
-        }
-    }
-}
-
-fn build_tray(app: &AppHandle, _sh: Shared, win: Arc<Mutex<slint::Weak<MainWindow>>>) {
-    let show = MenuItem::with_id(app, "show", "打开", true, None::<&str>).unwrap();
-    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>).unwrap();
-    let sep = PredefinedMenuItem::separator(app).unwrap();
-    let menu = tauri::menu::Menu::with_items(app, &[&show, &sep, &quit]).unwrap();
-    let win_for_tray = win.clone();
-    TrayIconBuilder::with_id("main-tray")
-        .icon(app.default_window_icon().cloned().expect("icon"))
-        .menu(&menu)
-        .show_menu_on_left_click(true)
-        .on_menu_event(move |_app, event| match event.id.as_ref() {
-            "show" => {
-                let h = win.clone();
-                slint::invoke_from_event_loop(move || {
-                    let w = h.lock().clone();
-                    if let Some(win) = w.upgrade() {
-                        let _ = win.show();
-                    }
-                })
-                .ok();
-            }
-            "quit" => _app.exit(0),
-            _ => {}
-        })
-        .on_tray_icon_event({
-            move |_tray, event| {
-            if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
-                let h = win_for_tray.clone();
-                slint::invoke_from_event_loop(move || {
-                    let w = h.lock().clone();
-                    if let Some(win) = w.upgrade() {
-                        let _ = win.show();
-                    }
-                })
-                .ok();
-            }
-        }})
-        .build(app)
-        .ok();
+        .run(tauri::generate_context!())
+        .expect("error while running EchoLink desktop");
 }
