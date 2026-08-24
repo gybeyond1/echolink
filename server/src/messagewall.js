@@ -1,8 +1,41 @@
 const { getDB } = require("./db");
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
 
 // 留言板 Webhook 的全局话题名（topics.name 唯一）。所有授权账号都是它的成员，
 // 留言统一汇进这一个会话，不与通知/私聊/设备会话混淆。
 const TOPIC_NAME = "messagewall";
+
+// 将留言板图片（base64 data URI）落盘到 data/uploads，返回媒体字段。
+// 仅支持 image/jpeg | image/png | image/webp；失败时抛错由调用方决定如何响应。
+function saveMessagewallImage(dataUri) {
+  if (!dataUri) return null;
+  const m = /^data:image\/(jpeg|png|webp);base64,(.+)$/i.exec(dataUri.trim());
+  if (!m) throw new Error("invalid image (expected data:image/jpeg|png|webp;base64,...)");
+  const sub = m[1].toLowerCase();
+  const ext = sub === "jpeg" ? "jpg" : sub;
+  let buf;
+  try {
+    buf = Buffer.from(m[2], "base64");
+  } catch (_) {
+    throw new Error("image base64 decode failed");
+  }
+  if (!buf || buf.length === 0) throw new Error("empty image");
+  if (buf.length > 10 * 1024 * 1024) throw new Error("image too large (>10MB)");
+
+  const dataDir = path.dirname(process.env.DB_PATH || "./data/notifysync.db");
+  const uploadsDir = path.join(dataDir, "uploads");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  const fname = crypto.randomBytes(12).toString("hex") + "." + ext;
+  fs.writeFileSync(path.join(uploadsDir, fname), buf);
+  return {
+    media_type: "image",
+    media_url: "/uploads/" + fname,
+    media_name: fname,
+    media_size: buf.length,
+  };
+}
 
 // 读取「接收留言板通知的账号」配置（settings.messagewall_targets，JSON 字符串数组）。
 // 为空 / 缺失 → 默认对【全部账号】开放（开箱即用）。
@@ -70,9 +103,9 @@ function ensureMessagewallTopic(targetIds, description) {
 }
 
 // 写入一条留言板消息，并实时推送给所有目标账号的设备。
-// title = 留言人（如「张三（13800138000）」），text = 留言正文。
-// 返回 { delivered: 账号数, message }
-function appendMessagewallMessage(title, text, description) {
+// title = 留言人（如「张三（13800138000）」），text = 留言正文（可空），imageDataUri = 可选 base64 图片。
+// 返回 { delivered: 账号数, message } 或 { delivered:0, message:null, error }
+function appendMessagewallMessage(title, text, description, imageDataUri) {
   const db = getDB();
   const targetIds = resolveMessagewallUserIds();
   if (targetIds.length === 0) {
@@ -84,12 +117,23 @@ function appendMessagewallMessage(title, text, description) {
   const t = String(title || "").slice(0, 500);
   const c = String(text || "").slice(0, 2000);
 
+  // 图片（可选）：base64 data URI → 落盘到 data/uploads，返回媒体字段
+  let media = { media_type: "text", media_url: null, media_name: null, media_size: 0 };
+  if (imageDataUri) {
+    try {
+      media = saveMessagewallImage(imageDataUri);
+      if (!media) media = { media_type: "text", media_url: null, media_name: null, media_size: 0 };
+    } catch (e) {
+      return { delivered: 0, message: null, error: e.message };
+    }
+  }
+
   const result = db
     .prepare(
-      `INSERT INTO topic_messages (topic, user_id, sender_name, title, text, media_type, timestamp)
-       VALUES (?, NULL, '留言板', ?, ?, 'text', ?)`
+      `INSERT INTO topic_messages (topic, user_id, sender_name, title, text, media_type, media_url, media_name, media_size, timestamp)
+       VALUES (?, NULL, '留言板', ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(TOPIC_NAME, t, c, ts);
+    .run(TOPIC_NAME, t, c, media.media_type, media.media_url, media.media_name || null, media.media_size, ts);
 
   const message = {
     id: result.lastInsertRowid,
@@ -103,10 +147,10 @@ function appendMessagewallMessage(title, text, description) {
     timestamp: ts,
     device_id: null,
     device_name: null,
-    media_type: "text",
-    media_url: null,
-    media_name: null,
-    media_size: 0,
+    media_type: media.media_type,
+    media_url: media.media_url,
+    media_name: media.media_name,
+    media_size: media.media_size,
     peer_avatar: null,
   };
 

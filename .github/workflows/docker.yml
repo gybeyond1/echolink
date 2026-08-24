@@ -45,4 +45,4 @@ jobs:
             echo "attempt $i: gh release upload failed (likely 503), retry in 25s..."; sleep 25
           done
         env:
-          GITHUB_TOKEN=***REDACTED*** secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

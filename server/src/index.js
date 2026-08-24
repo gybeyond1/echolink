@@ -14,6 +14,8 @@ const server = http.createServer(app);
 
 // 中间件
 app.use(cors());
+// 留言板 Webhook 可能携带 base64 图片，单独放宽 body 上限（全局 1mb 不够用）
+app.use("/api/webhook", express.json({ limit: "15mb" }));
 app.use(express.json({ limit: "1mb" }));
 
 // 反代友好：当部署在 nginx/caddy 等反向代理之后时，正确识别客户端 IP 与协议
@@ -51,7 +53,7 @@ function loadJwtSecret() {
   console.log("[JWT] auto-generated secret persisted to", secretFile);
   return generated;
 }
-process.env.JWT_SECRET=***REDACTED***
+process.env.JWT_SECRET = loadJwtSecret();
 
 // 健康检查
 app.get("/health", (req, res) => {
