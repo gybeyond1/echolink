@@ -9,6 +9,7 @@ server/data/*.db-wal
 
 # 本地环境变量（含密钥）
 server/.env.local
+server/.env
 
 # Android 构建产物
 android/.gradle/
