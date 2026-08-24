@@ -90,7 +90,13 @@ if (fs.existsSync(publicDir)) {
   // 上传的媒体文件（图片/语音/附件）静态可访问
   const uploadsDir = path.join(getDataDir(), "uploads");
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-  app.use("/uploads", express.static(uploadsDir));
+  app.use("/uploads", express.static(uploadsDir, {
+    maxAge: "1y",
+    immutable: true,
+    setHeaders: (res) => {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    },
+  }));
   // 未匹配的非 API 路径都回退到 index.html（单页应用）
   app.get(/^(?!\/api\/).*/, (req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));

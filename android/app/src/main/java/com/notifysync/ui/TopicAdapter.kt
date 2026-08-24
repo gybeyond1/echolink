@@ -506,19 +506,30 @@ class TopicAdapter(
 
     private fun loadImage(url: String, iv: ImageView) {
         iv.setImageBitmap(null)
+        // 以文件名（不含 host）做缓存 key：局域网与公网同一物理文件只缓存一份，换网直接命中本地
+        val cache = File(iv.context.cacheDir, "img_" + url.substringAfterLast('/').substringBefore('?'))
         scope.launch {
             try {
                 val bmp = withContext(Dispatchers.IO) {
-                    val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                        connectTimeout = 10000
-                        readTimeout = 15000
-                        doInput = true
+                    if (cache.exists() && cache.length() > 0) {
+                        BitmapFactory.decodeFile(cache.absolutePath)
+                    } else {
+                        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                            connectTimeout = 10000
+                            readTimeout = 30000
+                            doInput = true
+                            instanceFollowRedirects = true
+                        }
+                        conn.inputStream.use { input ->
+                            cache.outputStream().use { out -> input.copyTo(out) }
+                            BitmapFactory.decodeFile(cache.absolutePath)
+                        }
                     }
-                    conn.inputStream.use { BitmapFactory.decodeStream(it) }
                 }
                 iv.setImageBitmap(bmp)
             } catch (e: Exception) {
-                // ignore
+                // 半截损坏的缓存文件清掉，下次重新下载
+                try { cache.delete() } catch (_: Exception) {}
             }
         }
     }
