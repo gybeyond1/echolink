@@ -668,7 +668,7 @@ class TopicFragment : Fragment() {
 
     // 长按菜单：打开 / 删除（从列表移除）/ 关闭（彻底关闭，仅创建者）
     private fun showTopicMenu(topic: MyTopic) {
-        if (topic.kind == "devices") {
+        if (topic.kind == "devices" || topic.kind == "messagewall") {
             Toast.makeText(requireContext(), "「我的设备」是默认会话，不可删除", Toast.LENGTH_SHORT).show()
             return
         }
@@ -686,7 +686,7 @@ class TopicFragment : Fragment() {
     }
 
     private fun swipeDelete(topic: MyTopic) {
-        if (topic.kind == "devices") {
+        if (topic.kind == "devices" || topic.kind == "messagewall") {
             Toast.makeText(requireContext(), "该会话不可删除", Toast.LENGTH_SHORT).show()
             loadTopicList() // 还原被滑走的列表项
             return

@@ -182,6 +182,9 @@
         t.last_message = d.text || d.title || mediaLabel(d);
         t.last_message_at = d.timestamp;
         if (state.tab === "messages") renderSessionList();
+      } else {
+        // 收到未知话题消息（如首次收到留言板留言）→ 刷新左侧会话列表
+        loadTopics().catch(() => {});
       }
       // 当前聊天窗口追加（按 id 去重，REST 发送后本机也会收到）
       if (state.tab === "messages" && state.chat && state.chat.topic === m.topic && !msgIdSet.has(d.id)) {
@@ -198,6 +201,15 @@
     } else if (m.type === "notification") {
       state.notifCount++;
       if (state.tab === "messages") renderSessionList();
+    } else if (m.type === "message_deleted") {
+      // 服务端软删除广播：仅删除者本机其他设备需移除该气泡
+      if (m.topic && m.message_id != null) {
+        const body = document.getElementById("chatBody");
+        if (body && state.chat && state.chat.topic === m.topic) {
+          const el = body.querySelector(`[data-mid="${m.message_id}"]`);
+          if (el) el.remove();
+        }
+      }
     } else if (m.type === "profile_updated") {
       loadProfile();
     }
@@ -276,6 +288,7 @@
     { id: "admin_users", ic: "🛡️", label: "用户管理" },
     { id: "admin_topics", ic: "📚", label: "全部话题" },
     { id: "admin_notifs", ic: "📥", label: "全部通知" },
+    { id: "admin_messagewall", ic: "📝", label: "留言板" },
     { id: "admin_settings", ic: "⚙️", label: "服务器设置" },
   ];
 
@@ -321,6 +334,7 @@
       if (state.tab === "admin_topics") return renderAdminTopics(main);
       if (state.tab === "admin_notifs") return renderAdminNotifs(main);
       if (state.tab === "admin_settings") return renderAdminSettings(main);
+      if (state.tab === "admin_messagewall") return renderAdminMessagewall(main);
     } catch (e) {
       main.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
     }
@@ -501,7 +515,7 @@
     wsSend({ type: "subscribe", topic: t.name });
 
     const col = document.getElementById("chatCol");
-    const isSpecial = t.kind === "devices" || t.kind === "dm";
+    const isSpecial = t.kind === "devices" || t.kind === "dm" || t.kind === "messagewall";
     const actions = [
       t.my_role === "owner" && t.kind !== "dm" && t.kind !== "devices" ? `<button class="btn ghost sm" id="c-req">待审批${t.pending_requests > 0 ? `(${t.pending_requests})` : ""}</button>` : "",
       t.kind !== "dm" ? `<button class="btn ghost sm" id="c-members">成员</button>` : "",
@@ -510,6 +524,7 @@
     ].join("");
     const sub = t.kind === "devices" ? "设备同步会话 · 本账号互通"
       : t.kind === "dm" ? "好友私聊"
+      : t.kind === "messagewall" ? "留言板 · 门边访客留言推送"
       : `${t.my_role === "owner" ? "创建者" : "成员"} · #${esc(t.name)}`;
     col.innerHTML = chatHeader(
       (t.kind === "normal" ? "#" : "") + esc(t.display || t.name), sub, actions
@@ -552,6 +567,25 @@
     document.getElementById("ci-file").onchange = sendFile;
     setupVoice();
 
+    // 软删除：点击气泡上的删除按钮 → 仅本机隐藏（单向），并通知服务端
+    const body = document.getElementById("chatBody");
+    if (body) {
+      body.onclick = (e) => {
+        const btn = e.target.closest(".bubble-del[data-del]");
+        if (!btn) return;
+        const mid = parseInt(btn.dataset.del, 10);
+        if (isNaN(mid)) return;
+        if (!confirm("删除这条消息？仅在你的设备上隐藏，对方不受影响。")) return;
+        api(`/api/topics/${encodeURIComponent(t.name)}/messages/${mid}`, { method: "DELETE" })
+          .then(() => {
+            const el = body.querySelector(`[data-mid="${mid}"]`);
+            if (el) el.remove();
+            toast("已删除（仅本机）", "ok");
+          })
+          .catch(err => toast(err.message, "err"));
+      };
+    }
+
     loadMessages(t.name);
     input.focus();
   }
@@ -590,13 +624,14 @@
         media = `<div class="bubble-media"><a class="btn ghost sm" href="${url}" target="_blank" download>📄 ${esc(m.media_name || "文件")}（${fmtSize(m.media_size)}）</a></div>`;
       }
     }
-    return `<div class="msg-row ${mine ? "mine" : ""}">
+    return `<div class="msg-row ${mine ? "mine" : ""}" data-mid="${m.id}">
       ${avatarHtml(senderName, m.sender_avatar, 34)}
       <div class="bubble ${mine ? "bubble-own" : "bubble-other"}">
         <div class="bubble-sender">${esc(senderName)}${m.device_name ? `<span class="bubble-dev"> · ${esc(m.device_name)}</span>` : ""}<span class="bubble-time">${time}</span></div>
         ${m.title ? `<div class="bubble-title">${esc(m.title)}</div>` : ""}
         ${m.text ? `<div class="bubble-text">${esc(m.text)}</div>` : ""}
         ${media}
+        <button class="bubble-del" data-del="${m.id}" title="删除（仅本机隐藏）">🗑</button>
       </div>
     </div>`;
   }
@@ -1352,6 +1387,77 @@
         toast("设置已保存", "ok");
       } catch (e) { status.innerHTML = `<div class="empty">保存失败：${esc(e.message)}</div>`; }
       finally { btn.disabled = false; }
+    };
+  }
+
+  // ---------- Admin: 留言板 Webhook 配置 ----------
+  async function renderAdminMessagewall(main) {
+    main.innerHTML = `<h2 class="page-title">留言板 Webhook</h2>
+      <p class="page-sub">门边留言板应用可把访客留言推送到这里，作为独立会话显示，不与通知 / 私聊 / 设备会话混淆。勾选要接收留言的账号（留空 = 全部账号）。</p>
+      <div class="card" style="margin-bottom:16px">
+        <label>Webhook 地址（填到留言板应用的「Webhook URL」）</label>
+        <div class="row" style="align-items:flex-end">
+          <input id="mw-url" readonly value="" style="flex:1" />
+          <button class="btn ghost" id="mw-copy">复制</button>
+        </div>
+        <div style="margin-top:12px">
+          <label>接收留言的账号</label>
+          <div id="mw-users" class="chips">加载中…</div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px">
+          <button class="btn" id="mw-save">保存设置</button>
+          <button class="btn ghost" id="mw-test">发送测试留言</button>
+        </div>
+        <div id="mw-status" style="margin-top:12px"></div>
+      </div>`;
+    const status = document.getElementById("mw-status");
+    document.getElementById("mw-url").value = location.origin + "/api/webhook/messagewall";
+    document.getElementById("mw-copy").onclick = () => {
+      const v = document.getElementById("mw-url").value;
+      if (navigator.clipboard) navigator.clipboard.writeText(v).then(() => toast("已复制", "ok")).catch(() => {});
+    };
+
+    let users = [], targets = [];
+    try {
+      const r = await api("/api/admin/messagewall");
+      users = r.users || [];
+      targets = r.targets || [];
+    } catch (e) { status.innerHTML = `<div class="empty">读取失败：${esc(e.message)}</div>`; }
+
+    const box = document.getElementById("mw-users");
+    if (!users.length) { box.innerHTML = `<div class="empty">暂无用户。</div>`; }
+    else {
+      box.innerHTML = users.map(u => `
+        <label class="chip">
+          <input type="checkbox" data-user="${esc(u.username)}" ${targets.includes(u.username) ? "checked" : ""}/>
+          ${esc(u.username)}${u.role === "admin" ? ' <span class="badge admin">管理员</span>' : ""}
+        </label>`).join("");
+    }
+
+    document.getElementById("mw-save").onclick = async () => {
+      const sel = Array.from(box.querySelectorAll("input[data-user]:checked")).map(c => c.dataset.user);
+      const btn = document.getElementById("mw-save");
+      btn.disabled = true;
+      try {
+        const r = await api("/api/admin/messagewall", { method: "PUT", body: { targets: sel } });
+        status.innerHTML = `<div class="label" style="color:#1a7f37;font-weight:600">已保存。接收账号：${r.targets.length ? esc(r.targets.join("、")) : "全部账号"}</div>`;
+        toast("已保存", "ok");
+      } catch (e) { status.innerHTML = `<div class="empty">保存失败：${esc(e.message)}</div>`; }
+      finally { btn.disabled = false; }
+    };
+
+    document.getElementById("mw-test").onclick = async () => {
+      const url = document.getElementById("mw-url").value;
+      try {
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: "messagewall", sourceName: "留言板", sourceDesc: "测试", title: "测试用户", content: "这是一条测试留言，请忽略。" }),
+        });
+        const j = await resp.json().catch(() => ({}));
+        if (resp.ok && j.ok) status.innerHTML = `<div class="label" style="color:#1a7f37;font-weight:600">测试留言已发送（推送给 ${j.delivered} 个账号）。去「消息」里看留言板会话吧。</div>`;
+        else status.innerHTML = `<div class="empty">测试失败：${esc(j.error || resp.status)}</div>`;
+      } catch (e) { status.innerHTML = `<div class="empty">测试失败：${esc(e.message)}</div>`; }
     };
   }
 

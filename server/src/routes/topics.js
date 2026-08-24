@@ -110,6 +110,7 @@ router.get("/", authMiddleware, (req, res) => {
                 WHEN 'devices' THEN '我的设备（' || COALESCE(NULLIF(u.display_name, ''), u.username, '未知') || '）'
                 WHEN 'dm' THEN (SELECT COALESCE(u2.display_name, u2.username) FROM topic_members m2 LEFT JOIN users u2 ON m2.user_id = u2.id
                                 WHERE m2.topic_id = t.id AND m2.user_id != ? LIMIT 1)
+                WHEN 'messagewall' THEN COALESCE(t.title, '留言板')
                 ELSE t.name
               END as display_name,
               CASE t.kind
@@ -126,7 +127,7 @@ router.get("/", authMiddleware, (req, res) => {
                  ORDER BY id DESC LIMIT 1) as last_message,
               (SELECT COUNT(*) FROM topic_join_requests jr WHERE jr.topic_id = t.id AND jr.status='pending') as pending_requests,
               COALESCE((SELECT mbr.last_read_id FROM topic_members mbr WHERE mbr.topic_id = t.id AND mbr.user_id = ?), 0) as last_read_id,
-              (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name AND tm.id > COALESCE((SELECT mbr.last_read_id FROM topic_members mbr WHERE mbr.topic_id = t.id AND mbr.user_id = ?), 0) AND tm.user_id != ? AND tm.id NOT IN (SELECT message_id FROM topic_message_deletes WHERE user_id = ?)) as unread_count
+              (SELECT COUNT(*) FROM topic_messages tm WHERE tm.topic = t.name AND tm.id > COALESCE((SELECT mbr.last_read_id FROM topic_members mbr WHERE mbr.topic_id = t.id AND mbr.user_id = ?), 0) AND (tm.user_id IS NULL OR tm.user_id != ?) AND tm.id NOT IN (SELECT message_id FROM topic_message_deletes WHERE user_id = ?)) as unread_count
        FROM topics t
        ${isAdmin ? "LEFT" : "INNER"} JOIN topic_members m ON m.topic_id = t.id
        LEFT JOIN users u ON t.owner_id = u.id
@@ -317,6 +318,7 @@ router.post("/:topic/leave", authMiddleware, (req, res) => {
   if (!topic) return res.status(404).json({ error: "Topic not found" });
   // 设备会话为默认会话，不可退出；私聊会话允许从列表移除（仅删除自己的 membership，不删好友关系）
   if (topic.kind === "devices") return res.status(400).json({ error: "设备会话不可退出" });
+  if (topic.kind === "messagewall") return res.status(400).json({ error: "留言板会话不可退出" });
   // 管理员不是普通 member，但从列表移除/关闭普通话题时不应报错；按 delete 权限处理
   const mem = getMembership(topic.id, req.userId);
   const isAdmin = req.role === "admin";
