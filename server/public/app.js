@@ -108,6 +108,11 @@
     return `<div class="avatar avatar-txt" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px;background:linear-gradient(135deg,hsl(${h},72%,58%),hsl(${(h + 40) % 360},72%,48%))">${esc(initials(name))}</div>`;
   }
 
+  function mwAvatar(size) {
+    const px = Math.max(18, Math.round(size * 0.92));
+    return `<div class="mw-avatar" style="width:${size}px;height:${size}px;font-size:${px}px">📮</div>`;
+  }
+
   async function api(path, opts) {
     opts = opts || {};
     const headers = { "Content-Type": "application/json" };
@@ -432,6 +437,7 @@
       const active = state.chat && state.chat.topic === t.name;
       let av;
       if (kind === "devices") av = `<img class="avatar" style="width:46px;height:46px" src="devices_avatar.png" onerror="this.style.display='none'" />`;
+      else if (kind === "messagewall") av = mwAvatar(46);
       else if (kind === "dm") av = avatarHtml(name, null, 46);
       else av = avatarHtml("#" + t.name, null, 46, 205);
       const preview = t.last_message || mediaLabel(t) || (kind === "devices" ? "我的设备同步会话" : "暂无消息");
@@ -530,13 +536,13 @@
       (t.kind === "normal" ? "#" : "") + esc(t.display || t.name), sub, actions
     ) + `
       <div class="chat-body" id="chatBody"><div class="chat-loading">加载中…</div></div>
-      <div class="chat-input">
+      ${t.kind === "messagewall" ? "" : `<div class="chat-input">
         <button class="ci-btn" id="ci-attach" title="发送图片/文件">📎</button>
         <input type="file" id="ci-file" style="display:none" />
         <button class="ci-btn" id="ci-voice" title="录制语音">🎤</button>
         <input id="ci-text" type="text" placeholder="输入消息…" autocomplete="off" />
         <button class="btn" id="ci-send">发送</button>
-      </div>`;
+      </div>`}`;
     document.getElementById("chatBack").onclick = () => {
       state.chat = null;
       setChatOpen(false);
@@ -608,6 +614,7 @@
     // REST 返回的消息带 user_id；WS 广播的旧字段没有 user_id，回退用 sender_name 判断
     const mine = (state.userId && m.user_id === state.userId) ||
       (!m.user_id && m.sender_name === state.username);
+    const isMw = state.chat && state.chat.kind === "messagewall";
     const senderName = m.sender_display_name || m.sender_name || "未知";
     const time = fmtShort(m.timestamp);
     let media = "";
@@ -625,7 +632,7 @@
       }
     }
     return `<div class="msg-row ${mine ? "mine" : ""}" data-mid="${m.id}">
-      ${avatarHtml(senderName, m.sender_avatar, 34)}
+      ${isMw && !mine ? mwAvatar(34) : avatarHtml(senderName, m.sender_avatar, 34)}
       <div class="bubble ${mine ? "bubble-own" : "bubble-other"}">
         <div class="bubble-sender">${esc(senderName)}${m.device_name ? `<span class="bubble-dev"> · ${esc(m.device_name)}</span>` : ""}<span class="bubble-time">${time}</span></div>
         ${m.title ? `<div class="bubble-title">${esc(m.title)}</div>` : ""}
