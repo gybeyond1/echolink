@@ -26,6 +26,7 @@
   // API 基址：浏览器同源=空字符串（相对路径）；Tauri 桌面端=配置的 server_url
   let API_BASE = "";
   function isTauri() { return !!(window.__TAURI__ && window.__TAURI__.core); }
+  const BELL_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:60%;height:60%" aria-hidden="true"><path d="M18 16v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-5.5 4c0 .55-.45 1-1 1s-1-.45-1-1h2z"/></svg>';
 
   // 桌面端（Tauri/Windows）：禁用右键菜单与 F5 刷新，强化原生体验
   if (window.__TAURI__ || window.__TAURI_INTERNALS__) {
@@ -234,7 +235,7 @@
       <div class="auth-wrap">
         <div class="auth-card">
           <div class="brand">
-            <div class="logo">E</div>
+            <div class="logo">${BELL_ICON}</div>
             <h1>EchoLink</h1>
             <p>跨设备消息互联 · 通知同步 · 好友</p>
             <p style="font-size:12px;opacity:.7;margin-top:4px"><a href="https://github.com/gybeyond1/echolink" target="_blank" style="color:inherit;text-decoration:underline">github.com/gybeyond1/echolink</a></p>
@@ -307,7 +308,7 @@
     app.innerHTML = `
       <div class="layout">
         <aside class="sidebar">
-          <div class="brand"><div class="logo">E</div><h1>EchoLink</h1></div>
+          <div class="brand"><div class="logo">${BELL_ICON}</div><h1>EchoLink</h1></div>
           ${navItems().map(n => `<button class="nav-item ${state.tab === n.id ? "active" : ""}" data-tab="${n.id}"><span class="ic">${n.ic}</span>${n.label}${n.id === "messages" && unread > 0 ? `<span class="nav-badge">${unread > 99 ? "99+" : unread}</span>` : ""}</button>`).join("")}
           <div class="spacer"></div>
           <div class="user-box">
@@ -906,8 +907,13 @@
           state.chat = null;
           await loadTopics();
           render();
-          const t = state.topics.find(x => x.name === r.topic);
-          if (t) openChat(t); else toast("会话已创建，请刷新", "ok");
+          // 用服务器返回直接构造会话对象，避免列表刷新时序导致找不到新 DM
+          let t = state.topics.find(x => x.name === r.topic);
+          if (!t) {
+            t = { name: r.topic, kind: "dm", display_name: r.display_name || r.title || b.dataset.chat, my_role: "member" };
+            state.topics.unshift(t);
+          }
+          openChat(t);
         } catch (e) { toast(e.message, "err"); }
       });
       box.querySelectorAll("[data-unfriend]").forEach(b => b.onclick = async () => {
@@ -1477,6 +1483,13 @@
     document.documentElement.setAttribute("data-theme-mode", mode);
     const btn = document.getElementById("themeToggle");
     if (btn) btn.textContent = THEME_ICON[mode] || THEME_ICON.system;
+    // 桌面端同步原生标题栏主题
+    if (isTauri()) {
+      try {
+        const win = window.__TAURI__.window.getCurrentWindow();
+        win.setTheme(dark ? "dark" : "light");
+      } catch (e) {}
+    }
   }
   function setupThemeToggle() {
     const btn = document.getElementById("themeToggle");

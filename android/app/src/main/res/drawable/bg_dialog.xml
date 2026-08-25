@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="@color/chat_bg" />
-    <corners android:radius="28dp" />
-</shape>
+<!-- 弹窗背景：新拟态凸起（同色基底 + 右下暗影 + 左上高光），随浅/深主题切换 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 右下暗影 -->
+    <item android:left="2dp" android:top="2dp" android:right="6dp" android:bottom="8dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/neu_shadow_dark" />
+            <corners android:radius="28dp" />
+        </shape>
+    </item>
+    <!-- 左上高光 -->
+    <item android:left="6dp" android:top="6dp" android:right="2dp" android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/neu_shadow_light" />
+            <corners android:radius="28dp" />
+        </shape>
+    </item>
+    <!-- 表面 -->
+    <item android:left="4dp" android:top="4dp" android:right="4dp" android:bottom="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/chat_bg" />
+            <corners android:radius="26dp" />
+        </shape>
+    </item>
+</layer-list>

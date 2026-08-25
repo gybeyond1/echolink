@@ -42,6 +42,7 @@ import com.notifysync.data.AvatarLoader
 import com.notifysync.data.AppFilter
 import com.notifysync.data.AppFilterStore
 import com.notifysync.data.AuthManager
+import com.notifysync.data.ThemePrefs
 import com.notifysync.databinding.FragmentSettingsBinding
 import com.notifysync.service.NotificationListener
 import com.notifysync.service.SyncService
@@ -195,6 +196,45 @@ class SettingsFragment : Fragment() {
 
         // 应用过滤
         setupAppFilter()
+
+        // 主题切换（跟随系统 / 浅色 / 深色）
+        binding.tvThemeValue.text = themeLabel(ThemePrefs.getMode(requireContext()))
+        binding.llTheme.setOnClickListener { showThemeDialog() }
+    }
+
+    // ===== 主题切换 =====
+
+    private fun themeLabel(mode: Int): String = when (mode) {
+        ThemePrefs.MODE_LIGHT -> "浅色"
+        ThemePrefs.MODE_DARK -> "深色"
+        else -> "跟随系统"
+    }
+
+    private fun showThemeDialog() {
+        val modes = arrayOf("跟随系统", "浅色", "深色")
+        val current = ThemePrefs.getMode(requireContext())
+        val checked = when (current) {
+            ThemePrefs.MODE_LIGHT -> 1
+            ThemePrefs.MODE_DARK -> 2
+            else -> 0
+        }
+        AlertDialog.Builder(requireContext(), R.style.Theme_NotifySync_Dialog)
+            .setTitle("主题")
+            .setSingleChoiceItems(modes, checked) { dlg, which ->
+                val mode = when (which) {
+                    1 -> ThemePrefs.MODE_LIGHT
+                    2 -> ThemePrefs.MODE_DARK
+                    else -> ThemePrefs.MODE_SYSTEM
+                }
+                ThemePrefs.setMode(requireContext(), mode)
+                ThemePrefs.apply(requireContext())
+                binding.tvThemeValue.text = themeLabel(mode)
+                dlg.dismiss()
+                // 重建 Activity 以套用新主题（含状态栏/导航栏图标配色）
+                requireActivity().recreate()
+            }
+            .setNegativeButton("取消", null)
+            .showDimmed()
     }
 
     // ===== 用户资料（昵称 + 头像） =====

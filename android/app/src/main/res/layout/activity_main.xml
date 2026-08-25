@@ -22,6 +22,8 @@
         app:elevation="0dp"
         app:menu="@menu/bottom_nav_menu"
         app:labelVisibilityMode="labeled"
+        app:itemIconTint="@color/bottom_nav_item"
+        app:itemTextTint="@color/bottom_nav_item"
         app:layout_constraintBottom_toBottomOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -4,9 +4,9 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
-import androidx.appcompat.app.AppCompatDelegate
 import com.notifysync.data.AuthManager
 import com.notifysync.data.AppFilterStore
+import com.notifysync.data.ThemePrefs
 
 class App : Application() {
     override fun onCreate() {
@@ -19,8 +19,8 @@ class App : Application() {
     }
 
     private fun applyThemeMode() {
-        // 新拟态双主题：跟随系统浅色/深色（EchoLink 已对齐 WebUI 新拟态配色）
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        // 新拟态双主题：跟随系统 / 浅色 / 深色（用户可在设置中切换，持久化）
+        ThemePrefs.apply(this)
     }
 
     private fun createNotificationChannels() {
