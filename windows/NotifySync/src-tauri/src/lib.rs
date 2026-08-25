@@ -194,11 +194,15 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         sync_check: Mutex::new(Some(sync_notifications.clone())),
     });
 
-    TrayIconBuilder::with_id("main-tray")
+    let mut tray_builder = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
-        .icon(app.default_window_icon().cloned().expect("missing default window icon"))
         .tooltip("EchoLink")
-        .show_menu_on_left_click(false)
+        .show_menu_on_left_click(false);
+    // 使用应用主图标作为托盘图标（可见、正常样式）；缺失时退回无图标（功能不受影响）
+    if let Some(icon) = app.default_window_icon().cloned() {
+        tray_builder = tray_builder.icon(icon);
+    }
+    tray_builder
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main(app),
             "open_browser" => {

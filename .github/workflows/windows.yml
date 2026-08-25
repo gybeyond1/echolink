@@ -45,7 +45,7 @@ jobs:
 
       - name: Sync WebUI into desktop bundle
         shell: bash
-        run: cp -r ../server/public/. dist/
+        run: cp -r ../../server/public/. dist/
 
       - name: Build release (NSIS only)
         env:
