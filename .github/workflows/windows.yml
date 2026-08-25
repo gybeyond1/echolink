@@ -5,6 +5,7 @@ on:
     branches: ["main"]
     paths:
       - "windows/**"
+      - "server/public/**"
       - ".github/workflows/windows.yml"
   workflow_dispatch:
 
@@ -41,6 +42,10 @@ jobs:
 
       - name: Install Tauri CLI
         run: npm install
+
+      - name: Sync WebUI into desktop bundle
+        shell: bash
+        run: cp -r ../server/public/. dist/
 
       - name: Build release (NSIS only)
         env:

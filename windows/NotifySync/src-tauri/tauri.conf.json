@@ -23,17 +23,12 @@
         "resizable": true,
         "fullscreen": false,
         "visible": true,
-        "decorations": true
+        "decorations": true,
+        "skipTaskbar": true
       }
     ],
     "security": {
       "csp": null
-    },
-    "trayIcon": {
-      "id": "main-tray",
-      "iconPath": "icons/tray.png",
-      "iconAsTemplate": false,
-      "tooltip": "EchoLink"
     }
   },
   "bundle": {

@@ -114,6 +114,28 @@
     return `<div class="mw-avatar" style="width:${size}px;height:${size}px;font-size:${px}px">📮</div>`;
   }
 
+  // 特殊会话的友好展示名（前端兜底，服务端旧版本也能显示中文名）
+  function dmFriendId(name) {
+    const m = /^dm-(\d+)-(\d+)$/.exec(name || "");
+    if (!m) return null;
+    const a = +m[1], b = +m[2];
+    return (state.userId && state.userId !== a) ? a : b;
+  }
+  function topicTitle(t) {
+    const kind = t.kind || "normal";
+    if (kind === "devices") return "我的设备";
+    if (kind === "messagewall") return "留言板";
+    if (kind === "dm") {
+      const srv = t.display_name || "";
+      if (srv && !/^dm-\d+-\d+$/.test(srv)) return srv;
+      const fid = dmFriendId(t.name);
+      const f = (state.friends || []).find(x => String(x.id) === String(fid));
+      if (f) return f.display_name || f.username;
+      return srv || "私聊";
+    }
+    return t.display_name || t.name;
+  }
+
   async function api(path, opts) {
     opts = opts || {};
     const headers = { "Content-Type": "application/json" };
@@ -270,6 +292,9 @@
       try {
         const ep = mode === "login" ? "/api/auth/login" : "/api/auth/register";
         const r = await api(ep, { method: "POST", body: { username, password } });
+        if (!r || !r.token || !r.user || !r.user.username) {
+          throw new Error("登录失败：服务器未返回有效用户信息，请检查服务器地址是否正确");
+        }
         saveAuth(r.token, r.user.username, r.user.role, r.user.id);
         toast(mode === "login" ? "登录成功" : "注册成功，已自动登录", "ok");
         boot();
@@ -434,12 +459,12 @@
     // 会话列表
     state.topics.forEach(t => {
       const kind = t.kind || "normal";
-      const name = t.display_name || t.name;
+      const name = topicTitle(t);
       const active = state.chat && state.chat.topic === t.name;
       let av;
       if (kind === "devices") av = `<img class="avatar" style="width:46px;height:46px" src="devices_avatar.png" onerror="this.style.display='none'" />`;
       else if (kind === "messagewall") av = mwAvatar(46);
-      else if (kind === "dm") av = avatarHtml(name, null, 46);
+      else if (kind === "dm") av = avatarHtml(name, t.avatar, 46);
       else av = avatarHtml("#" + t.name, null, 46, 205);
       const preview = t.last_message || mediaLabel(t) || (kind === "devices" ? "我的设备同步会话" : "暂无消息");
       parts.push(sessionEntryHtml(active, {
@@ -534,7 +559,7 @@
       : t.kind === "messagewall" ? "留言板 · 门边访客留言推送"
       : `${t.my_role === "owner" ? "创建者" : "成员"} · #${esc(t.name)}`;
     col.innerHTML = chatHeader(
-      (t.kind === "normal" ? "#" : "") + esc(t.display || t.name), sub, actions
+      esc((t.kind === "normal" ? "#" : "") + topicTitle(t)), sub, actions
     ) + `
       <div class="chat-body" id="chatBody"><div class="chat-loading">加载中…</div></div>
       ${t.kind === "messagewall" ? "" : `<div class="chat-input">
@@ -881,6 +906,7 @@
       api("/api/friends").catch(() => ({ friends: [] })),
       api("/api/friends/requests").catch(() => ({ incoming: [], outgoing: [] })),
     ]);
+    state.friends = fr.friends || [];
 
     const box = document.getElementById("frList");
     if (!fr.friends.length) {
@@ -1512,7 +1538,47 @@
   }
 
   // ---------- boot ----------
+  // 桌面端（Tauri）：未配置服务器地址时，先展示「服务器地址」输入页
+  function renderServerSetup() {
+    app.innerHTML = `
+      <div class="auth-wrap">
+        <div class="auth-card">
+          <div class="brand">
+            <div class="logo">${BELL_ICON}</div>
+            <h1>EchoLink</h1>
+            <p>跨设备消息互联 · 通知同步 · 好友</p>
+          </div>
+          <div id="auth-form">
+            <label>服务器地址</label>
+            <input id="sv-url" type="text" placeholder="https://你的服务器:端口" autocomplete="off" />
+            <p style="font-size:12px;opacity:.7;margin-top:6px">例如 https://ntfy.225600.xyz:1314</p>
+            <button id="sv-save" class="btn block" style="margin-top:18px">保存并继续</button>
+          </div>
+        </div>
+      </div>`;
+    const save = document.getElementById("sv-save");
+    save.onclick = async () => {
+      const url = (document.getElementById("sv-url").value || "").trim().replace(/\/+$/, "");
+      if (!url) return toast("请输入服务器地址", "err");
+      save.disabled = true;
+      try {
+        await window.__TAURI__.core.invoke("save_server_url", { url });
+        API_BASE = url;
+        // 切换/首次配置服务器后，旧 token 失效，清除避免自动登录失败
+        ["ns_token", "ns_username", "ns_role", "ns_uid"].forEach(k => localStorage.removeItem(k));
+        state.token = ""; state.username = ""; state.userId = 0; state.role = "user";
+        toast("已保存，正在连接…", "ok");
+        boot();
+      } catch (e) {
+        toast(e.message || "保存失败", "err");
+      } finally {
+        save.disabled = false;
+      }
+    };
+  }
+
   function boot() {
+    if (isTauri() && !API_BASE) { renderServerSetup(); return; }
     render();
     if (state.token) {
       api("/api/auth/me")

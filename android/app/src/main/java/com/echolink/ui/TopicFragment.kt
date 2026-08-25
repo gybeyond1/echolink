@@ -40,7 +40,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.DividerItemDecoration
 import android.graphics.drawable.BitmapDrawable
 import com.echolink.data.BingWallpaper
 import com.google.android.material.textfield.TextInputEditText
@@ -232,12 +231,6 @@ class TopicFragment : Fragment() {
         )
         binding.rvTopics.layoutManager = LinearLayoutManager(requireContext())
         binding.rvTopics.adapter = listAdapter
-        // 不同会话之间用分隔线隔开
-        binding.rvTopics.addItemDecoration(
-            DividerItemDecoration(requireContext(), DividerItemDecoration.VERTICAL).apply {
-                setDrawable(ContextCompat.getDrawable(requireContext(), R.drawable.divider_topic)!!)
-            }
-        )
 
         chatAdapter = TopicAdapter(
             onItemLongClick = { msg ->

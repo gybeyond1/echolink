@@ -196,6 +196,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
+        .icon(app.default_window_icon().cloned().expect("missing default window icon"))
+        .tooltip("EchoLink")
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main(app),
