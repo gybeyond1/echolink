@@ -422,8 +422,8 @@ tr:hover td { background: var(--primary-soft); }
   color: #fff; font-weight: 700; user-select: none;
   box-shadow: var(--shadow-out-sm);
 }
-.avatar-txt.notif-ic { background: linear-gradient(135deg, #f5a623, #e8862d); font-size: 20px; }
-.avatar-txt.req-ic { background: linear-gradient(135deg, #e8645f, #c94242); font-size: 19px; }
+.avatar-txt.notif-ic { background: linear-gradient(135deg, #f5a623, #e8862d); font-size: 20px; width: 46px; height: 46px; }
+.avatar-txt.req-ic { background: linear-gradient(135deg, #e8645f, #c94242); font-size: 19px; width: 46px; height: 46px; }
 .avatar-txt.devices-ic { background: linear-gradient(135deg, #4a8fe7, #3a7fd7); font-size: 19px; }
 .avatar-txt.mw-ic { background: linear-gradient(135deg, #4a8fe7, #3a7fd7); font-size: 19px; }
 .mw-avatar {

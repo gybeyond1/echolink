@@ -32,13 +32,18 @@ class TopicListAdapter(
     fun getItem(position: Int): MyTopic = items[position]
     fun getItems(): List<MyTopic> = items
 
-    // 头像：设备会话→手机图标；私聊→好友头像（有则图片，无则首字母）；群聊→首字母
+    // 头像：设备会话→手机图标；留言板→信封图标；私聊→好友头像（有则图片，无则首字母）；群聊→首字母
     private fun bindAvatar(holder: ViewHolder, item: MyTopic, display: String) {
         when {
             item.kind == "devices" -> {
                 holder.tvAvatar.visibility = View.GONE
                 holder.ivAvatar.visibility = View.VISIBLE
                 holder.ivAvatar.setImageResource(R.drawable.ic_devices_avatar)
+            }
+            item.kind == "messagewall" -> {
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                holder.ivAvatar.setImageResource(R.drawable.ic_messagewall_avatar)
             }
             !item.avatarUrl.isNullOrBlank() -> {
                 holder.tvAvatar.visibility = View.GONE
@@ -72,7 +77,12 @@ class TopicListAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
-        val display = item.displayName ?: item.name
+        // 特殊会话展示名前端兜底（即使服务端返回内部标识也显示中文名）
+        val display = when (item.kind) {
+            "devices" -> "我的设备"
+            "messagewall" -> "留言板"
+            else -> item.displayName ?: item.name
+        }
         holder.tvName.text = display
         bindAvatar(holder, item, display)
 

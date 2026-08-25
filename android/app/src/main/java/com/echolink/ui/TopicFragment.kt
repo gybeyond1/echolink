@@ -455,8 +455,12 @@ class TopicFragment : Fragment() {
         chatAdapter.isDm = topic.kind == "dm"
         // 已读回执：仅 dm 私聊开启（通知/我的设备/群组不显示单双勾）
         chatAdapter.showReadReceipts = topic.kind == "dm"
-        // 聊天标题显示昵称（优先外部传入的展示名），并强制水平居中
-        binding.tvChatTitle.text = topic.displayName ?: topic.name
+        // 聊天标题显示昵称（优先外部传入的展示名），特殊会话前端兜底中文名，并强制水平居中
+        binding.tvChatTitle.text = when (topic.kind) {
+            "devices" -> "我的设备"
+            "messagewall" -> "留言板"
+            else -> topic.displayName ?: topic.name
+        }
         binding.tvChatTitle.gravity = Gravity.CENTER
         binding.btnPending.visibility = if (topic.myRole == "owner" && topic.pendingRequests > 0) View.VISIBLE else View.GONE
         // 平板且非仅聊天模式 → 左列表 + 右聊天并排；其余（手机 / 仅聊天模式）→ 聊天占满

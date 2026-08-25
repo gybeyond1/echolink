@@ -114,6 +114,28 @@
     return `<div class="mw-avatar" style="width:${size}px;height:${size}px;font-size:${px}px">📮</div>`;
   }
 
+  // 特殊会话的友好展示名（前端兜底，服务端旧版本也能显示中文名）
+  function dmFriendId(name) {
+    const m = /^dm-(\d+)-(\d+)$/.exec(name || "");
+    if (!m) return null;
+    const a = +m[1], b = +m[2];
+    return (state.userId && state.userId !== a) ? a : b;
+  }
+  function topicTitle(t) {
+    const kind = t.kind || "normal";
+    if (kind === "devices") return "我的设备";
+    if (kind === "messagewall") return "留言板";
+    if (kind === "dm") {
+      const srv = t.display_name || "";
+      if (srv && !/^dm-\d+-\d+$/.test(srv)) return srv;
+      const fid = dmFriendId(t.name);
+      const f = (state.friends || []).find(x => String(x.id) === String(fid));
+      if (f) return f.display_name || f.username;
+      return srv || "私聊";
+    }
+    return t.display_name || t.name;
+  }
+
   async function api(path, opts) {
     opts = opts || {};
     const headers = { "Content-Type": "application/json" };
@@ -434,12 +456,12 @@
     // 会话列表
     state.topics.forEach(t => {
       const kind = t.kind || "normal";
-      const name = t.display_name || t.name;
+      const name = topicTitle(t);
       const active = state.chat && state.chat.topic === t.name;
       let av;
       if (kind === "devices") av = `<img class="avatar" style="width:46px;height:46px" src="devices_avatar.png" onerror="this.style.display='none'" />`;
       else if (kind === "messagewall") av = mwAvatar(46);
-      else if (kind === "dm") av = avatarHtml(name, null, 46);
+      else if (kind === "dm") av = avatarHtml(name, t.avatar, 46);
       else av = avatarHtml("#" + t.name, null, 46, 205);
       const preview = t.last_message || mediaLabel(t) || (kind === "devices" ? "我的设备同步会话" : "暂无消息");
       parts.push(sessionEntryHtml(active, {
@@ -534,7 +556,7 @@
       : t.kind === "messagewall" ? "留言板 · 门边访客留言推送"
       : `${t.my_role === "owner" ? "创建者" : "成员"} · #${esc(t.name)}`;
     col.innerHTML = chatHeader(
-      (t.kind === "normal" ? "#" : "") + esc(t.display || t.name), sub, actions
+      esc((t.kind === "normal" ? "#" : "") + topicTitle(t)), sub, actions
     ) + `
       <div class="chat-body" id="chatBody"><div class="chat-loading">加载中…</div></div>
       ${t.kind === "messagewall" ? "" : `<div class="chat-input">
@@ -881,6 +903,7 @@
       api("/api/friends").catch(() => ({ friends: [] })),
       api("/api/friends/requests").catch(() => ({ incoming: [], outgoing: [] })),
     ]);
+    state.friends = fr.friends || [];
 
     const box = document.getElementById("frList");
     if (!fr.friends.length) {
