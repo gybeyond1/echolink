@@ -20,39 +20,18 @@
 项目 `server/` 目录已内置 `docker-compose.yml`，下面这份可直接复制，按需改一下管理员密码和端口就能用：
 
 ```yaml
-# EchoLink 一键部署
-# 使用方法：
-#   1. 按需修改下方 ADMIN_PASSWORD（管理员初始密码）和对外端口
-#   2. docker compose up -d --build
-#   3. 反向代理把 80/443 转发到本容器的 3000 端口
-# 数据保存在 ./data 目录（SQLite 数据库）
-
 services:
   echolink:
-    build: .
+    image: gybeyond/echolink-server:latest
     container_name: echolink
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - "3000:3000"
     environment:
-      - PORT=3000
-      # JWT_SECRET 首次启动自动生成并持久化到数据卷，无需手动设置；
-      # 如需固定密钥，取消下一行注释并设置强随机串：
-      # - JWT_SECRET=your-strong-random-secret-here
-      - DB_PATH=/app/data/echolink.db
-      - MAX_NOTIFICATION_HISTORY=${MAX_NOTIFICATION_HISTORY:-500}
-      - MAX_TOPIC_HISTORY=${MAX_TOPIC_HISTORY:-200}
-      # 管理员账号：首次启动自动创建；之后改这里并重启即可改密码。留空则不创建管理员。
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-me-please}
+      - ADMIN_USERNAME=***
+      - ADMIN_PASSWORD=***
     volumes:
       - ./data:/app/data
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 ```
 
 启动：
