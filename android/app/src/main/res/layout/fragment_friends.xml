@@ -91,12 +91,6 @@
                 android:visibility="gone" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/on_surface_variant"
-            android:alpha="0.15" />
-
         <!-- 好友列表 -->
         <FrameLayout
             android:layout_width="match_parent"

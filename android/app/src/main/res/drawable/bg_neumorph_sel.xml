@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知卡片「选中」态：新拟态凸起 + 品牌浅蓝表面，与未选中态（bg_neumorph）风格一致 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 右下暗影 -->
+    <item android:left="3dp" android:top="3dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/neu_shadow_dark" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <!-- 左上高光 -->
+    <item android:right="3dp" android:bottom="3dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/neu_shadow_light" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <!-- 表面（选中：品牌浅蓝） -->
+    <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/brand_primary_light" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+</layer-list>

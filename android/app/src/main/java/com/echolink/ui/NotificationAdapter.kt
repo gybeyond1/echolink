@@ -108,10 +108,8 @@ class NotificationAdapter(
             binding.tvDevice.text = item.deviceName ?: ""
 
             val isSel = isSelectionActive && selected.contains(item.id)
-            val ctx = binding.root.context
-            binding.root.setCardBackgroundColor(
-                if (isSel) ctx.getColor(R.color.brand_primary_light)
-                else ctx.getColor(R.color.surface)
+            binding.root.setBackgroundResource(
+                if (isSel) R.drawable.bg_neumorph_sel else R.drawable.bg_neumorph
             )
         }
 

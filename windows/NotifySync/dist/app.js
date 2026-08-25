@@ -1551,7 +1551,7 @@
           <div id="auth-form">
             <label>服务器地址</label>
             <input id="sv-url" type="text" placeholder="https://你的服务器:端口" autocomplete="off" />
-            <p style="font-size:12px;opacity:.7;margin-top:6px">例如 https://ntfy.225600.xyz:1314</p>
+            <p style="font-size:12px;opacity:.7;margin-top:6px">例如 https://你的服务器:端口</p>
             <button id="sv-save" class="btn block" style="margin-top:18px">保存并继续</button>
           </div>
         </div>
