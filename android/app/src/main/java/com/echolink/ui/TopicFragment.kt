@@ -1042,8 +1042,17 @@ class TopicFragment : Fragment() {
         AlertDialog.Builder(requireContext(), R.style.Theme_EchoLink_Dialog).setTitle("删除消息").setMessage("确定删除选中的 ${ids.size} 条消息吗？")
             .setPositiveButton("删除") { _, _ ->
                 lifecycleScope.launch {
-                    try { ids.forEach { ApiClient.deleteTopicMessage(topic, it) }; Toast.makeText(requireContext(), "已删除 ${ids.size} 条", Toast.LENGTH_SHORT).show(); chatAdapter.clearSelection(); loadMessages() }
-                    catch (e: Exception) { Toast.makeText(requireContext(), "删除失败: ${e.message}", Toast.LENGTH_SHORT).show() }
+                    try {
+                        ids.forEach { ApiClient.deleteTopicMessage(topic, it) }
+                        Toast.makeText(requireContext(), "已删除 ${ids.size} 条", Toast.LENGTH_SHORT).show()
+                        chatAdapter.clearSelection()
+                        updateSelectionUI()   // 关键：删除后收起右上角全选/删除栏，彻底退出多选态
+                        loadMessages()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "删除失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                        chatAdapter.clearSelection()
+                        updateSelectionUI()
+                    }
                 }
             }.setNegativeButton("取消", null).showDimmed()
     }
