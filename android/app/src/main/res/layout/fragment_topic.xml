@@ -65,6 +65,41 @@
             android:visibility="gone"
             style="@style/Widget.MaterialComponents.Button.TextButton" />
 
+        <!-- 多选操作栏：聊天多选时显示在顶部栏右侧，与对方昵称垂直齐平，不占消息流 -->
+        <LinearLayout
+            android:id="@+id/selectionBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:orientation="horizontal"
+            android:layout_marginStart="8dp"
+            android:padding="4dp"
+            android:gravity="center_vertical|end"
+            android:visibility="gone">
+
+            <ImageButton
+                android:id="@+id/btnSelectAll"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="全选"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_select_all" />
+
+            <ImageButton
+                android:id="@+id/btnDeleteSel"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="删除"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_delete" />
+        </LinearLayout>
+
     </LinearLayout>
 
     <!-- 双栏容器：手机=列表/聊天全屏切换；平板(≥600dp)=左列表右聊天并排 -->
@@ -336,40 +371,7 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- 多选操作栏：覆盖在消息区右上角，不占流，进入多选时消息不整体下移 -->
-            <LinearLayout
-                android:id="@+id/selectionBar"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end|top"
-                android:orientation="horizontal"
-                android:padding="4dp"
-                android:gravity="center_vertical|end"
-                android:visibility="gone">
-
-                <ImageButton
-                    android:id="@+id/btnSelectAll"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="4dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="全选"
-                    android:padding="10dp"
-                    android:scaleType="centerInside"
-                    android:src="@drawable/ic_select_all" />
-
-                <ImageButton
-                    android:id="@+id/btnDeleteSel"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginEnd="4dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="删除"
-                    android:padding="10dp"
-                    android:scaleType="centerInside"
-                    android:src="@drawable/ic_delete" />
-            </LinearLayout>
+            <!-- 多选操作栏已移至顶部栏 topBar 右侧（见 selectionBar） -->
         </FrameLayout>
 
         <!-- 底部输入栏（微信式）：背景透明，让全局壁纸（含输入框区域）整页覆盖 -->
