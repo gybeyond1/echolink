@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 暗色主题：仅翻转状态栏/导航栏图标为浅色（其余继承 values/themes.xml 的同名 style） -->
-    <style name="Theme.NotifySync" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.EchoLink" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorPrimaryVariant">@color/brand_primary_dark</item>
         <item name="colorOnPrimary">@color/on_primary</item>
@@ -19,12 +19,12 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
-        <item name="alertDialogTheme">@style/Theme.NotifySync.Dialog</item>
-        <item name="dialogTheme">@style/Theme.NotifySync.Dialog</item>
-        <item name="materialAlertDialogTheme">@style/Theme.NotifySync.Dialog</item>
+        <item name="alertDialogTheme">@style/Theme.EchoLink.Dialog</item>
+        <item name="dialogTheme">@style/Theme.EchoLink.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/Theme.EchoLink.Dialog</item>
     </style>
 
-    <style name="Theme.NotifySync.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+    <style name="Theme.EchoLink.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
         <item name="colorSurface">@color/chat_bg</item>
         <item name="colorSurfaceVariant">@color/chat_bg</item>
         <item name="colorOnSurface">@color/on_surface</item>

@@ -44,7 +44,7 @@ jobs:
 
       - name: Build release (NSIS only)
         env:
-          NOTIFYSYNC_SERVER: https://ntfy.225600.xyz:1314
+          ECHOLINK_SERVER: https://ntfy.225600.xyz:1314
         run: npx tauri build --bundles nsis
 
       - name: Locate bundle output

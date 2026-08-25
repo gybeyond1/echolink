@@ -6,10 +6,19 @@ const bcrypt = require("bcryptjs");
 let db;
 
 function initDB() {
-  const dbPath = process.env.DB_PATH || "./data/notifysync.db";
+  const dbPath = process.env.DB_PATH || "./data/echolink.db";
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
+  }
+
+  // 一次性迁移：旧 notifysync.db -> echolink.db（保留历史账号与消息，避免数据丢失）
+  const legacyPath = path.join(dir, "notifysync.db");
+  if (dbPath.endsWith("echolink.db") && !fs.existsSync(dbPath) && fs.existsSync(legacyPath)) {
+    for (const ext of ["", "-wal", "-shm"]) {
+      const lp = legacyPath + ext;
+      if (fs.existsSync(lp)) fs.copyFileSync(lp, dbPath + ext);
+    }
   }
 
   db = new Database(dbPath);

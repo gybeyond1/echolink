@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.notifysync"
+    namespace = "com.echolink"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.notifysync"
+        applicationId = "com.echolink"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -25,7 +25,7 @@ android {
 
     signingConfigs {
         create("fixed") {
-            val keystoreFile = System.getenv("KEYSTORE_FILE") ?: "notifysync.p12"
+            val keystoreFile = System.getenv("KEYSTORE_FILE") ?: "echolink.p12"
             storeFile = file(keystoreFile)
             storeType = "PKCS12"
             storePassword = System.getenv("KEYSTORE_PASSWORD")

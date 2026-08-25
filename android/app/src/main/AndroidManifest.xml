@@ -57,7 +57,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.NotifySync"
+        android:theme="@style/Theme.EchoLink"
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
@@ -65,7 +65,7 @@
         <activity
             android:name=".ui.LoginActivity"
             android:exported="true"
-            android:theme="@style/Theme.NotifySync">
+            android:theme="@style/Theme.EchoLink">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -77,7 +77,7 @@
             android:name=".ui.MainActivity"
             android:exported="false"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.NotifySync" />
+            android:theme="@style/Theme.EchoLink" />
 
         <!-- 通知监听服务 -->
         <service

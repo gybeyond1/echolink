@@ -39,7 +39,7 @@ services:
       # JWT_SECRET 首次启动自动生成并持久化到数据卷，无需手动设置；
       # 如需固定密钥，取消下一行注释并设置强随机串：
       # - JWT_SECRET=your-strong-random-secret-here
-      - DB_PATH=/app/data/notifysync.db
+      - DB_PATH=/app/data/echolink.db
       - MAX_NOTIFICATION_HISTORY=${MAX_NOTIFICATION_HISTORY:-500}
       - MAX_TOPIC_HISTORY=${MAX_TOPIC_HISTORY:-200}
       # 管理员账号：首次启动自动创建；之后改这里并重启即可改密码。留空则不创建管理员。

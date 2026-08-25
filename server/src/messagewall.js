@@ -24,7 +24,7 @@ function saveMessagewallImage(dataUri) {
   if (!buf || buf.length === 0) throw new Error("empty image");
   if (buf.length > 10 * 1024 * 1024) throw new Error("image too large (>10MB)");
 
-  const dataDir = path.dirname(process.env.DB_PATH || "./data/notifysync.db");
+  const dataDir = path.dirname(process.env.DB_PATH || "./data/echolink.db");
   const uploadsDir = path.join(dataDir, "uploads");
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   const fname = crypto.randomBytes(12).toString("hex") + "." + ext;

@@ -35,14 +35,14 @@ jobs:
           echo "$PWD/gradle-8.5/bin" >> "$GITHUB_PATH"
 
       - name: Decode signing key
-        run: echo "$SIGNING_KEY" | base64 -d > android/app/notifysync.p12
+        run: echo "$SIGNING_KEY" | base64 -d > android/app/echolink.p12
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
 
       - name: Build Release APK
         working-directory: android
         env:
-          KEYSTORE_FILE: notifysync.p12
+          KEYSTORE_FILE: echolink.p12
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

@@ -13,7 +13,7 @@ Tauri 2 桌面客户端，壳里加载 EchoLink WebUI，提供 Windows 专属能
 ```
 windows/NotifySync/
 ├── package.json            # @tauri-apps/cli
-├── dist/                   # 前端资源（一个自动跳转到 NOTIFYSYNC_SERVER 的 redirector）
+├── dist/                   # 前端资源（一个自动跳转到 ECHOLINK_SERVER 的 redirector）
 │   └── index.html
 ├── src-tauri/
 │   ├── Cargo.toml
@@ -42,7 +42,7 @@ WebView2 Runtime 已在 Win10 1803+/Win11 自带。
 ## 打包
 
 ```powershell
-$env:NOTIFYSYNC_SERVER = "https://ntfy.225600.xyz:1314"
+$env:ECHOLINK_SERVER = "https://ntfy.225600.xyz:1314"
 npx tauri build
 ```
 
@@ -52,7 +52,7 @@ npx tauri build
 ## 服务器地址配置
 
 - 默认 `https://ntfy.225600.xyz:1314`（与服务器 docker 反代一致）
-- 启动时设置环境变量 `NOTIFYSYNC_SERVER=...` 覆盖
+- 启动时设置环境变量 `ECHOLINK_SERVER=...` 覆盖
 - 编译时修改 `src-tauri/src/lib.rs::detect_server_url()` 默认值
 
 ## CI

@@ -1,2 +1,2 @@
 # Add project specific ProGuard rules here.
--keep class com.notifysync.** { *; }
+-keep class com.echolink.** { *; }

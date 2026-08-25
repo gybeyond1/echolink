@@ -1,5 +1,5 @@
 [package]
-name = "notifysync-desktop"
+name = "echolink-desktop"
 version = "0.1.0"
 description = "EchoLink Windows 桌面客户端"
 authors = ["gybeyond"]
@@ -7,7 +7,7 @@ edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "notifysync_desktop_lib"
+name = "echolink_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

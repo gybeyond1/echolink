@@ -5,7 +5,7 @@
       parent 用 MaterialComponents.DayNight，跟随系统暗色；
       颜色全部引用 @color（values / values-night 中定义，自动切换）。
     -->
-    <style name="Theme.NotifySync" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.EchoLink" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorPrimaryVariant">@color/brand_primary_dark</item>
         <item name="colorOnPrimary">@color/on_primary</item>
@@ -25,13 +25,13 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
         <!-- 弹窗（菜单/创建话题/发现/添加好友等）统一为新拟态基底 + 品牌蓝强调 -->
-        <item name="alertDialogTheme">@style/Theme.NotifySync.Dialog</item>
-        <item name="dialogTheme">@style/Theme.NotifySync.Dialog</item>
-        <item name="materialAlertDialogTheme">@style/Theme.NotifySync.Dialog</item>
+        <item name="alertDialogTheme">@style/Theme.EchoLink.Dialog</item>
+        <item name="dialogTheme">@style/Theme.EchoLink.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/Theme.EchoLink.Dialog</item>
     </style>
 
     <!-- 所有 AlertDialog 统一：与新拟态基底同色 + 品牌蓝强调 -->
-    <style name="Theme.NotifySync.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+    <style name="Theme.EchoLink.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
         <item name="colorSurface">@color/chat_bg</item>
         <item name="colorSurfaceVariant">@color/chat_bg</item>
         <item name="colorOnSurface">@color/on_surface</item>

@@ -29,7 +29,7 @@ app.use((req, res, next) => {
 
 // ---- JWT_SECRET 自动生成并持久化（无需在终端设置）----
 function getDataDir() {
-  const dbPath = process.env.DB_PATH || "./data/notifysync.db";
+  const dbPath = process.env.DB_PATH || "./data/echolink.db";
   return path.dirname(dbPath);
 }
 function loadJwtSecret() {

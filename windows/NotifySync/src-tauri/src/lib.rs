@@ -46,7 +46,7 @@ fn read_config(app: &AppHandle) -> AppConfig {
             }
         }
     }
-    if let Ok(v) = std::env::var("NOTIFYSYNC_SERVER") {
+    if let Ok(v) = std::env::var("ECHOLINK_SERVER") {
         if !v.trim().is_empty() {
             return AppConfig {
                 server_url: v.trim().trim_end_matches('/').to_string(),

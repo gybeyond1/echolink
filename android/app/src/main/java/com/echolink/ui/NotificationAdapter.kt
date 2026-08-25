@@ -1,4 +1,4 @@
-package com.notifysync.ui
+package com.echolink.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -15,9 +15,9 @@ import android.widget.Toast
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.notifysync.R
-import com.notifysync.data.NotificationItem
-import com.notifysync.databinding.ItemNotificationBinding
+import com.echolink.R
+import com.echolink.data.NotificationItem
+import com.echolink.databinding.ItemNotificationBinding
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
