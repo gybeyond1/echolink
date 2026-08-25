@@ -6,8 +6,10 @@
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="12dp"
     android:layout_marginVertical="4dp"
-    app:cardCornerRadius="10dp"
-    app:cardElevation="1dp">
+    app:cardCornerRadius="18dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="@android:color/transparent"
+    android:background="@drawable/bg_neumorph">
 
     <LinearLayout
         android:layout_width="match_parent"

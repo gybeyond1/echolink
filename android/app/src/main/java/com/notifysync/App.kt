@@ -19,9 +19,8 @@ class App : Application() {
     }
 
     private fun applyThemeMode() {
-        // 已移除深浅色主题切换（用户不需要该外观设置），统一强制浅色，
-        // 与聊天页 Telegram Day 配色保持一致
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        // 新拟态双主题：跟随系统浅色/深色（EchoLink 已对齐 WebUI 新拟态配色）
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
     }
 
     private fun createNotificationChannels() {

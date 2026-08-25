@@ -1,18 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 输入框：新拟态凹陷风（胶囊形，颜色随亮/暗主题切换） -->
+<!-- 新拟态凹陷（用于输入框/按压态）：左上暗影 + 右下高光，方向相反 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 左上暗影 -->
     <item android:left="3dp" android:top="3dp">
         <shape android:shape="rectangle">
             <solid android:color="@color/neu_shadow_dark" />
             <corners android:radius="20dp" />
         </shape>
     </item>
+    <!-- 右下高光 -->
     <item android:right="3dp" android:bottom="3dp">
         <shape android:shape="rectangle">
             <solid android:color="@color/neu_shadow_light" />
             <corners android:radius="20dp" />
         </shape>
     </item>
+    <!-- 表面（略向内收，形成凹陷） -->
     <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
         <shape android:shape="rectangle">
             <solid android:color="@color/neu_base" />

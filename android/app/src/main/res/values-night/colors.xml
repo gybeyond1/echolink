@@ -1,34 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 品牌色：哔哩紫系（暗色下按钮文字用深色更精致） -->
-    <color name="brand_primary">#FB7299</color>
-    <color name="brand_primary_dark">#FF8AA6</color>
-    <color name="brand_primary_light">#4A2533</color>
-    <color name="on_primary">#3A0D1C</color>
-    <color name="secondary">#9D85FF</color>
-    <color name="on_secondary">#1E1030</color>
+    <!-- 品牌色：对齐 WebUI 新拟态暗色（蓝 #5a9ff7） -->
+    <color name="brand_primary">#5a9ff7</color>
+    <color name="brand_primary_dark">#4a8fe7</color>
+    <color name="brand_primary_light">#2f3d52</color>
+    <color name="brand_gradient_start">#5a9ff7</color>
+    <color name="brand_gradient_end">#4a8fe7</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="secondary">#5a9ff7</color>
+    <color name="on_secondary">#FFFFFF</color>
 
-    <!-- 表面 / 背景（暗色「深色科技感」） -->
-    <color name="surface">#1E1E28</color>
-    <color name="surface_variant">#2D2D3B</color>
-    <color name="background">#15151D</color>
-    <color name="on_surface">#E9E9F2</color>
-    <color name="on_surface_variant">#9B9BAE</color>
-    <color name="outline">#3A3A4A</color>
+    <!-- 新拟态核心（暗色）：同色基底 + 左上高光 + 右下暗影 -->
+    <color name="neu_base">#2B3038</color>
+    <color name="neu_shadow_dark">#12151A</color>
+    <color name="neu_shadow_light">#3A424E</color>
+
+    <!-- 表面 / 背景 -->
+    <color name="surface">@color/neu_base</color>
+    <color name="surface_variant">#303640</color>
+    <color name="background">@color/neu_base</color>
+    <color name="chat_bg">@color/neu_base</color>
+    <color name="bubble_other">#2B3038</color>
+    <color name="bubble_own">#2F3D52</color>
+    <color name="bubble_own_time">#88B0D8</color>
+    <color name="on_surface">#D6DDE6</color>
+    <color name="on_surface_variant">#8B94A3</color>
+    <!-- 壁纸背景上的文字（暗色基底下用浅字，保证可读） -->
+    <color name="on_wallpaper">#D6DDE6</color>
+    <color name="outline">#3A424E</color>
 
     <!-- 输入框 -->
-    <color name="bg_input_fill">#17171F</color>
-    <color name="bg_input_stroke">#3A3A4A</color>
+    <color name="bg_input_fill">@color/neu_base</color>
+    <color name="bg_input_stroke">#3A424E</color>
 
     <!-- 图标默认色 -->
     <color name="icon_tint">#AAAAAA</color>
 
     <!-- 语义色 -->
-    <color name="ok">#3ECF8E</color>
-    <color name="danger">#FF7070</color>
+    <color name="ok">#34D399</color>
+    <color name="danger">#F06B65</color>
     <color name="warn">#F0B050</color>
-    <color name="error">#FF7070</color>
-    <color name="error_container">#4A2323</color>
+    <color name="error">#F06B65</color>
+    <color name="error_container">#3A2424</color>
 
     <!-- 兼容旧引用 -->
     <color name="purple_200">#FFBB86FC</color>

@@ -30,7 +30,9 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:background="@drawable/bg_neumorph"
+        android:padding="10dp">
 
         <!-- Sender + time row (GONE for consecutive messages) -->
         <LinearLayout

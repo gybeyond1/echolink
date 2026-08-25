@@ -8,7 +8,12 @@
     android:paddingEnd="12dp"
     android:paddingTop="10dp"
     android:paddingBottom="10dp"
-    android:background="?attr/selectableItemBackground">
+    android:background="@drawable/bg_neumorph"
+    android:foreground="?attr/selectableItemBackgroundBorderless"
+    android:layout_marginStart="10dp"
+    android:layout_marginEnd="10dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="4dp">
 
     <!-- 头像：首字母（无图时）或真实头像图片 -->
     <FrameLayout
