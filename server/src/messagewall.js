@@ -37,6 +37,36 @@ function saveMessagewallImage(dataUri) {
   };
 }
 
+// 将留言板语音（base64 data URI）落盘到 data/uploads，返回媒体字段。
+// 支持 audio/webm | audio/mp4 | audio/ogg | audio/amr | audio/x-m4a；失败时抛错。
+function saveMessagewallVoice(dataUri) {
+  if (!dataUri) return null;
+  const m = /^data:audio\/(webm|mp4|ogg|amr|x-m4a|mpeg|wav)(?:;.*)?;base64,(.+)$/i.exec(dataUri.trim());
+  if (!m) throw new Error("invalid voice (expected data:audio/...;base64,...)");
+  let sub = m[1].toLowerCase();
+  const ext = sub === "x-m4a" ? "m4a" : sub === "mpeg" ? "mp3" : sub;
+  let buf;
+  try {
+    buf = Buffer.from(m[2], "base64");
+  } catch (_) {
+    throw new Error("voice base64 decode failed");
+  }
+  if (!buf || buf.length === 0) throw new Error("empty voice");
+  if (buf.length > 20 * 1024 * 1024) throw new Error("voice too large (>20MB)");
+
+  const dataDir = path.dirname(process.env.DB_PATH || "./data/echolink.db");
+  const uploadsDir = path.join(dataDir, "uploads");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  const fname = crypto.randomBytes(12).toString("hex") + "." + ext;
+  fs.writeFileSync(path.join(uploadsDir, fname), buf);
+  return {
+    media_type: "voice",
+    media_url: "/uploads/" + fname,
+    media_name: fname,
+    media_size: buf.length,
+  };
+}
+
 // 读取「接收留言板通知的账号」配置（settings.messagewall_targets，JSON 字符串数组）。
 // 为空 / 缺失 → 默认对【全部账号】开放（开箱即用）。
 function getMessagewallTargets() {
@@ -103,9 +133,11 @@ function ensureMessagewallTopic(targetIds, description) {
 }
 
 // 写入一条留言板消息，并实时推送给所有目标账号的设备。
-// title = 留言人（如「张三（13800138000）」），text = 留言正文（可空），imageDataUri = 可选 base64 图片。
+// title = 留言人（如「张三（13800138000）」），text = 留言正文（可空），
+// imageDataUri = 可选 base64 图片，voiceDataUri = 可选 base64 语音。
+// 同时有图和语音时优先展示语音（表结构单 media 字段限制）。
 // 返回 { delivered: 账号数, message } 或 { delivered:0, message:null, error }
-function appendMessagewallMessage(title, text, description, imageDataUri) {
+function appendMessagewallMessage(title, text, description, imageDataUri, voiceDataUri) {
   const db = getDB();
   const targetIds = resolveMessagewallUserIds();
   if (targetIds.length === 0) {
@@ -117,9 +149,16 @@ function appendMessagewallMessage(title, text, description, imageDataUri) {
   const t = String(title || "").slice(0, 500);
   const c = String(text || "").slice(0, 2000);
 
-  // 图片（可选）：base64 data URI → 落盘到 data/uploads，返回媒体字段
+  // 媒体（可选）：语音优先，其次图片，均为 base64 data URI → 落盘到 data/uploads
   let media = { media_type: "text", media_url: null, media_name: null, media_size: 0 };
-  if (imageDataUri) {
+  if (voiceDataUri) {
+    try {
+      media = saveMessagewallVoice(voiceDataUri);
+      if (!media) media = { media_type: "text", media_url: null, media_name: null, media_size: 0 };
+    } catch (e) {
+      return { delivered: 0, message: null, error: e.message };
+    }
+  } else if (imageDataUri) {
     try {
       media = saveMessagewallImage(imageDataUri);
       if (!media) media = { media_type: "text", media_url: null, media_name: null, media_size: 0 };

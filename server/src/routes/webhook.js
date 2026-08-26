@@ -9,7 +9,7 @@ router.get("/messagewall", (req, res) => {
     ok: true,
     endpoint: "messagewall",
     method: "POST",
-    note: "发送 JSON: { source: 'messagewall', title: '<名字（联系方式）>', content: '<正文，可空>', image: '<可选 base64 data URI>' }",
+    note: "发送 JSON: { source: 'messagewall', title: '<名字（联系方式）>', content: '<正文，可空>', image: '<可选 base64 data URI>', voice: '<可选 base64 data URI>' }",
   });
 });
 
@@ -21,20 +21,21 @@ router.post("/messagewall", (req, res) => {
     return res.status(400).json({ error: "unsupported source (expected 'messagewall')" });
   }
   const title = String(body.title || "").trim();
-  const content = String(body.content || "").trim(); // 可空（纯图片留言）
+  const content = String(body.content || "").trim(); // 可空（纯图片/纯语音留言）
   const image = body.image ? String(body.image) : ""; // 可选 base64 data URI，无图则省略
+  const voice = body.voice ? String(body.voice) : ""; // 可选 base64 data URI，无语音则省略
   if (!title) {
     return res.status(400).json({ error: "title is required" });
   }
-  // 既无正文也无图片 → 无意义留言，拒绝
-  if (!content && !image) {
-    return res.status(400).json({ error: "title and (content or image) are required" });
+  // 既无正文也无图片也无语音 → 无意义留言，拒绝
+  if (!content && !image && !voice) {
+    return res.status(400).json({ error: "title and (content or image or voice) are required" });
   }
   const sourceName = String(body.sourceName || "留言板");
   const sourceDesc = String(body.sourceDesc || `来自「${sourceName}」的留言`);
 
   try {
-    const r = appendMessagewallMessage(title, content, sourceDesc, image || null);
+    const r = appendMessagewallMessage(title, content, sourceDesc, image || null, voice || null);
     if (r.error) {
       return res.status(400).json({ error: r.error });
     }
