@@ -126,7 +126,10 @@
   }
   function topicTitle(t) {
     const kind = t.kind || "normal";
-    if (kind === "devices") return "我的设备";
+    if (kind === "devices") {
+      // 后端已返回"我的设备（用户名）"格式，直接用；兜底为"我的设备"
+      return t.display_name && t.display_name !== "我的设备" ? t.display_name : "我的设备";
+    }
     if (kind === "messagewall") return "留言板";
     if (kind === "dm") {
       const srv = t.display_name || "";
