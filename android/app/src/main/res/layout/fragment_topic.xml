@@ -145,7 +145,7 @@
                     android:layout_height="match_parent"
                     android:gravity="center"
                     android:text="🔔"
-                    android:textSize="20sp"
+                    android:textSize="23sp"
                     android:background="@drawable/bg_mw_avatar"
                     android:textColor="@color/on_surface" />
             </FrameLayout>
