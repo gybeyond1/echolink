@@ -13,13 +13,9 @@
             android:id="@+id/nav_settings"
             android:icon="@android:drawable/ic_menu_preferences"
             android:title="设置" />
+        <item
+            android:id="@+id/nav_theme"
+            android:icon="@android:drawable/ic_menu_day"
+            android:title="切换主题" />
     </group>
-    <item android:title="外观">
-        <menu>
-            <item
-                android:id="@+id/nav_theme"
-                android:icon="@android:drawable/ic_menu_day"
-                android:title="切换主题" />
-        </menu>
-    </item>
 </menu>

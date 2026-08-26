@@ -57,37 +57,47 @@ class MainActivity : AppCompatActivity() {
             try { ServerSelector.selectOptimal(applicationContext) } catch (_: Exception) {}
         }
 
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        try {
+            binding = ActivityMainBinding.inflate(layoutInflater)
+            setContentView(binding.root)
 
-        binding.root.setBackgroundColor(ContextCompat.getColor(this, R.color.background))
+            binding.root.setBackgroundColor(ContextCompat.getColor(this, R.color.background))
 
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.TRANSPARENT
-        val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-            Configuration.UI_MODE_NIGHT_YES
-        val insetsCtrl = WindowInsetsControllerCompat(window, window.decorView)
-        insetsCtrl.isAppearanceLightStatusBars = !isNight
-        insetsCtrl.isAppearanceLightNavigationBars = !isNight
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            window.statusBarColor = Color.TRANSPARENT
+            window.navigationBarColor = Color.TRANSPARENT
+            val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+            val insetsCtrl = WindowInsetsControllerCompat(window, window.decorView)
+            insetsCtrl.isAppearanceLightStatusBars = !isNight
+            insetsCtrl.isAppearanceLightNavigationBars = !isNight
 
-        if (isTablet) {
-            setupDrawer()
-        } else {
-            binding.bottomNav!!.background = null
-            setupBottomNav()
-        }
-        setupGlobalFab()
+            if (isTablet) {
+                setupDrawer()
+            } else {
+                binding.bottomNav?.background = null
+                setupBottomNav()
+            }
+            setupGlobalFab()
 
-        SyncService.start(this)
-        registerReceiver(
-            notificationReceiver,
-            IntentFilter("com.echolink.NOTIFICATION_RECEIVED"),
-            Context.RECEIVER_NOT_EXPORTED
-        )
+            SyncService.start(this)
+            registerReceiver(
+                notificationReceiver,
+                IntentFilter("com.echolink.NOTIFICATION_RECEIVED"),
+                Context.RECEIVER_NOT_EXPORTED
+            )
 
-        if (savedInstanceState == null) {
-            handleIntent(intent)
+            if (savedInstanceState == null) {
+                handleIntent(intent)
+            }
+        } catch (e: Throwable) {
+            val tv = android.widget.TextView(this).apply {
+                text = "CRASH: ${e.javaClass.name}\n${e.message}\n\n${e.stackTraceToString()}"
+                setPadding(32, 32, 32, 32)
+                setTextColor(0xFFFF0000.toInt())
+                textSize = 12f
+            }
+            setContentView(tv)
         }
     }
 
