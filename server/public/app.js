@@ -134,7 +134,8 @@
       const fid = dmFriendId(t.name);
       const f = (state.friends || []).find(x => String(x.id) === String(fid));
       if (f) return f.display_name || f.username;
-      return srv || "私聊";
+      // 兜底：管理员视角可能不在好友列表中，用对方 ID 标识而非"私聊"
+      return fid ? ("用户" + fid) : (srv || "私聊");
     }
     return t.display_name || t.name;
   }

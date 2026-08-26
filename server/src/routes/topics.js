@@ -104,7 +104,7 @@ router.get("/", authMiddleware, (req, res) => {
   const isAdmin = req.role === "admin";
   const topics = db
     .prepare(
-      `SELECT t.id, t.name, t.title, t.description, t.owner_id, t.kind, u.username as owner_name,
+      `SELECT DISTINCT t.id, t.name, t.title, t.description, t.owner_id, t.kind, u.username as owner_name,
               ${isAdmin ? "'admin'" : "m.role"} as my_role,
               CASE t.kind
                 WHEN 'devices' THEN '我的设备（' || COALESCE(NULLIF(u.display_name, ''), u.username, '未知') || '）'
