@@ -12,7 +12,7 @@
 
     <!-- 新拟态核心：同色基底 + 左上高光 + 右下暗影 -->
     <color name="neu_base">#E8ECF2</color>
-    <color name="neu_shadow_dark">#A3B1C6</color>
+    <color name="neu_shadow_dark">#B8BEC8</color>
     <color name="neu_shadow_light">#FFFFFF</color>
 
     <!-- 表面 / 背景：与 neu_base 同色（新拟态凸起靠阴影） -->
