@@ -32,8 +32,8 @@ class MainActivity : AppCompatActivity() {
     /** 是否平板布局（最小宽度 ≥600dp） */
     private val isTablet: Boolean get() = resources.configuration.smallestScreenWidthDp >= 600
 
-    /** 平板端 DrawerLayout（两配置根元素同名 ID 导致 ViewBinding 类型为 View?，用 findViewById 强转） */
-    private val drawer: DrawerLayout get() = binding.root.findViewById(R.id.drawerLayout)
+    /** 平板端 DrawerLayout（两配置根元素同名 ID 导致 ViewBinding 类型为 View?，直接强转 root） */
+    private val drawer: DrawerLayout get() = binding.root as DrawerLayout
 
     private val notificationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -105,7 +105,7 @@ class MainActivity : AppCompatActivity() {
             if (!isTablet) {
                 binding.bottomNav!!.menu.findItem(R.id.nav_topic)?.isChecked = true
             } else {
-                binding.navView!!.setCheckedItem(R.id.nav_messages)
+                binding.navView?.setCheckedItem(R.id.nav_messages)
             }
         }
     }
@@ -113,24 +113,28 @@ class MainActivity : AppCompatActivity() {
     // ===== 平板侧滑栏 =====
 
     private fun setupDrawer() {
-        setSupportActionBar(binding.toolbar!!)
+        val toolbar = binding.toolbar ?: return
+        val navView = binding.navView ?: return
+        setSupportActionBar(toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
-        binding.toolbar!!.setNavigationOnClickListener {
+        toolbar.setNavigationOnClickListener {
             drawer.openDrawer(GravityCompat.START)
         }
         // 侧滑栏头部用户信息
-        val header = binding.navView!!.getHeaderView(0)
-        header.findViewById<android.widget.TextView>(R.id.navDisplayName)?.text =
-            AuthManager.displayName ?: AuthManager.username ?: "用户"
-        header.findViewById<android.widget.TextView>(R.id.navUsername)?.text =
-            "@${AuthManager.username ?: ""}"
-        // 点击用户信息框 → 账号设置
-        header.findViewById<View>(R.id.navUserBox)?.setOnClickListener {
-            drawer.closeDrawer(GravityCompat.START)
-            openAccountSettings()
+        val header = navView.getHeaderView(0)
+        if (header != null) {
+            header.findViewById<android.widget.TextView>(R.id.navDisplayName)?.text =
+                AuthManager.displayName ?: AuthManager.username ?: "用户"
+            header.findViewById<android.widget.TextView>(R.id.navUsername)?.text =
+                "@${AuthManager.username ?: ""}"
+            // 点击用户信息框 → 账号设置
+            header.findViewById<View>(R.id.navUserBox)?.setOnClickListener {
+                drawer.closeDrawer(GravityCompat.START)
+                openAccountSettings()
+            }
         }
 
-        binding.navView!!.setNavigationItemSelectedListener { item ->
+        navView.setNavigationItemSelectedListener { item ->
             drawer.closeDrawer(GravityCompat.START)
             when (item.itemId) {
                 R.id.nav_messages -> switchFragment(TopicFragment())
@@ -150,7 +154,7 @@ class MainActivity : AppCompatActivity() {
             .addToBackStack(null)
             .commit()
         binding.fabGlobal.visibility = View.GONE
-        binding.toolbar!!.title = "账号设置"
+        binding.toolbar?.title = "账号设置"
     }
 
     /** 切换主题对话框（跟随系统/浅色/深色） */
@@ -224,7 +228,7 @@ class MainActivity : AppCompatActivity() {
         binding.fabGlobal.visibility = if (showFab) View.VISIBLE else View.GONE
         // 平板：更新标题和侧滑栏选中状态
         if (isTablet) {
-            binding.toolbar!!.title = when (fragment) {
+            binding.toolbar?.title = when (fragment) {
                 is TopicFragment -> "消息"
                 is FriendsFragment -> "好友"
                 is SettingsFragment -> "设置"
@@ -236,7 +240,7 @@ class MainActivity : AppCompatActivity() {
                 is SettingsFragment -> R.id.nav_settings
                 else -> R.id.nav_messages
             }
-            binding.navView!!.setCheckedItem(navItem)
+            binding.navView?.setCheckedItem(navItem)
         }
     }
 

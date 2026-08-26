@@ -13,10 +13,10 @@
             <solid android:color="@color/neu_shadow_light" />
         </shape>
     </item>
-    <!-- 表面 -->
+    <!-- 表面：透明，只靠阴影体现新拟态凸起 -->
     <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
         <shape android:shape="oval">
-            <solid android:color="@color/neu_base" />
+            <solid android:color="@android:color/transparent" />
         </shape>
     </item>
 </layer-list>
