@@ -1,5 +1,7 @@
 package com.echolink.data
 
+// 服务器地址智能选择器：WiFi 下优先内网，否则公网
+
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
