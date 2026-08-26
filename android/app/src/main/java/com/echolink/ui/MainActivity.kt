@@ -16,7 +16,11 @@ import com.echolink.data.AppFilterStore
 import com.echolink.data.AuthManager
 import com.echolink.databinding.ActivityMainBinding
 import com.echolink.R
+import com.echolink.data.ServerSelector
 import com.echolink.service.SyncService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -38,6 +42,11 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
             return
+        }
+
+        // 启动时根据网络状态智能选择服务器（WiFi 优先内网，否则公网）
+        CoroutineScope(Dispatchers.IO).launch {
+            try { ServerSelector.selectOptimal(applicationContext) } catch (_: Exception) {}
         }
 
         binding = ActivityMainBinding.inflate(layoutInflater)

@@ -116,6 +116,7 @@ class SettingsFragment : Fragment() {
         binding.tvUsername.text = "uid:${AuthManager.username ?: "未知"}"
         binding.tvDeviceName.text = AuthManager.deviceName ?: "未知"
         binding.etServerUrl.setText(AuthManager.serverUrl)
+        binding.etLanServerUrl.setText(AuthManager.lanServerUrl ?: "")
 
         // 昵称点击编辑
         binding.llNickname.setOnClickListener { showNicknameDialog() }
@@ -147,12 +148,28 @@ class SettingsFragment : Fragment() {
             startActivity(intent)
         }
 
-        // 保存服务器地址
+        // 保存服务器地址（公网 + 可选内网），保存后触发智能选择
         binding.btnSaveServerUrl.setOnClickListener {
-            val url = binding.etServerUrl.text.toString().trim()
-            if (url.isNotEmpty()) {
-                AuthManager.serverUrl = url
-                Toast.makeText(requireContext(), "服务器地址已保存", Toast.LENGTH_SHORT).show()
+            val wan = binding.etServerUrl.text.toString().trim()
+            val lan = binding.etLanServerUrl.text.toString().trim()
+            if (wan.isEmpty()) {
+                Toast.makeText(requireContext(), "公网服务器地址不能为空", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            AuthManager.serverUrl = wan
+            AuthManager.lanServerUrl = lan.ifBlank { null }
+            lifecycleScope.launch {
+                val (changed, selected) = ServerSelector.selectOptimal(requireContext())
+                val tip = buildString {
+                    append("服务器地址已保存")
+                    if (lan.isNotBlank()) {
+                        append("，当前走")
+                        append(if (ServerSelector.usingLan) "内网" else "公网")
+                        append("（$selected）")
+                    }
+                    if (changed) append("，已自动切换")
+                }
+                Toast.makeText(requireContext(), tip, Toast.LENGTH_LONG).show()
                 SyncService.stop(requireContext())
                 SyncService.start(requireContext())
             }

@@ -281,18 +281,19 @@
                 android:textSize="16sp"
                 android:visibility="gone" />
 
-            <!-- 悬浮加号：新建 / 发现话题（与好友页 FAB 对齐） -->
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
+            <!-- 悬浮加号：新建 / 发现话题（新拟态圆形按钮，亮/暗主题自适应） -->
+            <ImageButton
                 android:id="@+id/fabAddTopic"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:layout_gravity="end|bottom"
                 android:layout_margin="16dp"
-                android:contentDescription="新建话题"
+                android:background="@drawable/bg_fab_neumorph"
                 android:src="@android:drawable/ic_input_add"
-                app:backgroundTint="@color/brand_primary"
-                app:tint="@color/white"
-                app:elevation="6dp" />
+                android:tint="@color/on_surface"
+                android:scaleType="centerInside"
+                android:padding="14dp"
+                android:contentDescription="新建话题" />
         </FrameLayout>
     </LinearLayout>
 

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 右下角悬浮按钮：新拟态凸起圆形（亮色/暗色随主题自动切换） -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 右下暗影 -->
+    <item android:left="3dp" android:top="3dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/neu_shadow_dark" />
+        </shape>
+    </item>
+    <!-- 左上高光 -->
+    <item android:right="3dp" android:bottom="3dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/neu_shadow_light" />
+        </shape>
+    </item>
+    <!-- 表面 -->
+    <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/neu_base" />
+        </shape>
+    </item>
+</layer-list>
