@@ -113,7 +113,7 @@
     return neuAvatar("\uD83D\uDCEC", size);
   }
   function neuAvatar(emoji, size) {
-    const px = Math.max(18, Math.round(size * 0.92));
+    const px = Math.max(14, Math.round(size * 0.58));
     return `<div class="neu-avatar" style="width:${size}px;height:${size}px;font-size:${px}px">${emoji}</div>`;
   }
 
