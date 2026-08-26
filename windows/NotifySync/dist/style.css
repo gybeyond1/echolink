@@ -107,7 +107,7 @@ body {
 
 /* ---------- 主题切换按钮 ---------- */
 .theme-toggle {
-  position: fixed; top: 14px; right: 14px; z-index: 1200;
+  position: fixed; bottom: 14px; right: 14px; z-index: 1200;
   width: 40px; height: 40px; border-radius: 50%;
   border: none;
   background: var(--panel);
@@ -426,12 +426,12 @@ tr:hover td { background: var(--primary-soft); }
 .avatar-txt.req-ic { background: linear-gradient(135deg, #e8645f, #c94242); font-size: 19px; width: 46px; height: 46px; }
 .avatar-txt.devices-ic { background: linear-gradient(135deg, #4a8fe7, #3a7fd7); font-size: 19px; }
 .avatar-txt.mw-ic { background: linear-gradient(135deg, #4a8fe7, #3a7fd7); font-size: 19px; }
-.mw-avatar {
+.mw-avatar, .neu-avatar {
   border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   line-height: 1; user-select: none;
   background: var(--surface);
-  box-shadow: var(--shadow-out-sm);
+  box-shadow: var(--shadow-out);
 }
 
 /* ---- 右侧聊天区 ---- */
@@ -477,9 +477,12 @@ tr:hover td { background: var(--primary-soft); }
   word-break: break-word;
 }
 .bubble-other {
-  background: var(--bubble-other-bg); color: var(--bubble-other-text);
+  background: var(--bubble-own-bg); color: var(--bubble-own-text);
   border-bottom-left-radius: 6px;
+  box-shadow: var(--shadow-in-sm);
 }
+.bubble-other .bubble-time { color: var(--bubble-own-time); }
+.bubble-other .bubble-sender { color: inherit; opacity: .75; }
 .bubble-own {
   background: var(--bubble-own-bg); color: var(--bubble-own-text);
   border-bottom-right-radius: 6px;
@@ -491,7 +494,6 @@ tr:hover td { background: var(--primary-soft); }
   float: right; margin-left: 10px; margin-top: 4px;
   font-size: 11px; font-weight: 400;
 }
-.bubble-other .bubble-time { color: var(--bubble-other-time); }
 .bubble-own .bubble-time { color: var(--bubble-own-time); }
 .bubble-own .bubble-sender { color: inherit; opacity: .75; }
 .bubble-title { font-weight: 700; margin-top: 2px; }
