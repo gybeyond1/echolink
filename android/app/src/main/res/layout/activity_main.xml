@@ -2,6 +2,7 @@
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -25,5 +26,22 @@
         app:itemIconTint="@color/bottom_nav_item"
         app:itemTextColor="@color/bottom_nav_item"
         app:layout_constraintBottom_toBottomOf="parent" />
+
+    <!-- 全局悬浮加号：消息页/好友页显示，设置/通知/聊天详情隐藏 -->
+    <ImageButton
+        android:id="@+id/fabGlobal"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:background="@drawable/bg_fab_neumorph"
+        android:src="@android:drawable/ic_input_add"
+        android:tint="@color/on_surface"
+        android:scaleType="centerInside"
+        android:padding="14dp"
+        android:contentDescription="添加"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomNav"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

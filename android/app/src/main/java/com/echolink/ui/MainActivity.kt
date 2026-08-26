@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
-    /** 是否平板布局（有 DrawerLayout 即为平板） */
-    private val isTablet: Boolean get() = binding.drawerLayout != null
+    /** 是否平板布局（最小宽度 ≥600dp） */
+    private val isTablet: Boolean get() = resources.configuration.smallestScreenWidthDp >= 600
 
     private val notificationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
