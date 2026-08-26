@@ -40,6 +40,7 @@
 
             <!-- 账号资料（头像 + 昵称 + 设备名） -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardAccount"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -246,6 +247,7 @@
 
             <!-- 外观（主题切换） -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardTheme"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_messages"
+            android:icon="@drawable/ic_chat"
+            android:title="消息" />
+        <item
+            android:id="@+id/nav_friends"
+            android:icon="@drawable/ic_people"
+            android:title="好友" />
+        <item
+            android:id="@+id/nav_settings"
+            android:icon="@android:drawable/ic_menu_preferences"
+            android:title="设置" />
+    </group>
+    <item android:title="外观">
+        <menu>
+            <item
+                android:id="@+id/nav_theme"
+                android:icon="@android:drawable/ic_menu_day"
+                android:title="切换主题" />
+        </menu>
+    </item>
+</menu>

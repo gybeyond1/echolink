@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.GravityCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
@@ -17,6 +19,7 @@ import com.echolink.data.AuthManager
 import com.echolink.databinding.ActivityMainBinding
 import com.echolink.R
 import com.echolink.data.ServerSelector
+import com.echolink.data.ThemePrefs
 import com.echolink.service.SyncService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,9 +28,11 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
+    /** 是否平板布局（有 DrawerLayout 即为平板） */
+    private val isTablet: Boolean get() = binding.drawerLayout != null
+
     private val notificationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            // 通知 UI 刷新
             val frag = supportFragmentManager.fragments.firstOrNull { it is NotificationsFragment }
             (frag as? NotificationsFragment)?.refresh()
         }
@@ -44,7 +49,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // 启动时根据网络状态智能选择服务器（WiFi 优先内网，否则公网）
         CoroutineScope(Dispatchers.IO).launch {
             try { ServerSelector.selectOptimal(applicationContext) } catch (_: Exception) {}
         }
@@ -52,15 +56,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 新拟态基底底色：随浅/深主题自动切换（@color/background = neu_base）
         binding.root.setBackgroundColor(ContextCompat.getColor(this, R.color.background))
-        // 底部导航栏透明，让新拟态基底（含底栏区域）成为统一整体
-        binding.bottomNav.background = null
 
-        // 全面屏沉浸式：内容延伸到状态栏/导航栏，不保留系统预留内边距
         WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        // 状态栏/导航栏透明，与新拟态基底一体；亮色用深色素图标，深色用浅色素图标（随主题切换）
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
         val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
@@ -69,12 +67,15 @@ class MainActivity : AppCompatActivity() {
         insetsCtrl.isAppearanceLightStatusBars = !isNight
         insetsCtrl.isAppearanceLightNavigationBars = !isNight
 
-        setupBottomNav()
+        if (isTablet) {
+            setupDrawer()
+        } else {
+            binding.bottomNav.background = null
+            setupBottomNav()
+        }
+        setupGlobalFab()
 
-        // 启动同步服务
         SyncService.start(this)
-
-        // 注册广播接收器
         registerReceiver(
             notificationReceiver,
             IntentFilter("com.echolink.NOTIFICATION_RECEIVED"),
@@ -97,15 +98,90 @@ class MainActivity : AppCompatActivity() {
             openTopic(topic)
         } else if (supportFragmentManager.fragments.isEmpty()) {
             switchFragment(TopicFragment())
-            binding.bottomNav.menu.findItem(com.echolink.R.id.nav_topic)?.isChecked = true
+            if (!isTablet) {
+                binding.bottomNav.menu.findItem(R.id.nav_topic)?.isChecked = true
+            } else {
+                binding.navView.setCheckedItem(R.id.nav_messages)
+            }
         }
     }
+
+    // ===== 平板侧滑栏 =====
+
+    private fun setupDrawer() {
+        setSupportActionBar(binding.toolbar)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        binding.toolbar.setNavigationOnClickListener {
+            binding.drawerLayout.openDrawer(GravityCompat.START)
+        }
+        // 侧滑栏头部用户信息
+        val header = binding.navView.getHeaderView(0)
+        header.findViewById<android.widget.TextView>(R.id.navDisplayName)?.text =
+            AuthManager.displayName ?: AuthManager.username ?: "用户"
+        header.findViewById<android.widget.TextView>(R.id.navUsername)?.text =
+            "@${AuthManager.username ?: ""}"
+        // 点击用户信息框 → 账号设置
+        header.findViewById<View>(R.id.navUserBox)?.setOnClickListener {
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+            openAccountSettings()
+        }
+
+        binding.navView.setNavigationItemSelectedListener { item ->
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+            when (item.itemId) {
+                R.id.nav_messages -> switchFragment(TopicFragment())
+                R.id.nav_friends -> switchFragment(FriendsFragment())
+                R.id.nav_settings -> switchFragment(SettingsFragment())
+                R.id.nav_theme -> showThemeDialog()
+            }
+            true
+        }
+    }
+
+    /** 侧滑栏底部用户信息 → 账号设置 */
+    fun openAccountSettings() {
+        supportFragmentManager
+            .beginTransaction()
+            .replace(binding.fragmentContainer.id, AccountSettingsFragment())
+            .addToBackStack(null)
+            .commit()
+        binding.fabGlobal.visibility = View.GONE
+        binding.toolbar.title = "账号设置"
+    }
+
+    /** 切换主题对话框（跟随系统/浅色/深色） */
+    private fun showThemeDialog() {
+        val modes = arrayOf("跟随系统", "浅色", "深色")
+        val current = ThemePrefs.getMode(this)
+        val checked = when (current) {
+            ThemePrefs.MODE_LIGHT -> 1
+            ThemePrefs.MODE_DARK -> 2
+            else -> 0
+        }
+        android.app.AlertDialog.Builder(this, R.style.Theme_EchoLink_Dialog)
+            .setTitle("主题")
+            .setSingleChoiceItems(modes, checked) { dlg, which ->
+                val mode = when (which) {
+                    1 -> ThemePrefs.MODE_LIGHT
+                    2 -> ThemePrefs.MODE_DARK
+                    else -> ThemePrefs.MODE_SYSTEM
+                }
+                ThemePrefs.setMode(this, mode)
+                ThemePrefs.apply(this)
+                dlg.dismiss()
+                recreate()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    // ===== 手机底部导航 =====
 
     private fun setupBottomNav() {
         binding.bottomNav.setOnItemSelectedListener { item ->
             val fragment: Fragment = when (item.itemId) {
-                com.echolink.R.id.nav_friends -> FriendsFragment()
-                com.echolink.R.id.nav_topic -> TopicFragment()
+                R.id.nav_friends -> FriendsFragment()
+                R.id.nav_topic -> TopicFragment()
                 else -> return@setOnItemSelectedListener false
             }
             switchFragment(fragment)
@@ -113,7 +189,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 顶栏齿轮 → 打开设置页（设置已从底栏移除，改由消息页顶栏进入） */
+    // ===== 全局 FAB =====
+
+    private fun setupGlobalFab() {
+        binding.fabGlobal.setOnClickListener {
+            showGlobalFabMenu(
+                owner = this,
+                onDiscover = { showDiscoverDialog(this) { t -> openTopic(t) } },
+                onCreateTopic = { showCreateTopicDialog(this) { t -> openTopic(t) } },
+                onAddFriend = { showAddFriendDialog(this) },
+                onSettings = { openSettings() }
+            )
+        }
+    }
+
+    fun setFabVisible(visible: Boolean) {
+        binding.fabGlobal.visibility = if (visible) View.VISIBLE else View.GONE
+    }
+
     fun openSettings() {
         switchFragment(SettingsFragment())
     }
@@ -123,21 +216,40 @@ class MainActivity : AppCompatActivity() {
             .beginTransaction()
             .replace(binding.fragmentContainer.id, fragment)
             .commit()
+        val showFab = fragment is TopicFragment || fragment is FriendsFragment
+        binding.fabGlobal.visibility = if (showFab) View.VISIBLE else View.GONE
+        // 平板：更新标题和侧滑栏选中状态
+        if (isTablet) {
+            binding.toolbar.title = when (fragment) {
+                is TopicFragment -> "消息"
+                is FriendsFragment -> "好友"
+                is SettingsFragment -> "设置"
+                is NotificationsFragment -> "通知"
+                else -> "EchoLink"
+            }
+            val navItem = when (fragment) {
+                is FriendsFragment -> R.id.nav_friends
+                is SettingsFragment -> R.id.nav_settings
+                else -> R.id.nav_messages
+            }
+            binding.navView.setCheckedItem(navItem)
+        }
     }
 
-    /** 话题列表顶部「通知」置顶条目 → 打开通知详情页（底栏仍高亮话题） */
     fun openNotifications() {
         switchFragment(NotificationsFragment())
-        binding.bottomNav.menu.findItem(com.echolink.R.id.nav_topic)?.isChecked = true
+        if (!isTablet) {
+            binding.bottomNav.menu.findItem(R.id.nav_topic)?.isChecked = true
+        }
     }
 
-    /** 通知详情页返回 → 回话题列表 */
     fun backToTopics() {
         switchFragment(TopicFragment())
-        binding.bottomNav.menu.findItem(com.echolink.R.id.nav_topic)?.isChecked = true
+        if (!isTablet) {
+            binding.bottomNav.menu.findItem(R.id.nav_topic)?.isChecked = true
+        }
     }
 
-    /** 打开话题页并定位到指定话题（用于点击状态栏话题通知 / 好友私聊入口） */
     fun openTopic(topic: String, title: String? = null) {
         val frag = TopicFragment()
         frag.arguments = Bundle().apply {
@@ -145,17 +257,22 @@ class MainActivity : AppCompatActivity() {
             if (title != null) putString("title", title)
         }
         switchFragment(frag)
-        // 仅高亮底栏，不触发 onItemSelected 以免丢失话题参数
-        binding.bottomNav.menu.findItem(com.echolink.R.id.nav_topic)?.isChecked = true
+        if (!isTablet) {
+            binding.bottomNav.menu.findItem(R.id.nav_topic)?.isChecked = true
+        }
+    }
+
+    override fun onBackPressed() {
+        if (isTablet && binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        } else {
+            super.onBackPressed()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            unregisterReceiver(notificationReceiver)
-        } catch (e: Exception) {
-            // ignored
-        }
+        try { unregisterReceiver(notificationReceiver) } catch (_: Exception) {}
     }
 
     companion object {
