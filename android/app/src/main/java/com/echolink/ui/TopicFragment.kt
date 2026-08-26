@@ -286,11 +286,7 @@ class TopicFragment : Fragment() {
         // 聊天态：待审批
         binding.btnPending.setOnClickListener { showPendingDialog() }
 
-        // 设置入口已移入「+」悬浮菜单（见 showTopicFabMenu），顶栏齿轮不再使用
-
-        // 悬浮加号：新建 / 发现话题
-        binding.fabAddTopic.setOnClickListener { showTopicFabMenu() }
-
+        // 设置入口已移入全局「+」悬浮菜单（MainActivity），顶栏齿轮不再使用
 
         // 列表态：「新的申请」入口（好友申请 + 加群申请）
         binding.rowNewRequests.setOnClickListener { showRequestsDialog() }
@@ -382,6 +378,9 @@ class TopicFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // 聊天态隐藏全局 FAB，列表态显示；兜底修正 switchFragment 强制显示导致的残留
+        val inChat = chatTopic != null || binding.chatLayout.visibility == View.VISIBLE
+        (activity as? MainActivity)?.setFabVisible(!inChat)
         requireActivity().registerReceiver(
             topicReceiver,
             IntentFilter("com.echolink.TOPIC_MESSAGE_RECEIVED").apply {
@@ -434,13 +433,15 @@ class TopicFragment : Fragment() {
         binding.tvChatTitle.visibility = View.GONE
         binding.btnPending.visibility = View.GONE
         // 设置已移入「+」FAB，顶栏齿轮保持隐藏
-        binding.fabAddTopic.visibility = View.VISIBLE
+        (activity as? MainActivity)?.setFabVisible(true)
         loadTopicList()
     }
 
     private fun showChatMode(topic: MyTopic) {
         chatTopic = topic
         currentTopic = topic.name
+        // 进入聊天详情：隐藏全局 FAB
+        (activity as? MainActivity)?.setFabVisible(false)
         // 会话「对方」头像（私聊 dm 为好友头像），供历史消息 sender_avatar 缺失时回退，
         // 避免「没头像」；也用于自聊场景让两侧都用当前实时头像
         chatAdapter.peerAvatarUrl = topic.avatarUrl
@@ -474,7 +475,6 @@ class TopicFragment : Fragment() {
             // #198 修复：左列表固定 360dp、weight=0，使聊天标题在「聊天面板」内而非整屏右半居中
             setDualTitleListWidth((360 * resources.displayMetrics.density).toInt(), 0f)
             binding.btnSettings.visibility = View.GONE
-            binding.fabAddTopic.visibility = View.VISIBLE
         } else {
             // 手机：列表/聊天全屏切换
             binding.listLayout.visibility = View.GONE
@@ -482,7 +482,6 @@ class TopicFragment : Fragment() {
             binding.tvTitleList.visibility = View.GONE
             binding.tvChatTitle.visibility = View.VISIBLE
             binding.btnSettings.visibility = View.GONE
-            binding.fabAddTopic.visibility = View.GONE
         }
         backCallback.isEnabled = true
         WebSocketClient.sendSubscribe(topic.name)
