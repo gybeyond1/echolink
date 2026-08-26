@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
         if (isTablet) {
             setupDrawer()
         } else {
-            binding.bottomNav.background = null
+            binding.bottomNav!!.background = null
             setupBottomNav()
         }
         setupGlobalFab()
@@ -99,9 +99,9 @@ class MainActivity : AppCompatActivity() {
         } else if (supportFragmentManager.fragments.isEmpty()) {
             switchFragment(TopicFragment())
             if (!isTablet) {
-                binding.bottomNav.menu.findItem(R.id.nav_topic)?.isChecked = true
+                binding.bottomNav!!.menu.findItem(R.id.nav_topic)?.isChecked = true
             } else {
-                binding.navView.setCheckedItem(R.id.nav_messages)
+                binding.navView!!.setCheckedItem(R.id.nav_messages)
             }
         }
     }
@@ -109,25 +109,25 @@ class MainActivity : AppCompatActivity() {
     // ===== 平板侧滑栏 =====
 
     private fun setupDrawer() {
-        setSupportActionBar(binding.toolbar)
+        setSupportActionBar(binding.toolbar!!)
         supportActionBar?.setDisplayShowTitleEnabled(false)
-        binding.toolbar.setNavigationOnClickListener {
-            binding.drawerLayout.openDrawer(GravityCompat.START)
+        binding.toolbar!!.setNavigationOnClickListener {
+            binding.drawerLayout!!.openDrawer(GravityCompat.START)
         }
         // 侧滑栏头部用户信息
-        val header = binding.navView.getHeaderView(0)
+        val header = binding.navView!!.getHeaderView(0)
         header.findViewById<android.widget.TextView>(R.id.navDisplayName)?.text =
             AuthManager.displayName ?: AuthManager.username ?: "用户"
         header.findViewById<android.widget.TextView>(R.id.navUsername)?.text =
             "@${AuthManager.username ?: ""}"
         // 点击用户信息框 → 账号设置
         header.findViewById<View>(R.id.navUserBox)?.setOnClickListener {
-            binding.drawerLayout.closeDrawer(GravityCompat.START)
+            binding.drawerLayout!!.closeDrawer(GravityCompat.START)
             openAccountSettings()
         }
 
-        binding.navView.setNavigationItemSelectedListener { item ->
-            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        binding.navView!!.setNavigationItemSelectedListener { item ->
+            binding.drawerLayout!!.closeDrawer(GravityCompat.START)
             when (item.itemId) {
                 R.id.nav_messages -> switchFragment(TopicFragment())
                 R.id.nav_friends -> switchFragment(FriendsFragment())
@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity() {
             .addToBackStack(null)
             .commit()
         binding.fabGlobal.visibility = View.GONE
-        binding.toolbar.title = "账号设置"
+        binding.toolbar!!.title = "账号设置"
     }
 
     /** 切换主题对话框（跟随系统/浅色/深色） */
@@ -178,7 +178,7 @@ class MainActivity : AppCompatActivity() {
     // ===== 手机底部导航 =====
 
     private fun setupBottomNav() {
-        binding.bottomNav.setOnItemSelectedListener { item ->
+        binding.bottomNav!!.setOnItemSelectedListener { item ->
             val fragment: Fragment = when (item.itemId) {
                 R.id.nav_friends -> FriendsFragment()
                 R.id.nav_topic -> TopicFragment()
@@ -220,7 +220,7 @@ class MainActivity : AppCompatActivity() {
         binding.fabGlobal.visibility = if (showFab) View.VISIBLE else View.GONE
         // 平板：更新标题和侧滑栏选中状态
         if (isTablet) {
-            binding.toolbar.title = when (fragment) {
+            binding.toolbar!!.title = when (fragment) {
                 is TopicFragment -> "消息"
                 is FriendsFragment -> "好友"
                 is SettingsFragment -> "设置"
@@ -232,21 +232,21 @@ class MainActivity : AppCompatActivity() {
                 is SettingsFragment -> R.id.nav_settings
                 else -> R.id.nav_messages
             }
-            binding.navView.setCheckedItem(navItem)
+            binding.navView!!.setCheckedItem(navItem)
         }
     }
 
     fun openNotifications() {
         switchFragment(NotificationsFragment())
         if (!isTablet) {
-            binding.bottomNav.menu.findItem(R.id.nav_topic)?.isChecked = true
+            binding.bottomNav!!.menu.findItem(R.id.nav_topic)?.isChecked = true
         }
     }
 
     fun backToTopics() {
         switchFragment(TopicFragment())
         if (!isTablet) {
-            binding.bottomNav.menu.findItem(R.id.nav_topic)?.isChecked = true
+            binding.bottomNav!!.menu.findItem(R.id.nav_topic)?.isChecked = true
         }
     }
 
@@ -258,13 +258,13 @@ class MainActivity : AppCompatActivity() {
         }
         switchFragment(frag)
         if (!isTablet) {
-            binding.bottomNav.menu.findItem(R.id.nav_topic)?.isChecked = true
+            binding.bottomNav!!.menu.findItem(R.id.nav_topic)?.isChecked = true
         }
     }
 
     override fun onBackPressed() {
-        if (isTablet && binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        if (isTablet && binding.drawerLayout!!.isDrawerOpen(GravityCompat.START)) {
+            binding.drawerLayout!!.closeDrawer(GravityCompat.START)
         } else {
             super.onBackPressed()
         }
