@@ -127,12 +127,27 @@ class MainActivity : AppCompatActivity() {
                 AuthManager.displayName ?: AuthManager.username ?: "用户"
             header.findViewById<android.widget.TextView>(R.id.navUsername)?.text =
                 "@${AuthManager.username ?: ""}"
+            // 加载用户头像
+            val avatarIv = header.findViewById<android.widget.ImageView>(R.id.navAvatar)
+            if (avatarIv != null) {
+                com.echolink.data.AvatarLoader.load(
+                    com.echolink.data.ApiClient.fullAvatarUrl(AuthManager.avatarUrl), avatarIv
+                )
+            }
             // 点击用户信息框 → 账号设置
             header.findViewById<View>(R.id.navUserBox)?.setOnClickListener {
                 drawer.closeDrawer(GravityCompat.START)
                 openAccountSettings()
             }
         }
+
+        // 增大侧滑栏边缘触摸区域（默认 20dp 太窄，平板上不灵敏）
+        try {
+            val edgeSizeField = androidx.drawerlayout.widget.DrawerLayout::class.java.getDeclaredField("mEdgeSize")
+            edgeSizeField.isAccessible = true
+            val dp48 = (48 * resources.displayMetrics.density).toInt()
+            edgeSizeField.setInt(drawer, dp48)
+        } catch (_: Exception) {}
 
         navView.setNavigationItemSelectedListener { item ->
             drawer.closeDrawer(GravityCompat.START)
@@ -224,8 +239,7 @@ class MainActivity : AppCompatActivity() {
             .beginTransaction()
             .replace(binding.fragmentContainer.id, fragment)
             .commit()
-        val showFab = fragment is TopicFragment || fragment is FriendsFragment
-        binding.fabGlobal.visibility = if (showFab) View.VISIBLE else View.GONE
+        // FAB 可见性由各 Fragment 在 onResume 中自行控制（聊天态隐藏、列表态显示）
         // 平板：更新标题和侧滑栏选中状态
         if (isTablet) {
             binding.toolbar?.title = when (fragment) {

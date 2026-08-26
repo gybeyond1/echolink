@@ -77,7 +77,6 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
         binding.rvFriends.layoutManager = LinearLayoutManager(requireContext())
         binding.rvFriends.adapter = friendAdapter
 
-        binding.fabAdd.setOnClickListener { showFabMenu() }
         binding.rowNewFriends.setOnClickListener { showNewFriendsDialog() }
 
         // 好友列表下拉刷新
@@ -107,6 +106,8 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
 
     override fun onResume() {
         super.onResume()
+        // 好友列表页显示全局 FAB
+        (activity as? MainActivity)?.setFabVisible(true)
         requireActivity().registerReceiver(
             friendsReceiver,
             IntentFilter("com.echolink.FRIENDS_CHANGED"),

@@ -39,8 +39,7 @@
             android:layout_width="52dp"
             android:layout_height="52dp"
             android:background="@drawable/bg_fab_neumorph"
-            android:src="@android:drawable/ic_input_add"
-            android:tint="@color/on_surface"
+            android:src="@drawable/ic_plus"
             android:scaleType="centerInside"
             android:padding="14dp"
             android:contentDescription="添加"
@@ -55,11 +54,15 @@
     <!-- 侧滑栏 -->
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/navView"
-        android:layout_width="280dp"
+        android:layout_width="300dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:background="?attr/colorSurface"
         app:headerLayout="@layout/nav_header"
-        app:menu="@menu/nav_drawer" />
+        app:menu="@menu/nav_drawer"
+        app:itemIconSize="28dp"
+        app:itemTextSize="18sp"
+        app:itemVerticalPadding="14dp"
+        app:itemHorizontalPadding="24dp" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
