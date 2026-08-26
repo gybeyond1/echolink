@@ -63,6 +63,9 @@ class TopicAdapter(
      *  彻底杜绝历史消息头像缺失导致的「首条没头像」。群聊/设备会话不设。 */
     var isDm: Boolean = false
 
+    /** 是否为留言板会话：访客消息统一显示 📮 头像（与 WebUI 一致），不加载 sender_avatar */
+    var isMessageWall: Boolean = false
+
     var selectionMode = false
         private set
     private val selected = mutableSetOf<Long>()
@@ -151,6 +154,8 @@ class TopicAdapter(
     }
 
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val avatarContainer: View = view.findViewById(R.id.avatarContainer)
+        val tvAvatar: TextView = view.findViewById(R.id.tvAvatar)
         val ivAvatar: ImageView = view.findViewById(R.id.ivAvatar)
         val llContent: View = view.findViewById(R.id.llContent)
         val llSenderInfo: android.widget.LinearLayout = view.findViewById(R.id.llSenderInfo)
@@ -193,7 +198,7 @@ class TopicAdapter(
                     }
                     if (!selectionMode) {
                         // Check avatar click first
-                        if (ivAvatar.visibility == View.VISIBLE && inViewBounds(ivAvatar, e)) {
+                        if (avatarContainer.visibility == View.VISIBLE && inViewBounds(avatarContainer, e)) {
                             onAvatarClick?.invoke(it)
                             return true
                         }
@@ -314,10 +319,10 @@ class TopicAdapter(
         val isSameSenderAsPrev = prevItem != null && isSameSender(prevItem!!, item)
 
         if (isSameSenderAsPrev) {
-            holder.ivAvatar.visibility = View.INVISIBLE
+            holder.avatarContainer.visibility = View.INVISIBLE
             holder.llSenderInfo.visibility = View.GONE
         } else {
-            holder.ivAvatar.visibility = View.VISIBLE
+            holder.avatarContainer.visibility = View.VISIBLE
             holder.llSenderInfo.visibility = View.VISIBLE
         }
 
@@ -363,7 +368,7 @@ class TopicAdapter(
 
         // Avatar loading (only for first message in group to save bandwidth)
         if (!isSameSenderAsPrev) {
-            loadAvatar(item, holder.ivAvatar)
+            loadAvatar(item, holder)
         }
 
         // 已读回执（WhatsApp 风）：仅 dm 私聊里「自己发出的」消息显示
@@ -400,9 +405,9 @@ class TopicAdapter(
         if (isMine) {
             root.addView(holder.ivStatus)
             root.addView(holder.llContent)
-            root.addView(holder.ivAvatar)
+            root.addView(holder.avatarContainer)
         } else {
-            root.addView(holder.ivAvatar)
+            root.addView(holder.avatarContainer)
             root.addView(holder.llContent)
             root.addView(holder.ivStatus)
         }
@@ -546,7 +551,16 @@ class TopicAdapter(
      *  关键修复：peer_avatar 由服务器 /messages 在 dm 下直接返回并附在每条消息上，
      *  彻底摆脱「peerAvatarUrl 外部未传/传空导致老消息无兜底」的隐患。
      */
-    private fun loadAvatar(item: TopicMessage, iv: ImageView) {
+    private fun loadAvatar(item: TopicMessage, holder: ViewHolder) {
+        // 留言板访客消息：统一显示 📮 emoji + 灰色新拟态圆底（与 WebUI 一致）
+        if (isMessageWall && !isSelfMessage(item)) {
+            holder.ivAvatar.visibility = View.GONE
+            holder.tvAvatar.visibility = View.VISIBLE
+            holder.tvAvatar.text = "\uD83D\uDCEC"
+            holder.tvAvatar.setBackgroundResource(R.drawable.bg_mw_avatar)
+            holder.tvAvatar.setTextColor(holder.itemView.context.getColor(R.color.on_surface))
+            return
+        }
         val url = if (isSelfMessage(item)) {
             ApiClient.fullAvatarUrl(AuthManager.avatarUrl)
         } else if (isDm) {
@@ -558,10 +572,25 @@ class TopicAdapter(
             ApiClient.fullAvatarUrl(item.senderAvatar)
         }
         if (url.isNullOrBlank()) {
-            iv.setImageResource(R.drawable.ic_default_avatar)
+            // 无头像：显示首字母
+            holder.ivAvatar.visibility = View.GONE
+            holder.tvAvatar.visibility = View.VISIBLE
+            holder.tvAvatar.text = initials(item.senderDisplayName ?: item.senderName)
+            holder.tvAvatar.setBackgroundResource(R.drawable.bg_circle_avatar)
+            holder.tvAvatar.setTextColor(android.graphics.Color.WHITE)
             return
         }
-        AvatarLoader.load(url, iv)
+        holder.tvAvatar.visibility = View.GONE
+        holder.ivAvatar.visibility = View.VISIBLE
+        AvatarLoader.load(url, holder.ivAvatar)
+    }
+
+    private fun initials(name: String): String {
+        val s = name.trim()
+        if (s.isEmpty()) return "?"
+        // 中文取最后一个字，英文取首字母
+        return if (s[0].code in 0x4E00..0x9FFF) s.last().toString()
+        else s.take(1).uppercase()
     }
 
     private fun playVoice(url: String) {

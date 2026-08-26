@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知图标底：橙色渐变圆（与 WebUI .notif-ic 一致） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:angle="315"
+        android:startColor="#F5A623"
+        android:endColor="#E8862D" />
+</shape>

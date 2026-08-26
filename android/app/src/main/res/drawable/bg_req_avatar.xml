@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 新申请图标底：红色渐变圆（与 WebUI .req-ic 一致） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:angle="315"
+        android:startColor="#E8645F"
+        android:endColor="#C94242" />
+</shape>

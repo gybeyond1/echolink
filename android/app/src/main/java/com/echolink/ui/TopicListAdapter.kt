@@ -41,9 +41,11 @@ class TopicListAdapter(
                 holder.ivAvatar.setImageResource(R.drawable.ic_devices_avatar)
             }
             item.kind == "messagewall" -> {
-                holder.tvAvatar.visibility = View.GONE
-                holder.ivAvatar.visibility = View.VISIBLE
-                holder.ivAvatar.setImageResource(R.drawable.ic_messagewall_avatar)
+                holder.ivAvatar.visibility = View.GONE
+                holder.tvAvatar.visibility = View.VISIBLE
+                holder.tvAvatar.text = "\uD83D\uDCEC"
+                holder.tvAvatar.setBackgroundResource(R.drawable.bg_mw_avatar)
+                holder.tvAvatar.setTextColor(holder.itemView.context.getColor(R.color.on_surface))
             }
             !item.avatarUrl.isNullOrBlank() -> {
                 holder.tvAvatar.visibility = View.GONE

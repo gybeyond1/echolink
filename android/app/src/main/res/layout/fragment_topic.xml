@@ -146,7 +146,7 @@
                     android:gravity="center"
                     android:text="🔔"
                     android:textSize="20sp"
-                    android:background="@drawable/bg_circle_avatar" />
+                    android:background="@drawable/bg_notif_avatar" />
             </FrameLayout>
 
             <LinearLayout
@@ -205,13 +205,13 @@
                 android:layout_width="44dp"
                 android:layout_height="44dp">
 
-                <ImageView
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:padding="11dp"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_person_add"
-                    android:background="@drawable/bg_circle_avatar"
+                    android:gravity="center"
+                    android:text="👥"
+                    android:textSize="19sp"
+                    android:background="@drawable/bg_req_avatar"
                     android:contentDescription="新的申请" />
             </FrameLayout>
 
