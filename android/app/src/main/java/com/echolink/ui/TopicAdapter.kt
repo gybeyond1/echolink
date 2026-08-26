@@ -445,11 +445,12 @@ class TopicAdapter(
             holder.tvSender.setTextColor(ctx.getColor(R.color.on_surface_variant))
             holder.tvTime.setTextColor(ctx.getColor(R.color.bubble_own_time))
         } else {
-            holder.llContent.setBackgroundResource(R.drawable.bg_msg_other)
+            // 对方气泡与自己一致（统一绿色气泡风格）
+            holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
             holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvText.setTextColor(ctx.getColor(R.color.on_surface))
-            holder.tvSender.setTextColor(ctx.getColor(R.color.brand_primary))
-            holder.tvTime.setTextColor(ctx.getColor(R.color.on_surface_variant))
+            holder.tvSender.setTextColor(ctx.getColor(R.color.on_surface_variant))
+            holder.tvTime.setTextColor(ctx.getColor(R.color.bubble_own_time))
         }
     }
 

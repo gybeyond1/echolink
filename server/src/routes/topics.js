@@ -141,7 +141,7 @@ router.get("/", authMiddleware, (req, res) => {
                AND tm.id NOT IN (SELECT message_id FROM topic_message_deletes WHERE user_id = ?)
            )
          )
-       ORDER BY CASE t.kind WHEN 'devices' THEN 0 WHEN 'dm' THEN 1 ELSE 2 END, last_message_at DESC, t.created_at DESC
+       ORDER BY CASE t.kind WHEN 'devices' THEN 0 WHEN 'messagewall' THEN 1 WHEN 'dm' THEN 2 ELSE 3 END, last_message_at DESC, t.created_at DESC
        LIMIT 100`
     )
     .all(req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, req.userId, ...(isAdmin ? [] : [req.userId]));

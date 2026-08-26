@@ -110,8 +110,11 @@
   }
 
   function mwAvatar(size) {
+    return neuAvatar("\uD83D\uDCEC", size);
+  }
+  function neuAvatar(emoji, size) {
     const px = Math.max(18, Math.round(size * 0.92));
-    return `<div class="mw-avatar" style="width:${size}px;height:${size}px;font-size:${px}px">📮</div>`;
+    return `<div class="neu-avatar" style="width:${size}px;height:${size}px;font-size:${px}px">${emoji}</div>`;
   }
 
   // 特殊会话的友好展示名（前端兜底，服务端旧版本也能显示中文名）
@@ -437,7 +440,7 @@
     parts.push(sessionEntryHtml(notifActive, {
       attrs: `data-special="notifications"`,
       html: `
-        <div class="avatar avatar-txt notif-ic">🔔</div>
+        ${neuAvatar("\uD83D\uDD14", 46)}
         <div class="sess-body">
           <div class="sess-row"><b>通知</b>${state.notifCount ? `<span class="sess-badge">${state.notifCount}</span>` : ""}</div>
           <div class="sess-preview">所有设备的同步通知</div>
@@ -462,7 +465,7 @@
       const name = topicTitle(t);
       const active = state.chat && state.chat.topic === t.name;
       let av;
-      if (kind === "devices") av = `<img class="avatar" style="width:46px;height:46px" src="devices_avatar.png" onerror="this.style.display='none'" />`;
+      if (kind === "devices") av = neuAvatar("\uD83D\uDCF1", 46);
       else if (kind === "messagewall") av = mwAvatar(46);
       else if (kind === "dm") av = avatarHtml(name, t.avatar, 46);
       else av = avatarHtml("#" + t.name, null, 46, 205);

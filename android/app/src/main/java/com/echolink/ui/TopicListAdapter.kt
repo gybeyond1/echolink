@@ -36,9 +36,12 @@ class TopicListAdapter(
     private fun bindAvatar(holder: ViewHolder, item: MyTopic, display: String) {
         when {
             item.kind == "devices" -> {
-                holder.tvAvatar.visibility = View.GONE
-                holder.ivAvatar.visibility = View.VISIBLE
-                holder.ivAvatar.setImageResource(R.drawable.ic_devices_avatar)
+                holder.ivAvatar.visibility = View.GONE
+                holder.tvAvatar.visibility = View.VISIBLE
+                holder.tvAvatar.text = "\uD83D\uDCF1"
+                holder.tvAvatar.setBackgroundResource(R.drawable.bg_mw_avatar)
+                holder.tvAvatar.setTextColor(holder.itemView.context.getColor(R.color.on_surface))
+                holder.tvAvatar.textSize = 23f
             }
             item.kind == "messagewall" -> {
                 holder.ivAvatar.visibility = View.GONE
@@ -46,6 +49,7 @@ class TopicListAdapter(
                 holder.tvAvatar.text = "\uD83D\uDCEC"
                 holder.tvAvatar.setBackgroundResource(R.drawable.bg_mw_avatar)
                 holder.tvAvatar.setTextColor(holder.itemView.context.getColor(R.color.on_surface))
+                holder.tvAvatar.textSize = 23f // 比默认 18sp 放大约 30%
             }
             !item.avatarUrl.isNullOrBlank() -> {
                 holder.tvAvatar.visibility = View.GONE

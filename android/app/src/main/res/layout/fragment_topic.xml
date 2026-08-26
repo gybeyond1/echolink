@@ -146,7 +146,8 @@
                     android:gravity="center"
                     android:text="🔔"
                     android:textSize="20sp"
-                    android:background="@drawable/bg_notif_avatar" />
+                    android:background="@drawable/bg_mw_avatar"
+                    android:textColor="@color/on_surface" />
             </FrameLayout>
 
             <LinearLayout
