@@ -3,10 +3,6 @@ name: Build Windows Desktop (Tauri)
 on:
   push:
     branches: ["main"]
-    paths:
-      - "windows/**"
-      - "server/public/**"
-      - ".github/workflows/windows.yml"
   workflow_dispatch:
 
 jobs:
