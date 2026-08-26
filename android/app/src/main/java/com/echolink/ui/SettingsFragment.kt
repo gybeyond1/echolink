@@ -42,6 +42,7 @@ import com.echolink.data.AvatarLoader
 import com.echolink.data.AppFilter
 import com.echolink.data.AppFilterStore
 import com.echolink.data.AuthManager
+import com.echolink.data.ServerSelector
 import com.echolink.data.ThemePrefs
 import com.echolink.databinding.FragmentSettingsBinding
 import com.echolink.service.NotificationListener
