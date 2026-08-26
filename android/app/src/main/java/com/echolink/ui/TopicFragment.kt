@@ -458,6 +458,11 @@ class TopicFragment : Fragment() {
         }
         binding.tvChatTitle.gravity = Gravity.CENTER
         binding.btnPending.visibility = if (topic.myRole == "owner" && topic.pendingRequests > 0) View.VISIBLE else View.GONE
+        // 留言板是单向接收（只看不发），隐藏底部输入栏和表情/附件面板
+        val isMw = topic.kind == "messagewall"
+        binding.inputBar.visibility = if (isMw) View.GONE else View.VISIBLE
+        binding.panelContainer.visibility = View.GONE
+        binding.tvEmptyChat.text = if (isMw) "暂无留言" else "暂无消息\n发送一条消息开始聊天"
         // 平板且非仅聊天模式 → 左列表 + 右聊天并排；其余（手机 / 仅聊天模式）→ 聊天占满
         val dual = isWide && !chatOnly
         if (dual) {

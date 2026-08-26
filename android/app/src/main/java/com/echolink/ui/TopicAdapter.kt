@@ -559,6 +559,7 @@ class TopicAdapter(
             holder.tvAvatar.text = "\uD83D\uDCEC"
             holder.tvAvatar.setBackgroundResource(R.drawable.bg_mw_avatar)
             holder.tvAvatar.setTextColor(holder.itemView.context.getColor(R.color.on_surface))
+            holder.tvAvatar.textSize = 22f // 比默认 17sp 放大约 30%
             return
         }
         val url = if (isSelfMessage(item)) {

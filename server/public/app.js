@@ -593,11 +593,13 @@
     };
 
     const input = document.getElementById("ci-text");
-    input.onkeydown = (e) => { if (e.key === "Enter") sendText(); };
-    document.getElementById("ci-send").onclick = sendText;
-    document.getElementById("ci-attach").onclick = () => document.getElementById("ci-file").click();
-    document.getElementById("ci-file").onchange = sendFile;
-    setupVoice();
+    if (input) {
+      input.onkeydown = (e) => { if (e.key === "Enter") sendText(); };
+      document.getElementById("ci-send").onclick = sendText;
+      document.getElementById("ci-attach").onclick = () => document.getElementById("ci-file").click();
+      document.getElementById("ci-file").onchange = sendFile;
+      setupVoice();
+    }
 
     // 软删除：点击气泡上的删除按钮 → 仅本机隐藏（单向），并通知服务端
     const body = document.getElementById("chatBody");
@@ -619,7 +621,7 @@
     }
 
     loadMessages(t.name);
-    input.focus();
+    if (input) input.focus();
   }
 
   async function loadMessages(topic) {
