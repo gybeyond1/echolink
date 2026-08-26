@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
@@ -30,6 +31,9 @@ class MainActivity : AppCompatActivity() {
 
     /** 是否平板布局（最小宽度 ≥600dp） */
     private val isTablet: Boolean get() = resources.configuration.smallestScreenWidthDp >= 600
+
+    /** 平板端 DrawerLayout（两配置根元素同名 ID 导致 ViewBinding 类型为 View?，用 findViewById 强转） */
+    private val drawer: DrawerLayout get() = binding.root.findViewById(R.id.drawerLayout)
 
     private val notificationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -112,7 +116,7 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar!!)
         supportActionBar?.setDisplayShowTitleEnabled(false)
         binding.toolbar!!.setNavigationOnClickListener {
-            binding.drawerLayout!!.openDrawer(GravityCompat.START)
+            drawer.openDrawer(GravityCompat.START)
         }
         // 侧滑栏头部用户信息
         val header = binding.navView!!.getHeaderView(0)
@@ -122,12 +126,12 @@ class MainActivity : AppCompatActivity() {
             "@${AuthManager.username ?: ""}"
         // 点击用户信息框 → 账号设置
         header.findViewById<View>(R.id.navUserBox)?.setOnClickListener {
-            binding.drawerLayout!!.closeDrawer(GravityCompat.START)
+            drawer.closeDrawer(GravityCompat.START)
             openAccountSettings()
         }
 
         binding.navView!!.setNavigationItemSelectedListener { item ->
-            binding.drawerLayout!!.closeDrawer(GravityCompat.START)
+            drawer.closeDrawer(GravityCompat.START)
             when (item.itemId) {
                 R.id.nav_messages -> switchFragment(TopicFragment())
                 R.id.nav_friends -> switchFragment(FriendsFragment())
@@ -263,8 +267,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        if (isTablet && binding.drawerLayout!!.isDrawerOpen(GravityCompat.START)) {
-            binding.drawerLayout!!.closeDrawer(GravityCompat.START)
+        if (isTablet && drawer.isDrawerOpen(GravityCompat.START)) {
+            drawer.closeDrawer(GravityCompat.START)
         } else {
             super.onBackPressed()
         }
