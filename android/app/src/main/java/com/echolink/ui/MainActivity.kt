@@ -302,8 +302,10 @@ class MainActivity : AppCompatActivity() {
 
     /** Multi-window 拖窗口时手动切布局，避免 Activity 重建导致 Fragment 状态恢复崩溃 */
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        // 先记录当前 Fragment 类型
+        val current = supportFragmentManager.findFragmentById(binding.fragmentContainer.id)
+        val isFriends = current is FriendsFragment
         super.onConfigurationChanged(newConfig)
-        val currentFragment = supportFragmentManager.findFragmentById(binding.fragmentContainer.id)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.root.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, R.color.background))
@@ -313,11 +315,17 @@ class MainActivity : AppCompatActivity() {
             binding.bottomNav?.background = null
             setupBottomNav()
         }
-        if (currentFragment != null) {
-            supportFragmentManager
-                .beginTransaction()
-                .replace(binding.fragmentContainer.id, currentFragment)
-                .commit()
+        // 用新实例重建 Fragment，避免旧视图残留
+        val fragment: Fragment = if (isFriends) FriendsFragment() else TopicFragment()
+        supportFragmentManager
+            .beginTransaction()
+            .replace(binding.fragmentContainer.id, fragment)
+            .commitNow()
+        // 同步选中状态
+        if (isTablet) {
+            binding.navView?.setCheckedItem(if (isFriends) R.id.nav_friends else R.id.nav_messages)
+        } else {
+            binding.bottomNav?.menu?.findItem(if (isFriends) R.id.nav_friends else R.id.nav_topic)?.isChecked = true
         }
     }
 
