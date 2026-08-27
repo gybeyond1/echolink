@@ -114,15 +114,6 @@ class TopicAdapter(
         }
     }
 
-    /** 移除指定 id 的消息（发送失败时用） */
-    fun removeMessage(id: Long) {
-        val idx = items.indexOfFirst { it.id == id }
-        if (idx >= 0) {
-            items.removeAt(idx)
-            notifyItemRemoved(idx)
-        }
-    }
-
     fun enterSelection(item: TopicMessage) {
         selectionMode = true
         if (item.id > 0) selected.add(item.id)
@@ -152,7 +143,6 @@ class TopicAdapter(
 
     /** 本地移除一条消息（软删除后在其他设备上同步隐藏，不影响数据源之外的逻辑） */
     fun removeMessage(id: Long) {
-        if (id <= 0) return
         val pos = items.indexOfFirst { it.id == id }
         if (pos < 0) return
         items.removeAt(pos)

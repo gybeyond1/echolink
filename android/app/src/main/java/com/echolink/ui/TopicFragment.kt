@@ -29,6 +29,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.GridView
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1359,7 +1360,7 @@ class TopicFragment : Fragment() {
             }
             sr.setRecognitionListener(object : android.speech.RecognitionListener {
                 override fun onResults(results: android.os.Bundle?) {
-                    val text = results?.getStringArrayList(android.speech.RecognizerIntent.RESULTS_RECOGNITION)?.firstOrNull()
+                    val text = results?.getStringArrayList(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
                     if (!text.isNullOrEmpty()) {
                         binding.etInput.setText(text)
                         binding.etInput.setSelection(text.length)
