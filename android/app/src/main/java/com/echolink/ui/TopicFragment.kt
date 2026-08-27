@@ -802,15 +802,39 @@ class TopicFragment : Fragment() {
     }
 
     private fun publish(topic: String, title: String, text: String, mediaType: String, mediaUrl: String?, mediaName: String?, mediaSize: Long, duration: Int = 0) {
+        // 先插入发送中的临时消息，让用户立即看到
+        val tempId = -System.currentTimeMillis()
+        val tempMsg = TopicMessage(
+            id = tempId,
+            topic = topic,
+            title = title,
+            text = text,
+            senderName = AuthManager.username ?: "me",
+            timestamp = System.currentTimeMillis(),
+            deviceId = AuthManager.deviceId,
+            deviceName = AuthManager.deviceName,
+            mediaType = mediaType,
+            mediaUrl = mediaUrl,
+            mediaName = mediaName,
+            mediaSize = mediaSize,
+            duration = duration,
+            senderUserId = AuthManager.userId,
+            sending = true
+        )
+        chatAdapter.appendItems(listOf(tempMsg))
+        binding.tvEmptyChat.visibility = View.GONE
+        binding.recyclerView.visibility = View.VISIBLE
+        scrollToBottom()
+
         lifecycleScope.launch {
             try {
                 val json = ApiClient.publishTopicMessage(topic, title, text, mediaType, mediaUrl, mediaName, mediaSize, duration)
                 val msg = parseTopicMessage(json.getJSONObject("topic_message"))
-                chatAdapter.appendItems(listOf(msg))
-                binding.tvEmptyChat.visibility = View.GONE
-                binding.recyclerView.visibility = View.VISIBLE
-                scrollToBottom()
+                // 用真实消息替换临时消息
+                chatAdapter.replaceMessage(tempId, msg)
             } catch (e: Exception) {
+                // 发送失败：移除临时消息
+                chatAdapter.removeMessage(tempId)
                 Toast.makeText(requireContext(), "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
@@ -1186,7 +1210,6 @@ class TopicFragment : Fragment() {
     // 媒体发送统一入口：好友私聊（dm）优先 P2P 直连（不占服务器带宽），
     // 30 秒打洞不成功自动回退 HTTP 上传（服务器中转兜底）；其他会话直接走 HTTP
     private fun sendMediaSmart(topic: String, file: File, kind: String, name: String, duration: Int = 0) {
-        binding.progressBar.visibility = View.VISIBLE
         if (chatTopic?.kind == "dm" && P2pManager.isReady) {
             P2pManager.sendFileWithFallback(
                 requireContext(), topic, file, kind, name,
@@ -1195,12 +1218,10 @@ class TopicFragment : Fragment() {
                     lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name, duration) }
                 },
                 onSuccess = { p2pUrl ->
-                    binding.progressBar.visibility = View.GONE
                     publish(topic, "", "", kind, p2pUrl, name, file.length(), duration)
                     try { file.delete() } catch (_: Exception) {}
                 },
                 onError = { msg ->
-                    binding.progressBar.visibility = View.GONE
                     Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
                     try { file.delete() } catch (_: Exception) {}
                 }
@@ -1220,7 +1241,6 @@ class TopicFragment : Fragment() {
         } catch (e: Exception) {
             Toast.makeText(requireContext(), "上传失败: ${e.message}", Toast.LENGTH_SHORT).show()
         } finally {
-            binding.progressBar.visibility = View.GONE
             try { file.delete() } catch (_: Exception) {}
         }
     }

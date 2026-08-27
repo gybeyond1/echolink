@@ -117,7 +117,7 @@
                 android:id="@+id/tvVoiceDuration"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0\""
+                android:text="0&quot;"
                 android:textColor="@android:color/white"
                 android:textSize="15sp"
                 android:layout_marginEnd="8dp" />
@@ -152,14 +152,27 @@
 
     </LinearLayout>
 
-    <!-- 已读回执（WhatsApp 风重叠双勾）：放在气泡外侧，避免撑高气泡 -->
-    <ImageView
-        android:id="@+id/ivStatus"
+    <!-- 已读回执 + 发送中圈圈：放在气泡外侧 -->
+    <FrameLayout
+        android:id="@+id/statusContainer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:layout_marginStart="4dp"
         android:layout_marginEnd="4dp"
-        android:layout_marginBottom="6dp"
-        android:visibility="gone" />
+        android:layout_marginBottom="6dp">
+
+        <ImageView
+            android:id="@+id/ivStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/pbSending"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:indeterminateTint="@color/on_surface_variant"
+            android:visibility="gone" />
+    </FrameLayout>
 </LinearLayout>

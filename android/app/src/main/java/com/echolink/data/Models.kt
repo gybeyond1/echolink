@@ -68,7 +68,8 @@ data class TopicMessage(
     val senderAvatar: String? = null,
     val senderDisplayName: String? = null,
     val peerAvatar: String? = null,
-    val read: Boolean = false
+    val read: Boolean = false,
+    val sending: Boolean = false  // 本地发送中状态（仅客户端用，不参与序列化）
 )
 
 // ===== JSON 解析扩展 =====

@@ -105,6 +105,24 @@ class TopicAdapter(
         notifyItemRangeInserted(start, list.size)
     }
 
+    /** 用真实消息替换发送中的临时消息（按临时 id 匹配） */
+    fun replaceMessage(tempId: Long, realMsg: TopicMessage) {
+        val idx = items.indexOfFirst { it.id == tempId }
+        if (idx >= 0) {
+            items[idx] = realMsg
+            notifyItemChanged(idx)
+        }
+    }
+
+    /** 移除指定 id 的消息（发送失败时用） */
+    fun removeMessage(id: Long) {
+        val idx = items.indexOfFirst { it.id == id }
+        if (idx >= 0) {
+            items.removeAt(idx)
+            notifyItemRemoved(idx)
+        }
+    }
+
     fun enterSelection(item: TopicMessage) {
         selectionMode = true
         if (item.id > 0) selected.add(item.id)
@@ -173,7 +191,9 @@ class TopicAdapter(
         val ivVoiceIcon: ImageView = view.findViewById(R.id.ivVoiceIcon)
         val llFile: View = view.findViewById(R.id.llFile)
         val tvFile: TextView = view.findViewById(R.id.tvFile)
+        val statusContainer: View = view.findViewById(R.id.statusContainer)
         val ivStatus: ImageView = view.findViewById(R.id.ivStatus)
+        val pbSending: View = view.findViewById(R.id.pbSending)
         var item: TopicMessage? = null
         private var selectionTapHandled = false
         var lastMine: Boolean? = null
@@ -365,6 +385,8 @@ class TopicAdapter(
                     holder.llVoice.visibility = View.VISIBLE
                     holder.tvVoiceDuration.text = if (item.duration > 0) "${item.duration}\"" else "0\""
                     holder.ivVoiceIcon.setImageResource(R.drawable.ic_voice_3)
+                    // 接收方（左侧）图标镜像翻转：播放三角朝右，信号在左
+                    holder.ivVoiceIcon.scaleX = if (isSelfMessage(item)) 1f else -1f
                 }
                 "file" -> {
                     holder.llFile.visibility = View.VISIBLE
@@ -381,13 +403,21 @@ class TopicAdapter(
 
         // 已读回执（WhatsApp 风）：仅 dm 私聊里「自己发出的」消息显示
         // 单勾（灰）= 已送达；重叠双勾（蓝）= 对方已读
+        // 发送中：显示小圈圈，不显示钩子
         if (isMine && showReadReceipts) {
-            holder.ivStatus.visibility = View.VISIBLE
-            holder.ivStatus.setImageResource(
-                if (item.read) R.drawable.ic_double_check else R.drawable.ic_check_single
-            )
+            if (item.sending) {
+                holder.ivStatus.visibility = View.GONE
+                holder.pbSending.visibility = View.VISIBLE
+            } else {
+                holder.pbSending.visibility = View.GONE
+                holder.ivStatus.visibility = View.VISIBLE
+                holder.ivStatus.setImageResource(
+                    if (item.read) R.drawable.ic_double_check else R.drawable.ic_check_single
+                )
+            }
         } else {
             holder.ivStatus.visibility = View.GONE
+            holder.pbSending.visibility = View.GONE
         }
 
         // Selection visual
@@ -411,13 +441,13 @@ class TopicAdapter(
         // 已读回执仅在 dm 私聊自己消息时显示，要放在消息气泡左侧，不要卡在头像和气泡之间。
         root.removeAllViews()
         if (isMine) {
-            root.addView(holder.ivStatus)
+            root.addView(holder.statusContainer)
             root.addView(holder.llContent)
             root.addView(holder.avatarContainer)
         } else {
             root.addView(holder.avatarContainer)
             root.addView(holder.llContent)
-            root.addView(holder.ivStatus)
+            root.addView(holder.statusContainer)
         }
         val g = if (isMine) Gravity.END else Gravity.START
         root.gravity = g or Gravity.CENTER_VERTICAL
