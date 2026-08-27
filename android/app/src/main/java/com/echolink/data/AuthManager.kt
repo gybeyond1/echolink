@@ -9,6 +9,7 @@ object AuthManager {
     private const val KEY_USER_ID = "user_id"
     private const val KEY_USERNAME = "username"
     private const val KEY_SERVER_URL = "server_url"
+    private const val KEY_PUBLIC_SERVER_URL = "public_server_url"
     private const val KEY_LAN_SERVER_URL = "lan_server_url"
     private const val KEY_DEVICE_ID = "device_id"
     private const val KEY_DEVICE_NAME = "device_name"
@@ -36,9 +37,15 @@ object AuthManager {
         get() = prefs.getString(KEY_USERNAME, null)
         set(value) = prefs.edit().putString(KEY_USERNAME, value).apply()
 
+    /** 当前正在使用的服务器地址（会被 ServerSelector 在内网/公网间切换） */
     var serverUrl: String
         get() = prefs.getString(KEY_SERVER_URL, "http://10.0.2.2:3000") ?: "http://10.0.2.2:3000"
         set(value) = prefs.edit().putString(KEY_SERVER_URL, value.trimEnd('/')).apply()
+
+    /** 用户保存的公网服务器地址（不会被 ServerSelector 修改，设置页显示这个） */
+    var publicServerUrl: String
+        get() = prefs.getString(KEY_PUBLIC_SERVER_URL, null) ?: serverUrl
+        set(value) = prefs.edit().putString(KEY_PUBLIC_SERVER_URL, value.trimEnd('/')).apply()
 
     // 内网服务器地址（设置页可选填写，填了才启用 WiFi 下智能切换）
     var lanServerUrl: String?

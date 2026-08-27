@@ -107,16 +107,27 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@drawable/bg_role_badge"
-            android:padding="8dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
             android:visibility="gone">
 
             <TextView
-                android:id="@+id/tvVoice"
+                android:id="@+id/tvVoiceDuration"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🔊 语音消息"
+                android:text="0\""
                 android:textColor="@android:color/white"
-                android:textSize="14sp" />
+                android:textSize="15sp"
+                android:layout_marginEnd="8dp" />
+
+            <ImageView
+                android:id="@+id/ivVoiceIcon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_voice_3"
+                android:scaleType="centerInside" />
         </LinearLayout>
 
         <LinearLayout

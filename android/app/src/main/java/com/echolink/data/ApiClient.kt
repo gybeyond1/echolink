@@ -193,7 +193,8 @@ object ApiClient {
         mediaType: String = "text",
         mediaUrl: String? = null,
         mediaName: String? = null,
-        mediaSize: Long = 0
+        mediaSize: Long = 0,
+        duration: Int = 0
     ): JSONObject {
         val body = JSONObject()
             .put("title", title)
@@ -205,6 +206,7 @@ object ApiClient {
         if (mediaUrl != null) body.put("media_url", mediaUrl)
         if (mediaName != null) body.put("media_name", mediaName)
         if (mediaSize > 0) body.put("media_size", mediaSize)
+        if (duration > 0) body.put("duration", duration)
         return execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/publish", "POST", body))
     }
 

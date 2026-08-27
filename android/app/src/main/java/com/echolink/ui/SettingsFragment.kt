@@ -124,7 +124,7 @@ class SettingsFragment : Fragment() {
         loadProfile()
         binding.tvUsername.text = "uid:${AuthManager.username ?: "未知"}"
         binding.tvDeviceName.text = AuthManager.deviceName ?: "未知"
-        binding.etServerUrl.setText(AuthManager.serverUrl)
+        binding.etServerUrl.setText(AuthManager.publicServerUrl)
         binding.etLanServerUrl.setText(AuthManager.lanServerUrl ?: "")
 
         // 昵称点击编辑
@@ -165,6 +165,7 @@ class SettingsFragment : Fragment() {
                 Toast.makeText(requireContext(), "公网服务器地址不能为空", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            AuthManager.publicServerUrl = wan
             AuthManager.serverUrl = wan
             AuthManager.lanServerUrl = lan.ifBlank { null }
             lifecycleScope.launch {

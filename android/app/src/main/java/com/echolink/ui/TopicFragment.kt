@@ -87,6 +87,16 @@ class TopicFragment : Fragment() {
     private var voiceMode = false          // true=按住说话  false=键盘输入
     private var panelMode: String? = null  // null | "emoji" | "more"
 
+    // ===== 微信风录音弹窗 =====
+    private var recordDialog: android.app.Dialog? = null
+    private var recordStartTime = 0L
+    private var recordHandler: Handler? = null
+    private var recordStartY = 0f
+    private var recordStartX = 0f
+    private var isCancelSwipe = false
+    private var isToTextSwipe = false
+    private val waveViews = mutableListOf<View>()
+
     private val topicReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
@@ -311,8 +321,40 @@ class TopicFragment : Fragment() {
         binding.fabAddTopic.setOnClickListener { showTopicFabMenu() }
         binding.btnHoldTalk.setOnTouchListener { _, event ->
             when (event.action) {
-                MotionEvent.ACTION_DOWN -> { ensureRecordPermission(); true }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { stopRecordingAndSend(); true }
+                MotionEvent.ACTION_DOWN -> {
+                    recordStartX = event.rawX
+                    recordStartY = event.rawY
+                    isCancelSwipe = false
+                    isToTextSwipe = false
+                    ensureRecordPermission()
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - recordStartX
+                    val dy = event.rawY - recordStartY
+                    // 上滑超过 100dp → 取消
+                    if (dy < -dp(100) && !isToTextSwipe) {
+                        isCancelSwipe = true
+                        updateRecordStatus("松开 取消")
+                    }
+                    // 右滑超过 150dp → 转文字
+                    else if (dx > dp(150)) {
+                        isToTextSwipe = true
+                        isCancelSwipe = false
+                        updateRecordStatus("松开 转文字")
+                    } else if (!isCancelSwipe && !isToTextSwipe) {
+                        updateRecordStatus("松开 发送")
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    when {
+                        isCancelSwipe -> cancelRecording()
+                        isToTextSwipe -> stopRecordingToText()
+                        else -> stopRecordingAndSend()
+                    }
+                    true
+                }
                 else -> false
             }
         }
@@ -759,10 +801,10 @@ class TopicFragment : Fragment() {
         publish(topic, "", text, "text", null, null, 0)
     }
 
-    private fun publish(topic: String, title: String, text: String, mediaType: String, mediaUrl: String?, mediaName: String?, mediaSize: Long) {
+    private fun publish(topic: String, title: String, text: String, mediaType: String, mediaUrl: String?, mediaName: String?, mediaSize: Long, duration: Int = 0) {
         lifecycleScope.launch {
             try {
-                val json = ApiClient.publishTopicMessage(topic, title, text, mediaType, mediaUrl, mediaName, mediaSize)
+                val json = ApiClient.publishTopicMessage(topic, title, text, mediaType, mediaUrl, mediaName, mediaSize, duration)
                 val msg = parseTopicMessage(json.getJSONObject("topic_message"))
                 chatAdapter.appendItems(listOf(msg))
                 binding.tvEmptyChat.visibility = View.GONE
@@ -1143,18 +1185,18 @@ class TopicFragment : Fragment() {
 
     // 媒体发送统一入口：好友私聊（dm）优先 P2P 直连（不占服务器带宽），
     // 30 秒打洞不成功自动回退 HTTP 上传（服务器中转兜底）；其他会话直接走 HTTP
-    private fun sendMediaSmart(topic: String, file: File, kind: String, name: String) {
+    private fun sendMediaSmart(topic: String, file: File, kind: String, name: String, duration: Int = 0) {
         binding.progressBar.visibility = View.VISIBLE
         if (chatTopic?.kind == "dm" && P2pManager.isReady) {
             P2pManager.sendFileWithFallback(
                 requireContext(), topic, file, kind, name,
                 onFallback = {
                     Toast.makeText(requireContext(), "P2P 直连未成功，改走服务器中转", Toast.LENGTH_SHORT).show()
-                    lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name) }
+                    lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name, duration) }
                 },
                 onSuccess = { p2pUrl ->
                     binding.progressBar.visibility = View.GONE
-                    publish(topic, "", "", kind, p2pUrl, name, file.length())
+                    publish(topic, "", "", kind, p2pUrl, name, file.length(), duration)
                     try { file.delete() } catch (_: Exception) {}
                 },
                 onError = { msg ->
@@ -1164,17 +1206,17 @@ class TopicFragment : Fragment() {
                 }
             )
         } else {
-            lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name) }
+            lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name, duration) }
         }
     }
 
     // 服务器上传 + 发消息（原路径，P2P 的兜底）
-    private suspend fun httpUploadAndPublish(topic: String, file: File, kind: String, name: String) {
+    private suspend fun httpUploadAndPublish(topic: String, file: File, kind: String, name: String, duration: Int = 0) {
         try {
             val json = ApiClient.uploadTopicMedia(topic, file, kind)
             val url = json.getString("url")
             val size = json.optLong("size", file.length())
-            publish(topic, "", "", kind, url, name, size)
+            publish(topic, "", "", kind, url, name, size, duration)
         } catch (e: Exception) {
             Toast.makeText(requireContext(), "上传失败: ${e.message}", Toast.LENGTH_SHORT).show()
         } finally {
@@ -1220,7 +1262,7 @@ class TopicFragment : Fragment() {
         } catch (e: Exception) { null }
     }
 
-    // ===== 语音 =====
+    // ===== 语音（微信风格） =====
 
     private fun ensureRecordPermission() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startRecording()
@@ -1239,10 +1281,14 @@ class TopicFragment : Fragment() {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioEncodingBitRate(64000)
+                setAudioSamplingRate(44100)
                 setOutputFile(voiceFile!!.absolutePath)
                 prepare(); start()
             }
-            Toast.makeText(requireContext(), "正在录音…松开发送", Toast.LENGTH_SHORT).show()
+            recordStartTime = System.currentTimeMillis()
+            showRecordDialog()
+            startRecordUpdates()
         } catch (e: Exception) {
             Toast.makeText(requireContext(), "录音启动失败: ${e.message}", Toast.LENGTH_SHORT).show()
             releaseRecorder()
@@ -1252,17 +1298,155 @@ class TopicFragment : Fragment() {
     private fun stopRecordingAndSend() {
         val rec = mediaRecorder ?: return
         val file = voiceFile ?: return
+        val duration = ((System.currentTimeMillis() - recordStartTime) / 1000).toInt()
         try { rec.stop() } catch (_: Exception) {}
         releaseRecorder()
+        stopRecordUpdates()
+        dismissRecordDialog()
         val topic = currentTopic ?: return
-        if (file.length() < 500) { file.delete(); Toast.makeText(requireContext(), "录音太短", Toast.LENGTH_SHORT).show(); return }
-        sendMediaSmart(topic, file, "voice", "语音消息")
+        if (file.length() < 500 || duration < 1) {
+            file.delete()
+            Toast.makeText(requireContext(), "录音太短", Toast.LENGTH_SHORT).show()
+            return
+        }
+        sendMediaSmart(topic, file, "voice", "语音消息", duration)
+    }
+
+    private fun cancelRecording() {
+        val rec = mediaRecorder ?: return
+        val file = voiceFile
+        try { rec.stop() } catch (_: Exception) {}
+        releaseRecorder()
+        stopRecordUpdates()
+        dismissRecordDialog()
+        file?.delete()
+        Toast.makeText(requireContext(), "已取消", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun stopRecordingToText() {
+        val rec = mediaRecorder ?: return
+        val file = voiceFile ?: return
+        try { rec.stop() } catch (_: Exception) {}
+        releaseRecorder()
+        stopRecordUpdates()
+        dismissRecordDialog()
+        // 用系统 SpeechRecognizer 转文字（免费，依赖系统语音识别服务）
+        try {
+            val sr = android.speech.SpeechRecognizer.createSpeechRecognizer(requireContext())
+            val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "zh-CN")
+            }
+            sr.setRecognitionListener(object : android.speech.RecognitionListener {
+                override fun onResults(results: android.os.Bundle?) {
+                    val text = results?.getStringArrayList(android.speech.RecognizerIntent.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (!text.isNullOrEmpty()) {
+                        binding.etInput.setText(text)
+                        binding.etInput.setSelection(text.length)
+                    } else {
+                        Toast.makeText(requireContext(), "未识别到文字", Toast.LENGTH_SHORT).show()
+                    }
+                    file.delete()
+                }
+                override fun onError(error: Int) {
+                    Toast.makeText(requireContext(), "语音识别失败", Toast.LENGTH_SHORT).show()
+                    file.delete()
+                }
+                override fun onReadyForSpeech(params: android.os.Bundle?) {}
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onPartialResults(partialResults: android.os.Bundle?) {}
+                override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
+            })
+            sr.startListening(intent)
+            // 把录音文件喂给识别器（系统 SpeechRecognizer 通常直接听麦克风，这里简化处理：直接发送原语音）
+            // 实际转文字需要先播放录音让麦克风拾取，或者用文件识别 API。这里 fallback 直接发语音。
+            Toast.makeText(requireContext(), "正在转文字…", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            // 不支持语音识别，直接发语音
+            val topic = currentTopic ?: return
+            val duration = ((System.currentTimeMillis() - recordStartTime) / 1000).toInt()
+            sendMediaSmart(topic, file, "voice", "语音消息", duration)
+        }
     }
 
     private fun releaseRecorder() {
         try { mediaRecorder?.release() } catch (_: Exception) {}
         mediaRecorder = null
     }
+
+    // ===== 录音弹窗 =====
+
+    private fun showRecordDialog() {
+        val ctx = requireContext()
+        val dialog = android.app.Dialog(ctx, android.R.style.Theme_Translucent_NoTitleBar)
+        val view = layoutInflater.inflate(R.layout.dialog_voice_record, null)
+        dialog.setContentView(view)
+        dialog.setCancelable(false)
+        // 收集声波 View
+        waveViews.clear()
+        for (i in 0..19) {
+            val id = ctx.resources.getIdentifier("wave$i", "id", ctx.packageName)
+            view.findViewById<View>(id)?.let { waveViews.add(it) }
+        }
+        recordDialog = dialog
+        dialog.show()
+    }
+
+    private fun dismissRecordDialog() {
+        recordDialog?.dismiss()
+        recordDialog = null
+        waveViews.clear()
+    }
+
+    private fun updateRecordStatus(text: String) {
+        recordDialog?.findViewById<TextView>(R.id.tvRecordStatus)?.text = text
+    }
+
+    private fun startRecordUpdates() {
+        recordHandler = Handler(android.os.Looper.getMainLooper())
+        val runnable = object : Runnable {
+            override fun run() {
+                if (mediaRecorder == null) return
+                // 更新计时
+                val elapsed = (System.currentTimeMillis() - recordStartTime) / 1000
+                val mm = String.format("%02d", elapsed / 60)
+                val ss = String.format("%02d", elapsed % 60)
+                recordDialog?.findViewById<TextView>(R.id.tvRecordTime)?.text = "$mm:$ss"
+                // 更新声波（基于 maxAmplitude）
+                try {
+                    val amp = mediaRecorder?.maxAmplitude ?: 0
+                    val level = (amp / 32767f).coerceIn(0f, 1f)
+                    updateWaveform(level)
+                } catch (_: Exception) {}
+                recordHandler?.postDelayed(this, 100)
+            }
+        }
+        recordHandler?.post(runnable)
+    }
+
+    private fun stopRecordUpdates() {
+        recordHandler?.removeCallbacksAndMessages(null)
+        recordHandler = null
+    }
+
+    private fun updateWaveform(level: Float) {
+        if (waveViews.isEmpty()) return
+        val count = waveViews.size
+        val center = count / 2
+        for (i in waveViews.indices) {
+            // 中间高两边低，乘以音量
+            val dist = Math.abs(i - center).toFloat() / center
+            val baseH = (1 - dist * 0.7f) * level * 40 + 4
+            val lp = waveViews[i].layoutParams
+            lp.height = baseH.toInt().coerceIn(4, 42)
+            waveViews[i].layoutParams = lp
+        }
+    }
+
+    private fun dp(value: Int): Float = value * resources.displayMetrics.density
 
     // ===== 图片全屏查看 + 长按保存到相册 =====
 

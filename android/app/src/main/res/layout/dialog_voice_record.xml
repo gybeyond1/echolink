@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#80000000"
+    android:gravity="bottom">
+
+    <!-- 中间录音状态区域 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <!-- 录音气泡（微信风绿色） -->
+        <LinearLayout
+            android:id="@+id/recordBubble"
+            android:layout_width="200dp"
+            android:layout_height="120dp"
+            android:background="@drawable/bg_voice_record_bubble"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <!-- 实时声波 -->
+            <LinearLayout
+                android:id="@+id/waveformContainer"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp">
+
+                <!-- 20 个声波柱，代码里动态改高度 -->
+                <View android:id="@+id/wave0"  android:layout_width="3dp" android:layout_height="6dp"  android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave1"  android:layout_width="3dp" android:layout_height="10dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave2"  android:layout_width="3dp" android:layout_height="14dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave3"  android:layout_width="3dp" android:layout_height="18dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave4"  android:layout_width="3dp" android:layout_height="22dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave5"  android:layout_width="3dp" android:layout_height="26dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave6"  android:layout_width="3dp" android:layout_height="30dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave7"  android:layout_width="3dp" android:layout_height="34dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave8"  android:layout_width="3dp" android:layout_height="38dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave9"  android:layout_width="3dp" android:layout_height="42dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave10" android:layout_width="3dp" android:layout_height="42dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave11" android:layout_width="3dp" android:layout_height="38dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave12" android:layout_width="3dp" android:layout_height="34dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave13" android:layout_width="3dp" android:layout_height="30dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave14" android:layout_width="3dp" android:layout_height="26dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave15" android:layout_width="3dp" android:layout_height="22dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave16" android:layout_width="3dp" android:layout_height="18dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave17" android:layout_width="3dp" android:layout_height="14dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave18" android:layout_width="3dp" android:layout_height="10dp" android:layout_margin="1dp" android:background="#FFFFFF" />
+                <View android:id="@+id/wave19" android:layout_width="3dp" android:layout_height="6dp"  android:layout_margin="1dp" android:background="#FFFFFF" />
+            </LinearLayout>
+
+            <!-- 状态文字 -->
+            <TextView
+                android:id="@+id/tvRecordStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="松开 发送"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- 计时 -->
+        <TextView
+            android:id="@+id/tvRecordTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="00:00"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <!-- 底部操作区：取消 | 松开 发送 | 转文字 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingBottom="40dp">
+
+        <TextView
+            android:id="@+id/btnCancelRecord"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="取消"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/btnReleaseSend"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="松开 发送"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnToText"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="滑到这里 转文字"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+</LinearLayout>

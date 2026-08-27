@@ -63,6 +63,7 @@ data class TopicMessage(
     val mediaUrl: String? = null,
     val mediaName: String? = null,
     val mediaSize: Long = 0,
+    val duration: Int = 0,  // 语音时长（秒），仅 voice 类型有效
     val senderUserId: Long = 0,
     val senderAvatar: String? = null,
     val senderDisplayName: String? = null,
@@ -136,6 +137,7 @@ fun parseTopicMessages(jsonArray: JSONArray): List<TopicMessage> {
                 mediaUrl = obj.optNullable("media_url"),
                 mediaName = obj.optNullable("media_name"),
                 mediaSize = obj.optLong("media_size", 0),
+                duration = obj.optInt("duration", 0),
                 senderUserId = obj.optLong("user_id", 0),
                 senderAvatar = obj.optNullable("sender_avatar"),
                 senderDisplayName = obj.optNullable("sender_display_name"),
@@ -161,6 +163,7 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
         mediaUrl = json.optNullable("media_url"),
         mediaName = json.optNullable("media_name"),
         mediaSize = json.optLong("media_size", 0),
+        duration = json.optInt("duration", 0),
         senderUserId = json.optLong("user_id", 0),
         senderAvatar = json.optNullable("sender_avatar"),
         senderDisplayName = json.optNullable("sender_display_name"),

@@ -14,7 +14,7 @@ import java.net.URL
  * 服务器地址智能选择：
  * - 连 WiFi 且配置了内网地址 → 先测内网连通性，通就走内网，不通自动切公网
  * - 没连 WiFi 或没配内网地址 → 直接走公网
- * 公网地址存在 AuthManager.serverUrl，内网地址存在 AuthManager.lanServerUrl。
+ * 公网地址存在 AuthManager.publicServerUrl，内网地址存在 AuthManager.lanServerUrl。
  * 选择结果写回 AuthManager.serverUrl（ApiClient / WebSocket 都读这个字段）。
  */
 object ServerSelector {
@@ -31,7 +31,7 @@ object ServerSelector {
      * @return Pair(是否切换了地址, 选中的地址)
      */
     suspend fun selectOptimal(context: Context): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        val wan = AuthManager.serverUrl
+        val wan = AuthManager.publicServerUrl
         val lan = AuthManager.lanServerUrl
         val onWifi = isOnWifi(context)
 

@@ -50,6 +50,10 @@ class TopicAdapter(
     private val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    /** 当前正在播放语音的图标（用于停止动画） */
+    private var currentPlayingIcon: ImageView? = null
+    private var currentMediaPlayer: MediaPlayer? = null
+
     /** 是否显示已读回执（仅 dm 私聊开启）：自己发出的消息显示单勾/双勾 */
     var showReadReceipts: Boolean = false
 
@@ -165,6 +169,8 @@ class TopicAdapter(
         val tvText: TextView = view.findViewById(R.id.tvText)
         val ivMedia: ImageView = view.findViewById(R.id.ivMedia)
         val llVoice: View = view.findViewById(R.id.llVoice)
+        val tvVoiceDuration: TextView = view.findViewById(R.id.tvVoiceDuration)
+        val ivVoiceIcon: ImageView = view.findViewById(R.id.ivVoiceIcon)
         val llFile: View = view.findViewById(R.id.llFile)
         val tvFile: TextView = view.findViewById(R.id.tvFile)
         val ivStatus: ImageView = view.findViewById(R.id.ivStatus)
@@ -235,8 +241,8 @@ class TopicAdapter(
                 llVoice.visibility == View.VISIBLE && inViewBounds(llVoice, ev) -> {
                     if (!item.mediaUrl.isNullOrEmpty()) {
                         val local = P2pManager.localP2pFile(ctx, item.mediaUrl)
-                        if (local != null) playVoice(local.absolutePath)
-                        else playVoice(fullUrl(item.mediaUrl))
+                        if (local != null) playVoice(local.absolutePath, ivVoiceIcon)
+                        else playVoice(fullUrl(item.mediaUrl), ivVoiceIcon)
                     }
                 }
                 llFile.visibility == View.VISIBLE && inViewBounds(llFile, ev) -> {
@@ -357,6 +363,8 @@ class TopicAdapter(
                 }
                 "voice" -> {
                     holder.llVoice.visibility = View.VISIBLE
+                    holder.tvVoiceDuration.text = if (item.duration > 0) "${item.duration}\"" else "0\""
+                    holder.ivVoiceIcon.setImageResource(R.drawable.ic_voice_3)
                 }
                 "file" -> {
                     holder.llFile.visibility = View.VISIBLE
@@ -595,16 +603,42 @@ class TopicAdapter(
         else s.take(1).uppercase()
     }
 
-    private fun playVoice(url: String) {
+    private fun playVoice(url: String, icon: ImageView) {
+        // 停止之前的播放
+        currentMediaPlayer?.let {
+            try { it.stop() } catch (_: Exception) {}
+            try { it.release() } catch (_: Exception) {}
+        }
+        currentPlayingIcon?.setImageResource(R.drawable.ic_voice_3)
+        currentPlayingIcon = null
+
         try {
             val mp = MediaPlayer()
+            currentMediaPlayer = mp
             mp.setDataSource(url)
-            mp.setOnPreparedListener { it.start() }
-            mp.setOnCompletionListener { it.release() }
-            mp.setOnErrorListener { m, _, _ -> m.release(); true }
+            mp.setOnPreparedListener {
+                it.start()
+                // 启动播放动画
+                icon.setImageResource(R.drawable.anim_voice_play)
+                (icon.drawable as? android.graphics.drawable.AnimationDrawable)?.start()
+                currentPlayingIcon = icon
+            }
+            mp.setOnCompletionListener {
+                it.release()
+                icon.setImageResource(R.drawable.ic_voice_3)
+                if (currentPlayingIcon === icon) currentPlayingIcon = null
+                currentMediaPlayer = null
+            }
+            mp.setOnErrorListener { m, _, _ ->
+                m.release()
+                icon.setImageResource(R.drawable.ic_voice_3)
+                if (currentPlayingIcon === icon) currentPlayingIcon = null
+                currentMediaPlayer = null
+                true
+            }
             mp.prepareAsync()
         } catch (e: Exception) {
-            // ignore
+            icon.setImageResource(R.drawable.ic_voice_3)
         }
     }
 
