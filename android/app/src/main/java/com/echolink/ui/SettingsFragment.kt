@@ -107,7 +107,7 @@ class SettingsFragment : Fragment() {
     private fun setupUI() {
         // 平板端：账号资料移到侧滑栏底部用户信息入口，设置页隐藏账号卡片
         // 主题切换也移到侧滑栏，设置页隐藏主题卡片
-        val isTablet = resources.configuration.smallestScreenWidthDp >= 600
+        val isTablet = resources.configuration.screenWidthDp >= 600
         if (isTablet) {
             binding.cardAccount.visibility = View.GONE
             binding.cardTheme.visibility = View.GONE

@@ -409,9 +409,9 @@ class TopicFragment : Fragment() {
 
     // ===== 模式切换 =====
 
-    /** 平板判定：最小宽度 ≥600dp（sw600dp 资源限定符对应值） */
+    /** 平板判定：当前窗口宽度 ≥600dp（Multi-window 拖窗口时动态变化） */
     private val isWide: Boolean
-        get() = resources.configuration.smallestScreenWidthDp >= 600
+        get() = resources.configuration.screenWidthDp >= 600
 
     /** 平板双栏：左列表标题栏宽度跟随列表列（360dp, weight=0），聊天标题才能在聊天面板内居中 */
     private fun setDualTitleListWidth(width: Int, weight: Float) {

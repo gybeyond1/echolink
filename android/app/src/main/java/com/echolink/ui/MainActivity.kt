@@ -32,10 +32,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
     /** 是否平板布局（最小宽度 ≥600dp） */
-    private val isTablet: Boolean get() = resources.configuration.smallestScreenWidthDp >= 600
+    /** 平板判定：当前窗口宽度 ≥600dp（Multi-window 拖窗口时会动态变化） */
+    private val isTablet: Boolean get() = resources.configuration.screenWidthDp >= 600
 
-    /** 平板端 DrawerLayout（两配置根元素同名 ID 导致 ViewBinding 类型为 View?，直接强转 root） */
-    private val drawer: DrawerLayout get() = binding.root as DrawerLayout
+    /** 平板端 DrawerLayout（安全强转，手机布局 root 是 ConstraintLayout 时返回 null） */
+    private val drawer: DrawerLayout? get() = binding.root as? DrawerLayout
 
     /** 平板左半屏右滑打开侧滑栏（避免与系统左滑返回冲突） */
     private val drawerGestureDetector by lazy {
@@ -47,8 +48,8 @@ class MainActivity : AppCompatActivity() {
                 if (e1.x > screenW * 0.4f) return false
                 // 右滑：distanceX < 0（手指向右移动），且水平位移 > 垂直位移
                 if (distanceX < -25 && Math.abs(distanceX) > Math.abs(distanceY) * 1.5f) {
-                    if (!drawer.isDrawerOpen(GravityCompat.START)) {
-                        drawer.openDrawer(GravityCompat.START)
+                    if (drawer?.isDrawerOpen(GravityCompat.START) == false) {
+                        drawer?.openDrawer(GravityCompat.START)
                         return true
                     }
                 }
@@ -145,7 +146,7 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
         toolbar.setNavigationOnClickListener {
-            drawer.openDrawer(GravityCompat.START)
+            drawer?.openDrawer(GravityCompat.START)
         }
         // 侧滑栏头部用户信息
         val header = navView.getHeaderView(0)
@@ -163,13 +164,13 @@ class MainActivity : AppCompatActivity() {
             }
             // 点击用户信息框 → 账号设置
             header.findViewById<View>(R.id.navUserBox)?.setOnClickListener {
-                drawer.closeDrawer(GravityCompat.START)
+                drawer?.closeDrawer(GravityCompat.START)
                 openAccountSettings()
             }
         }
 
         navView.setNavigationItemSelectedListener { item ->
-            drawer.closeDrawer(GravityCompat.START)
+            drawer?.closeDrawer(GravityCompat.START)
             when (item.itemId) {
                 R.id.nav_messages -> switchFragment(TopicFragment())
                 R.id.nav_friends -> switchFragment(FriendsFragment())
@@ -285,15 +286,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (isTablet && !drawer.isDrawerOpen(GravityCompat.START)) {
+        if (isTablet && drawer?.isDrawerOpen(GravityCompat.START) == false) {
             drawerGestureDetector.onTouchEvent(ev)
         }
         return super.dispatchTouchEvent(ev)
     }
 
     override fun onBackPressed() {
-        if (isTablet && drawer.isDrawerOpen(GravityCompat.START)) {
-            drawer.closeDrawer(GravityCompat.START)
+        if (isTablet && drawer?.isDrawerOpen(GravityCompat.START) == true) {
+            drawer?.closeDrawer(GravityCompat.START)
         } else {
             super.onBackPressed()
         }

@@ -48,9 +48,9 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
 
     private lateinit var friendAdapter: FriendAdapter
 
-    /** 平板判定：最小宽度 ≥600dp */
+    /** 平板判定：当前窗口宽度 ≥600dp（Multi-window 拖窗口时动态变化） */
     private val isWide: Boolean
-        get() = resources.configuration.smallestScreenWidthDp >= 600
+        get() = resources.configuration.screenWidthDp >= 600
 
     /** 仅首次加载后自动选中第一个好友，避免 onResume 反复重置用户已选的聊天 */
     private var initialAutoSelectDone = false
