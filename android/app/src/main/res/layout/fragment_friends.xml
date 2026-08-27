@@ -135,7 +135,6 @@
                 android:layout_marginEnd="16dp"
                 android:layout_marginBottom="16dp"
                 android:background="@drawable/bg_fab_neumorph"
-                android:backgroundTint="@null"
                 android:src="@drawable/ic_plus"
                 android:scaleType="centerInside"
                 android:padding="14dp"
@@ -163,4 +162,6 @@
             android:visibility="visible" />
     </FrameLayout>
 
-</LinearLayout>
+    </LinearLayout>
+
+</FrameLayout>
