@@ -428,14 +428,15 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
   const mediaType = hasMedia ? String(media_type).slice(0, 16) : "text";
 
   const result = db
-    .prepare(`INSERT INTO topic_messages (topic, user_id, device_id, sender_name, title, text, media_type, media_url, media_name, media_size, device_name, timestamp)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO topic_messages (topic, user_id, device_id, sender_name, title, text, media_type, media_url, media_name, media_size, duration, device_name, timestamp)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       name, req.userId, deviceId, sender,
       String(title || "").slice(0, 500), String(text || "").slice(0, 2000),
       mediaType, hasMedia ? String(media_url).slice(0, 500) : null,
       hasMedia ? String(media_name || "").slice(0, 200) : null,
       hasMedia ? (parseInt(media_size) || 0) : 0,
+      hasMedia ? (parseInt(req.body.duration) || 0) : 0,
       deviceName || null,
       ts
     );
@@ -461,6 +462,7 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
     media_url: hasMedia ? media_url : null,
     media_name: hasMedia ? (media_name || "") : null,
     media_size: hasMedia ? (parseInt(media_size) || 0) : 0,
+    duration: hasMedia ? (parseInt(req.body.duration) || 0) : 0,
     sender_name: sender,
     sender_display_name: userRow?.display_name || null,
     sender_avatar: userRow?.avatar || null,

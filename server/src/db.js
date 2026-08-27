@@ -97,6 +97,11 @@ function initDB() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // 兼容旧库：topic_messages 表加 duration 列（语音时长，秒）
+  const tmMsgCols = db.pragma("table_info(topic_messages)").map((c) => c.name);
+  if (!tmMsgCols.includes("duration")) {
+    db.exec("ALTER TABLE topic_messages ADD COLUMN duration INTEGER DEFAULT 0");
+  }
 
   // 服务器设置（文件/图片/语音大小上限、话题历史上限等），key/value 存储
   db.exec(`
