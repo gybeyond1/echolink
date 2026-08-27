@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
@@ -34,6 +36,26 @@ class MainActivity : AppCompatActivity() {
 
     /** 平板端 DrawerLayout（两配置根元素同名 ID 导致 ViewBinding 类型为 View?，直接强转 root） */
     private val drawer: DrawerLayout get() = binding.root as DrawerLayout
+
+    /** 平板左半屏右滑打开侧滑栏（避免与系统左滑返回冲突） */
+    private val drawerGestureDetector by lazy {
+        GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+                if (!isTablet || e1 == null) return false
+                val screenW = resources.displayMetrics.widthPixels
+                // 只在左半屏（≤40%宽度）按下时响应右滑
+                if (e1.x > screenW * 0.4f) return false
+                // 右滑：distanceX < 0（手指向右移动），且水平位移 > 垂直位移
+                if (distanceX < -25 && Math.abs(distanceX) > Math.abs(distanceY) * 1.5f) {
+                    if (!drawer.isDrawerOpen(GravityCompat.START)) {
+                        drawer.openDrawer(GravityCompat.START)
+                        return true
+                    }
+                }
+                return false
+            }
+        })
+    }
 
     private val notificationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -115,6 +137,12 @@ class MainActivity : AppCompatActivity() {
     private fun setupDrawer() {
         val toolbar = binding.toolbar ?: return
         val navView = binding.navView ?: return
+        // 避开状态栏：顶部 padding = 状态栏高度，左侧多留 8dp
+        val statusBarH = resources.getDimensionPixelSize(
+            resources.getIdentifier("status_bar_height", "dimen", "android")
+        ).coerceAtLeast(0)
+        val left8 = (8 * resources.displayMetrics.density).toInt()
+        toolbar.setPadding(toolbar.paddingStart + left8, statusBarH, toolbar.paddingEnd, toolbar.paddingBottom)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
         toolbar.setNavigationOnClickListener {
@@ -140,14 +168,6 @@ class MainActivity : AppCompatActivity() {
                 openAccountSettings()
             }
         }
-
-        // 增大侧滑栏边缘触摸区域（默认 20dp 太窄，平板上不灵敏）
-        try {
-            val edgeSizeField = androidx.drawerlayout.widget.DrawerLayout::class.java.getDeclaredField("mEdgeSize")
-            edgeSizeField.isAccessible = true
-            val dp48 = (48 * resources.displayMetrics.density).toInt()
-            edgeSizeField.setInt(drawer, dp48)
-        } catch (_: Exception) {}
 
         navView.setNavigationItemSelectedListener { item ->
             drawer.closeDrawer(GravityCompat.START)
@@ -282,6 +302,13 @@ class MainActivity : AppCompatActivity() {
         if (!isTablet) {
             binding.bottomNav!!.menu.findItem(R.id.nav_topic)?.isChecked = true
         }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (isTablet && !drawer.isDrawerOpen(GravityCompat.START)) {
+            drawerGestureDetector.onTouchEvent(ev)
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     override fun onBackPressed() {
