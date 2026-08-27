@@ -44,4 +44,9 @@
         <item name="android:textColor">@color/on_surface</item>
         <item name="android:windowIsFloating">true</item>
     </style>
+
+    <!-- 侧滑栏菜单项文字：放大到 18sp -->
+    <style name="NavDrawerText" parent="TextAppearance.MaterialComponents.Subtitle1">
+        <item name="android:textSize">18sp</item>
+    </style>
 </resources>

@@ -61,7 +61,7 @@
         app:headerLayout="@layout/nav_header"
         app:menu="@menu/nav_drawer"
         app:itemIconSize="28dp"
-        app:itemTextSize="18sp"
+        app:itemTextAppearance="@style/NavDrawerText"
         app:itemVerticalPadding="14dp"
         app:itemHorizontalPadding="24dp" />
 
