@@ -99,7 +99,6 @@ class MainActivity : AppCompatActivity() {
             binding.bottomNav?.background = null
             setupBottomNav()
         }
-        setupGlobalFab()
 
         SyncService.start(this)
         registerReceiver(
@@ -188,7 +187,6 @@ class MainActivity : AppCompatActivity() {
             .replace(binding.fragmentContainer.id, AccountSettingsFragment())
             .addToBackStack(null)
             .commit()
-        binding.fabGlobal.visibility = View.GONE
         binding.toolbar?.title = "账号设置"
     }
 
@@ -230,24 +228,6 @@ class MainActivity : AppCompatActivity() {
             switchFragment(fragment)
             true
         }
-    }
-
-    // ===== 全局 FAB =====
-
-    private fun setupGlobalFab() {
-        binding.fabGlobal.setOnClickListener {
-            showGlobalFabMenu(
-                owner = this,
-                onDiscover = { showDiscoverDialog(this) { t -> openTopic(t) } },
-                onCreateTopic = { showCreateTopicDialog(this) { t -> openTopic(t) } },
-                onAddFriend = { showAddFriendDialog(this) },
-                onSettings = { openSettings() }
-            )
-        }
-    }
-
-    fun setFabVisible(visible: Boolean) {
-        binding.fabGlobal.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
     fun openSettings() {

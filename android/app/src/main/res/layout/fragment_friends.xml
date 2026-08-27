@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
     android:background="@android:color/transparent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:background="@android:color/transparent">
 
     <!-- 左侧：好友列表（手机=整页；平板=固定宽度的左栏，右侧放聊天） -->
     <LinearLayout
@@ -120,20 +125,22 @@
                 android:textColor="@color/on_surface_variant"
                 android:textSize="16sp"
                 android:visibility="gone" />
-        </FrameLayout>
 
-        <!-- 底部大「+」：添加好友 / 发现·创建话题（原消息页 FAB + 右上角添加，合并入口） -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabAdd"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:layout_margin="16dp"
-            android:contentDescription="添加"
-            android:src="@android:drawable/ic_input_add"
-            app:backgroundTint="@color/brand_primary"
-            app:tint="@color/white"
-            app:elevation="6dp" />
+            <!-- 新拟态悬浮加号 -->
+            <ImageButton
+                android:id="@+id/fabAdd"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_fab_neumorph"
+                android:backgroundTint="@null"
+                android:src="@drawable/ic_plus"
+                android:scaleType="centerInside"
+                android:padding="14dp"
+                android:contentDescription="添加" />
+        </FrameLayout>
     </LinearLayout>
 
     <!-- 右侧：平板聊天容器（手机隐藏；点好友后在右侧打开聊天，左栏保留好友列表） -->

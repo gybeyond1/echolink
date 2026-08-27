@@ -90,6 +90,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
         }
 
         setupWideMode()
+        binding.fabAdd.setOnClickListener { showFabMenu() }
         load()
     }
 
@@ -106,8 +107,6 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
 
     override fun onResume() {
         super.onResume()
-        // 好友列表页显示全局 FAB
-        (activity as? MainActivity)?.setFabVisible(true)
         requireActivity().registerReceiver(
             friendsReceiver,
             IntentFilter("com.echolink.FRIENDS_CHANGED"),
