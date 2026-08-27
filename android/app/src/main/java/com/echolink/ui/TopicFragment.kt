@@ -93,9 +93,7 @@ class TopicFragment : Fragment() {
     private var recordStartTime = 0L
     private var recordHandler: Handler? = null
     private var recordStartY = 0f
-    private var recordStartX = 0f
     private var isCancelSwipe = false
-    private var isToTextSwipe = false
     private val waveViews = mutableListOf<View>()
 
     private val topicReceiver = object : BroadcastReceiver() {
@@ -323,37 +321,29 @@ class TopicFragment : Fragment() {
         binding.btnHoldTalk.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    recordStartX = event.rawX
                     recordStartY = event.rawY
                     isCancelSwipe = false
-                    isToTextSwipe = false
                     ensureRecordPermission()
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = event.rawX - recordStartX
                     val dy = event.rawY - recordStartY
                     // 上滑超过 100dp → 取消
-                    if (dy < -dp(100) && !isToTextSwipe) {
-                        isCancelSwipe = true
-                        updateRecordStatus("松开 取消")
-                    }
-                    // 右滑超过 150dp → 转文字
-                    else if (dx > dp(150)) {
-                        isToTextSwipe = true
-                        isCancelSwipe = false
-                        updateRecordStatus("松开 转文字")
-                    } else if (!isCancelSwipe && !isToTextSwipe) {
-                        updateRecordStatus("松开 发送")
+                    if (dy < -dp(100)) {
+                        if (!isCancelSwipe) {
+                            isCancelSwipe = true
+                            updateRecordStatus("松开取消")
+                        }
+                    } else {
+                        if (isCancelSwipe) {
+                            isCancelSwipe = false
+                            updateRecordStatus("松开发送")
+                        }
                     }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    when {
-                        isCancelSwipe -> cancelRecording()
-                        isToTextSwipe -> stopRecordingToText()
-                        else -> stopRecordingAndSend()
-                    }
+                    if (isCancelSwipe) cancelRecording() else stopRecordingAndSend()
                     true
                 }
                 else -> false
@@ -1344,55 +1334,6 @@ class TopicFragment : Fragment() {
         Toast.makeText(requireContext(), "已取消", Toast.LENGTH_SHORT).show()
     }
 
-    private fun stopRecordingToText() {
-        val rec = mediaRecorder ?: return
-        val file = voiceFile ?: return
-        try { rec.stop() } catch (_: Exception) {}
-        releaseRecorder()
-        stopRecordUpdates()
-        dismissRecordDialog()
-        // 用系统 SpeechRecognizer 转文字（免费，依赖系统语音识别服务）
-        try {
-            val sr = android.speech.SpeechRecognizer.createSpeechRecognizer(requireContext())
-            val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "zh-CN")
-            }
-            sr.setRecognitionListener(object : android.speech.RecognitionListener {
-                override fun onResults(results: android.os.Bundle?) {
-                    val text = results?.getStringArrayList(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-                    if (!text.isNullOrEmpty()) {
-                        binding.etInput.setText(text)
-                        binding.etInput.setSelection(text.length)
-                    } else {
-                        Toast.makeText(requireContext(), "未识别到文字", Toast.LENGTH_SHORT).show()
-                    }
-                    file.delete()
-                }
-                override fun onError(error: Int) {
-                    Toast.makeText(requireContext(), "语音识别失败", Toast.LENGTH_SHORT).show()
-                    file.delete()
-                }
-                override fun onReadyForSpeech(params: android.os.Bundle?) {}
-                override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {}
-                override fun onPartialResults(partialResults: android.os.Bundle?) {}
-                override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
-            })
-            sr.startListening(intent)
-            // 把录音文件喂给识别器（系统 SpeechRecognizer 通常直接听麦克风，这里简化处理：直接发送原语音）
-            // 实际转文字需要先播放录音让麦克风拾取，或者用文件识别 API。这里 fallback 直接发语音。
-            Toast.makeText(requireContext(), "正在转文字…", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            // 不支持语音识别，直接发语音
-            val topic = currentTopic ?: return
-            val duration = ((System.currentTimeMillis() - recordStartTime) / 1000).toInt()
-            sendMediaSmart(topic, file, "voice", "语音消息", duration)
-        }
-    }
-
     private fun releaseRecorder() {
         try { mediaRecorder?.release() } catch (_: Exception) {}
         mediaRecorder = null
@@ -1406,9 +1347,9 @@ class TopicFragment : Fragment() {
         val view = layoutInflater.inflate(R.layout.dialog_voice_record, null)
         dialog.setContentView(view)
         dialog.setCancelable(false)
-        // 收集声波 View
+        // 收集声波 View（9 个柱）
         waveViews.clear()
-        for (i in 0..19) {
+        for (i in 0..8) {
             val id = ctx.resources.getIdentifier("wave$i", "id", ctx.packageName)
             view.findViewById<View>(id)?.let { waveViews.add(it) }
         }
