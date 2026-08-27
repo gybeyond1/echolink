@@ -300,6 +300,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Multi-window 拖窗口时手动切布局，避免 Activity 重建导致 Fragment 状态恢复崩溃 */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val currentFragment = supportFragmentManager.findFragmentById(binding.fragmentContainer.id)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        binding.root.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, R.color.background))
+        if (isTablet) {
+            setupDrawer()
+        } else {
+            binding.bottomNav?.background = null
+            setupBottomNav()
+        }
+        if (currentFragment != null) {
+            supportFragmentManager
+                .beginTransaction()
+                .replace(binding.fragmentContainer.id, currentFragment)
+                .commit()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         try { unregisterReceiver(notificationReceiver) } catch (_: Exception) {}
