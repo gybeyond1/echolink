@@ -80,7 +80,7 @@ class ZoomableImageView @JvmOverloads constructor(
                 parent?.requestDisallowInterceptTouchEvent(currentScale > 1.01f)
             }
             MotionEvent.ACTION_MOVE -> {
-                if (currentScale > 1.01f && scaleDetector.pointerCount <= 1) {
+                if (currentScale > 1.01f && event.pointerCount <= 1) {
                     val dx = event.x - lastX
                     val dy = event.y - lastY
                     matrix.postTranslate(dx, dy)
