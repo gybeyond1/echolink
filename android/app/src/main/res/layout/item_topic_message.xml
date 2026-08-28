@@ -90,14 +90,30 @@
             android:layout_marginTop="2dp"
             android:textSize="14sp" />
 
-        <!-- Media area (default hidden, shown by type) -->
-        <ImageView
-            android:id="@+id/ivMedia"
-            android:layout_width="180dp"
-            android:layout_height="180dp"
+        <!-- Media area (image / video thumbnail, default hidden) -->
+        <FrameLayout
+            android:id="@+id/mediaContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:scaleType="centerCrop"
-            android:visibility="gone" />
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/ivMedia"
+                android:layout_width="180dp"
+                android:layout_height="180dp"
+                android:scaleType="centerCrop" />
+
+            <ImageView
+                android:id="@+id/ivPlayOverlay"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="center"
+                android:src="@android:drawable/ic_media_play"
+                android:background="@drawable/bg_circle_avatar"
+                android:padding="9dp"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <LinearLayout
             android:id="@+id/llVoice"

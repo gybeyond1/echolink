@@ -176,6 +176,8 @@ class TopicAdapter(
         val tvTitle: TextView = view.findViewById(R.id.tvTitle)
         val tvText: TextView = view.findViewById(R.id.tvText)
         val ivMedia: ImageView = view.findViewById(R.id.ivMedia)
+        val mediaContainer: android.widget.FrameLayout = view.findViewById(R.id.mediaContainer)
+        val ivPlayOverlay: ImageView = view.findViewById(R.id.ivPlayOverlay)
         val llVoice: View = view.findViewById(R.id.llVoice)
         val tvVoiceDuration: TextView = view.findViewById(R.id.tvVoiceDuration)
         val ivVoiceIcon: ImageView = view.findViewById(R.id.ivVoiceIcon)
@@ -245,8 +247,13 @@ class TopicAdapter(
         private fun openMediaIfHit(item: TopicMessage, ev: MotionEvent) {
             val ctx = itemView.context
             when {
-                ivMedia.visibility == View.VISIBLE && inViewBounds(ivMedia, ev) -> {
-                    onImageClick?.invoke(item)
+                mediaContainer.visibility == View.VISIBLE && inViewBounds(mediaContainer, ev) -> {
+                    if (item.mediaType == "file" && isVideoFile(item.mediaName)) {
+                        // 视频：调用系统播放器
+                        if (!item.mediaUrl.isNullOrEmpty()) openFile(ctx, item)
+                    } else {
+                        onImageClick?.invoke(item)
+                    }
                 }
                 llVoice.visibility == View.VISIBLE && inViewBounds(llVoice, ev) -> {
                     if (!item.mediaUrl.isNullOrEmpty()) {
@@ -360,10 +367,11 @@ class TopicAdapter(
 
         // Media rendering
         val isMedia = item.mediaType != "text" && !item.mediaUrl.isNullOrEmpty()
-        holder.ivMedia.visibility = View.GONE
+        holder.mediaContainer.visibility = View.GONE
+        holder.ivPlayOverlay.visibility = View.GONE
         holder.llVoice.visibility = View.GONE
         holder.llFile.visibility = View.GONE
-        // 统一恢复气泡背景（语音/图片/文字都用 bg_msg_own）
+        // 统一恢复气泡背景（语音/文字用气泡，图片/视频去掉气泡）
         val dpRestore = holder.itemView.context.resources.displayMetrics.density
         holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
         holder.llContent.setPadding((12*dpRestore).toInt(), (7*dpRestore).toInt(), (12*dpRestore).toInt(), (7*dpRestore).toInt())
@@ -371,10 +379,15 @@ class TopicAdapter(
         if (isMedia) {
             when (item.mediaType) {
                 "image" -> {
-                    holder.ivMedia.visibility = View.VISIBLE
+                    holder.mediaContainer.visibility = View.VISIBLE
+                    holder.ivPlayOverlay.visibility = View.GONE
                     val local = P2pManager.localP2pFile(holder.itemView.context, item.mediaUrl)
                     if (local != null) loadLocalImage(local, holder.ivMedia)
                     else loadImage(fullUrl(item.mediaUrl!!), holder.ivMedia)
+                    // 图片去掉气泡包裹
+                    holder.llContent.setBackgroundResource(0)
+                    holder.llContent.setPadding(0, 0, 0, 0)
+                    holder.llContent.elevation = 0f
                 }
                 "voice" -> {
                     holder.llVoice.visibility = View.VISIBLE
@@ -382,18 +395,14 @@ class TopicAdapter(
                     holder.tvVoiceDuration.text = "${dur}\""
                     holder.ivVoiceIcon.setImageResource(R.drawable.ic_voice_3)
                     val isMine = isSelfMessage(item)
-                    // 图标位置：发送方在右，接收方在左
                     holder.llVoice.layoutDirection = if (isMine) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
-                    // 图标方向：发送方信号朝右（不翻转），接收方信号朝左（翻转）
                     holder.ivVoiceIcon.scaleX = if (isMine) 1f else -1f
-                    // 语音条长度：5秒一档，最短90dp，每档+25dp，最大240dp
                     val dp = holder.itemView.context.resources.displayMetrics.density
                     val steps = ((dur - 1) / 5).coerceIn(0, 6)
                     val widthDp = 90 + steps * 25
                     val lp = holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams
                     lp.width = (widthDp * dp).toInt()
                     holder.llVoice.layoutParams = lp
-                    // 语音气泡与文字消息气泡一致（bg_msg_own），语音条不设独立背景
                     holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
                     holder.llContent.elevation = 1.5f * dp
                     val ctx = holder.itemView.context
@@ -401,9 +410,19 @@ class TopicAdapter(
                     holder.ivVoiceIcon.setColorFilter(ctx.getColor(R.color.on_surface))
                 }
                 "file" -> {
-                    holder.llFile.visibility = View.VISIBLE
-                    val suffix = if (item.mediaUrl?.startsWith("p2p:") == true) " · P2P直传" else ""
-                    holder.tvFile.text = "\uD83D\uDCC4 ${item.mediaName ?: "文件"}  (${formatSize(item.mediaSize)})$suffix"
+                    if (isVideoFile(item.mediaName)) {
+                        // 视频：显示缩略图 + 播放按钮，去掉气泡
+                        holder.mediaContainer.visibility = View.VISIBLE
+                        holder.ivPlayOverlay.visibility = View.VISIBLE
+                        loadVideoThumbnail(item, holder.ivMedia)
+                        holder.llContent.setBackgroundResource(0)
+                        holder.llContent.setPadding(0, 0, 0, 0)
+                        holder.llContent.elevation = 0f
+                    } else {
+                        holder.llFile.visibility = View.VISIBLE
+                        val suffix = if (item.mediaUrl?.startsWith("p2p:") == true) " · P2P直传" else ""
+                        holder.tvFile.text = "\uD83D\uDCC4 ${item.mediaName ?: "文件"}  (${formatSize(item.mediaSize)})$suffix"
+                    }
                 }
             }
         }
@@ -466,7 +485,7 @@ class TopicAdapter(
         holder.llSenderInfo.gravity = g
         holder.tvTitle.gravity = g
         holder.tvText.gravity = g
-        (holder.ivMedia.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
+        (holder.mediaContainer.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
         (holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
         (holder.llFile.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
 
@@ -590,6 +609,38 @@ class TopicAdapter(
                 // 半截损坏的缓存文件清掉，下次重新下载
                 try { cache.delete() } catch (_: Exception) {}
             }
+        }
+    }
+
+    /** 判断文件名是否为视频 */
+    private fun isVideoFile(name: String?): Boolean {
+        if (name == null) return false
+        val lower = name.lowercase()
+        return lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".avi")
+            || lower.endsWith(".mkv") || lower.endsWith(".webm") || lower.endsWith(".flv")
+            || lower.endsWith(".wmv") || lower.endsWith(".m4v") || lower.endsWith(".3gp")
+    }
+
+    /** 加载视频缩略图：本地文件用 MediaMetadataRetriever 取第一帧，远程 URL 也尝试取帧 */
+    private fun loadVideoThumbnail(item: TopicMessage, iv: ImageView) {
+        iv.setImageBitmap(null)
+        scope.launch {
+            val bmp = withContext(Dispatchers.IO) {
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    val local = P2pManager.localP2pFile(iv.context, item.mediaUrl!!)
+                    if (local != null) {
+                        retriever.setDataSource(local.absolutePath)
+                    } else {
+                        retriever.setDataSource(fullUrl(item.mediaUrl!!), HashMap<String, String>())
+                    }
+                    val frame = retriever.frameAtTime
+                    retriever.release()
+                    frame
+                } catch (_: Exception) { null }
+            }
+            if (bmp != null) iv.setImageBitmap(bmp)
+            else iv.setBackgroundColor(0xFF2a2d35.toInt())
         }
     }
 
