@@ -363,6 +363,11 @@ class TopicAdapter(
         // 15分钟时间轴：与上一条消息间隔超过15分钟才显示时间
         val showTime = position == 0 || (item.timestamp - items[position - 1].timestamp) > 15 * 60 * 1000
         holder.tvTime.visibility = if (showTime) View.VISIBLE else View.GONE
+        // 留言板消息上下间距增大，避免连续消息挤在一起
+        val rootLp = holder.itemView.layoutParams as androidx.recyclerview.widget.RecyclerView.LayoutParams
+        rootLp.topMargin = if (isMessageWall) (6 * holder.itemView.context.resources.displayMetrics.density).toInt() else 0
+        rootLp.bottomMargin = if (isMessageWall) (4 * holder.itemView.context.resources.displayMetrics.density).toInt() else 0
+        holder.itemView.layoutParams = rootLp
 
         // Title and text
         // 留言板：title 是访客 ID+联系方式，放到发送人位置单独显示，气泡里只放内容
@@ -517,6 +522,16 @@ class TopicAdapter(
         val lpContent = holder.llContent.layoutParams as android.widget.LinearLayout.LayoutParams
         lpContent.width = ViewGroup.LayoutParams.WRAP_CONTENT
         lpContent.weight = 0f
+        // 气泡与头像之间留 8dp 间距；顶部 2dp 让头像与发送人名字顶部齐平
+        lpContent.topMargin = (2 * dp).toInt()
+        lpContent.bottomMargin = 0
+        if (isMine) {
+            lpContent.marginStart = 0
+            lpContent.marginEnd = (8 * dp).toInt()
+        } else {
+            lpContent.marginStart = (8 * dp).toInt()
+            lpContent.marginEnd = 0
+        }
         holder.llContent.layoutParams = lpContent
 
         val padH = (8 * dp).toInt()
