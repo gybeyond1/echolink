@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 按住说话按钮：默认新拟态凸起，按下凹陷 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <layer-list>
+            <!-- 左上暗影（凹陷） -->
+            <item android:left="3dp" android:top="3dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/neu_shadow_dark" />
+                    <corners android:radius="22dp" />
+                </shape>
+            </item>
+            <!-- 右下高光 -->
+            <item android:right="3dp" android:bottom="3dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/neu_shadow_light" />
+                    <corners android:radius="22dp" />
+                </shape>
+            </item>
+            <!-- 表面 -->
+            <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/neu_base" />
+                    <corners android:radius="22dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <!-- 右下暗影（凸起） -->
+            <item android:left="3dp" android:top="3dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/neu_shadow_dark" />
+                    <corners android:radius="22dp" />
+                </shape>
+            </item>
+            <!-- 左上高光 -->
+            <item android:right="3dp" android:bottom="3dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/neu_shadow_light" />
+                    <corners android:radius="22dp" />
+                </shape>
+            </item>
+            <!-- 表面 -->
+            <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/neu_base" />
+                    <corners android:radius="22dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

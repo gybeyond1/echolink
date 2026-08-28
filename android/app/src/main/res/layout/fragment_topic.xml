@@ -425,10 +425,11 @@
                     android:id="@+id/btnHoldTalk"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="@drawable/bg_input"
+                    android:background="@drawable/bg_hold_talk"
                     android:text="按住 说话"
                     android:textSize="15sp"
-                    android:textColor="?android:attr/textColorPrimary"
+                    android:textStyle="bold"
+                    android:textColor="@color/on_surface"
                     android:visibility="gone" />
             </FrameLayout>
 
