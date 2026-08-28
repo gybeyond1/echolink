@@ -380,10 +380,21 @@ class TopicAdapter(
                 }
                 "voice" -> {
                     holder.llVoice.visibility = View.VISIBLE
-                    holder.tvVoiceDuration.text = if (item.duration > 0) "${item.duration}\"" else "0\""
+                    val dur = item.duration.coerceAtLeast(1)
+                    holder.tvVoiceDuration.text = "${dur}\""
                     holder.ivVoiceIcon.setImageResource(R.drawable.ic_voice_3)
-                    // 图标方向：发送方（右侧）镜像翻转，接收方（左侧）保持原样
-                    holder.ivVoiceIcon.scaleX = if (isSelfMessage(item)) -1f else 1f
+                    val isMine = isSelfMessage(item)
+                    // 图标位置：发送方在右，接收方在左
+                    holder.llVoice.layoutDirection = if (isMine) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+                    // 图标方向：发送方信号朝右（不翻转），接收方信号朝左（翻转）
+                    holder.ivVoiceIcon.scaleX = if (isMine) 1f else -1f
+                    // 语音条长度：5秒一档，最短80dp，每档+25dp，最大220dp
+                    val dp = holder.itemView.context.resources.displayMetrics.density
+                    val steps = ((dur - 1) / 5).coerceIn(0, 6)
+                    val widthDp = 80 + steps * 25
+                    val lp = holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams
+                    lp.width = (widthDp * dp).toInt()
+                    holder.llVoice.layoutParams = lp
                     // 语音消息：去掉外层气泡背景，纯语音条
                     holder.llContent.setBackgroundResource(android.R.color.transparent)
                     holder.llContent.setPadding(0, 0, 0, 0)
