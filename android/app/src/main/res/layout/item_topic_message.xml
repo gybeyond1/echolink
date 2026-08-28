@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Telegram-style chat message: avatar on left, sender name above bubble, content inside bubble.
+<!-- Telegram-style chat message: avatar on left, content on right.
      Consecutive messages from same sender: avatar INVISIBLE, sender row GONE. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -40,21 +40,23 @@
             android:visibility="gone" />
     </FrameLayout>
 
-    <!-- Right column: sender info (above bubble) + bubble -->
+    <!-- Content area -->
     <LinearLayout
+        android:id="@+id/llContent"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:background="@drawable/bg_neumorph"
+        android:padding="10dp">
 
-        <!-- Sender + time row (GONE for consecutive messages) - OUTSIDE bubble -->
+        <!-- Sender + time row (GONE for consecutive messages) -->
         <LinearLayout
             android:id="@+id/llSenderInfo"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="2dp">
+            android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/tvSender"
@@ -73,108 +75,98 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- Bubble content -->
-        <LinearLayout
-            android:id="@+id/llContent"
+        <TextView
+            android:id="@+id/tvTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/bg_neumorph"
-            android:padding="8dp">
+            android:layout_marginTop="2dp"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="14sp" />
+
+        <!-- Media area (image / video thumbnail, default hidden) -->
+        <FrameLayout
+            android:id="@+id/mediaContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/ivMedia"
+                android:layout_width="180dp"
+                android:layout_height="180dp"
+                android:scaleType="centerCrop" />
+
+            <ImageView
+                android:id="@+id/ivPlayOverlay"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="center"
+                android:src="@android:drawable/ic_media_play"
+                android:background="@drawable/bg_circle_avatar"
+                android:padding="9dp"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/llVoice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/ivVoiceIcon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_voice_3"
+                android:scaleType="centerInside" />
+
+            <!-- 弹性占位：把播放标志和时长分到两端 -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <TextView
-                android:id="@+id/tvTitle"
+                android:id="@+id/tvVoiceDuration"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textSize="14sp" />
-
-            <!-- Media area (image / video thumbnail, default hidden) -->
-            <FrameLayout
-                android:id="@+id/mediaContainer"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:visibility="gone">
-
-                <ImageView
-                    android:id="@+id/ivMedia"
-                    android:layout_width="180dp"
-                    android:layout_height="180dp"
-                    android:scaleType="centerCrop" />
-
-                <ImageView
-                    android:id="@+id/ivPlayOverlay"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_gravity="center"
-                    android:src="@android:drawable/ic_media_play"
-                    android:background="@drawable/bg_circle_avatar"
-                    android:padding="9dp"
-                    android:visibility="gone" />
-            </FrameLayout>
-
-            <LinearLayout
-                android:id="@+id/llVoice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp"
-                android:visibility="gone">
-
-                <ImageView
-                    android:id="@+id/ivVoiceIcon"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:src="@drawable/ic_voice_3"
-                    android:scaleType="centerInside" />
-
-                <!-- 弹性占位：把播放标志和时长分到两端 -->
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1" />
-
-                <TextView
-                    android:id="@+id/tvVoiceDuration"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0&quot;"
-                    android:textColor="@color/on_surface"
-                    android:textSize="15sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/llFile"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/bg_role_badge"
-                android:padding="8dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/tvFile"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="📄 文件"
-                    android:textColor="@android:color/white"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
+                android:text="0&quot;"
+                android:textColor="@color/on_surface"
+                android:textSize="15sp" />
         </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/llFile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_role_badge"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvFile"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📄 文件"
+                android:textColor="@android:color/white"
+                android:textSize="14sp" />
+        </LinearLayout>
+
     </LinearLayout>
 
     <!-- 已读回执 + 发送中圈圈：放在气泡外侧 -->
