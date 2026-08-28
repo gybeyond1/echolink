@@ -388,10 +388,10 @@ class TopicAdapter(
                     holder.llVoice.layoutDirection = if (isMine) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
                     // 图标方向：发送方信号朝右（不翻转），接收方信号朝左（翻转）
                     holder.ivVoiceIcon.scaleX = if (isMine) 1f else -1f
-                    // 语音条长度：5秒一档，最短80dp，每档+25dp，最大220dp
+                    // 语音条长度：5秒一档，最短90dp，每档+25dp，最大240dp
                     val dp = holder.itemView.context.resources.displayMetrics.density
                     val steps = ((dur - 1) / 5).coerceIn(0, 6)
-                    val widthDp = 80 + steps * 25
+                    val widthDp = 90 + steps * 25
                     val lp = holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams
                     lp.width = (widthDp * dp).toInt()
                     holder.llVoice.layoutParams = lp

@@ -118,8 +118,13 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_voice_3"
-                android:scaleType="centerInside"
-                android:layout_marginEnd="8dp" />
+                android:scaleType="centerInside" />
+
+            <!-- 弹性占位：把播放标志和时长分到两端 -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <TextView
                 android:id="@+id/tvVoiceDuration"

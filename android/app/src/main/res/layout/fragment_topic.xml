@@ -426,6 +426,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:background="@drawable/bg_hold_talk"
+                    android:stateListAnimator="@null"
                     android:text="按住 说话"
                     android:textSize="15sp"
                     android:textStyle="bold"
