@@ -360,6 +360,9 @@ class TopicAdapter(
             displayName
         }
         holder.tvTime.text = timeFormat.format(Date(item.timestamp))
+        // 15分钟时间轴：与上一条消息间隔超过15分钟才显示时间
+        val showTime = position == 0 || (item.timestamp - items[position - 1].timestamp) > 15 * 60 * 1000
+        holder.tvTime.visibility = if (showTime) View.VISIBLE else View.GONE
 
         // Title and text
         // 留言板：title 是访客 ID+联系方式，放到发送人位置单独显示，气泡里只放内容
@@ -491,6 +494,7 @@ class TopicAdapter(
         }
         val g = if (isMine) Gravity.END else Gravity.START
         root.gravity = g or Gravity.CENTER_VERTICAL
+        holder.llContent.gravity = g or Gravity.CENTER_VERTICAL
         holder.llSenderInfo.gravity = g
         holder.tvTitle.gravity = g
         holder.tvText.gravity = g
