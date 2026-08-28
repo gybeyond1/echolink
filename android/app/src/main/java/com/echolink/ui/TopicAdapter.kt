@@ -382,8 +382,8 @@ class TopicAdapter(
                     holder.llVoice.visibility = View.VISIBLE
                     holder.tvVoiceDuration.text = if (item.duration > 0) "${item.duration}\"" else "0\""
                     holder.ivVoiceIcon.setImageResource(R.drawable.ic_voice_3)
-                    // 接收方（左侧）图标镜像翻转：播放三角朝右，信号在左
-                    holder.ivVoiceIcon.scaleX = if (isSelfMessage(item)) 1f else -1f
+                    // 图标方向：发送方（右侧）镜像翻转，接收方（左侧）保持原样
+                    holder.ivVoiceIcon.scaleX = if (isSelfMessage(item)) -1f else 1f
                     // 语音消息：去掉外层气泡背景，纯语音条
                     holder.llContent.setBackgroundResource(android.R.color.transparent)
                     holder.llContent.setPadding(0, 0, 0, 0)

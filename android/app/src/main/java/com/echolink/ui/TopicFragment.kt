@@ -1198,28 +1198,9 @@ class TopicFragment : Fragment() {
         sendMediaSmart(topic, file, kind, displayName)
     }
 
-    // 媒体发送统一入口：好友私聊（dm）优先 P2P 直连（不占服务器带宽），
-    // 30 秒打洞不成功自动回退 HTTP 上传（服务器中转兜底）；其他会话直接走 HTTP
+    // 媒体发送统一入口：直接走服务器 HTTP 上传（已去掉 P2P 直连，避免打洞等待导致发送慢）
     private fun sendMediaSmart(topic: String, file: File, kind: String, name: String, duration: Int = 0) {
-        if (chatTopic?.kind == "dm" && P2pManager.isReady) {
-            P2pManager.sendFileWithFallback(
-                requireContext(), topic, file, kind, name,
-                onFallback = {
-                    Toast.makeText(requireContext(), "P2P 直连未成功，改走服务器中转", Toast.LENGTH_SHORT).show()
-                    lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name, duration) }
-                },
-                onSuccess = { p2pUrl ->
-                    publish(topic, "", "", kind, p2pUrl, name, file.length(), duration)
-                    try { file.delete() } catch (_: Exception) {}
-                },
-                onError = { msg ->
-                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-                    try { file.delete() } catch (_: Exception) {}
-                }
-            )
-        } else {
-            lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name, duration) }
-        }
+        lifecycleScope.launch { httpUploadAndPublish(topic, file, kind, name, duration) }
     }
 
     // 服务器上传 + 发消息（原路径，P2P 的兜底）
