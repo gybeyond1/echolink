@@ -254,6 +254,7 @@ class TopicFragment : Fragment() {
                 if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
             },
             onImageClick = { msg -> showImagesViewer(msg) },
+            onVideoClick = { msg -> showVideoPlayer(msg) },
             onAvatarClick = { msg -> handleAvatarClick(msg) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -1558,6 +1559,74 @@ class TopicFragment : Fragment() {
         val base = AuthManager.serverUrl.trimEnd('/')
         return if (path.startsWith("http")) path else "$base$path"
     }
+
+    /** 视频消息：APP 内部全屏播放（VideoView + 系统 MediaController） */
+    private fun showVideoPlayer(msg: TopicMessage) {
+        val url = msg.mediaUrl ?: return
+        val ctx = requireContext()
+        val videoPath = if (url.startsWith("p2p:")) {
+            val local = P2pManager.localP2pFile(ctx, url)
+            if (local == null) {
+                Toast.makeText(ctx, "该视频经 P2P 直连传输，未落地本设备", Toast.LENGTH_SHORT).show()
+                return
+            }
+            local.absolutePath
+        } else fullServerUrl(url)
+
+        val dialog = androidx.appcompat.app.AppCompatDialog(ctx)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val root = android.widget.FrameLayout(ctx)
+        root.setBackgroundColor(0xFF000000.toInt())
+
+        val videoView = android.widget.VideoView(ctx)
+        videoView.layoutParams = android.widget.FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        root.addView(videoView)
+
+        // 关闭按钮
+        val btnClose = android.widget.ImageButton(ctx).apply {
+            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setColorFilter(0xFFFFFFFF.toInt())
+            setPadding(dp(12).toInt(), dp(12).toInt(), dp(12).toInt(), dp(12).toInt())
+        }
+        btnClose.layoutParams = android.widget.FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.END }
+        btnClose.setOnClickListener { dialog.dismiss() }
+        root.addView(btnClose)
+
+        dialog.setContentView(root)
+        dialog.show()
+        dialog.window?.apply {
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0xFF000000.toInt()))
+            decorView.setPadding(0, 0, 0, 0)
+            val lp = attributes
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+            lp.height = ViewGroup.LayoutParams.MATCH_PARENT
+            attributes = lp
+        }
+
+        val controller = android.widget.MediaController(ctx)
+        controller.setAnchorView(videoView)
+        videoView.setMediaController(controller)
+        videoView.setVideoPath(videoPath)
+        videoView.setOnPreparedListener { mp ->
+            mp.isLooping = false
+            videoView.start()
+        }
+        videoView.setOnErrorListener { _, _, _ ->
+            Toast.makeText(ctx, "视频播放失败", Toast.LENGTH_SHORT).show()
+            dialog.dismiss()
+            true
+        }
+        dialog.setOnDismissListener {
+            try { videoView.stopPlayback() } catch (_: Exception) {}
+        }
+    }
+
 
     /** 长按保存入口：API 29+ 免权限直存 MediaStore；API ≤28 先查/申请写存储权限 */
     private fun trySaveImage(bmp: android.graphics.Bitmap) {

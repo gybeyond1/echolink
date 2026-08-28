@@ -43,6 +43,7 @@ class TopicAdapter(
     private val onItemLongClick: (TopicMessage) -> Unit,
     private val onItemClick: (TopicMessage) -> Unit,
     private val onImageClick: ((TopicMessage) -> Unit)? = null,
+    private val onVideoClick: ((TopicMessage) -> Unit)? = null,
     private val onAvatarClick: ((TopicMessage) -> Unit)? = null
 ) : RecyclerView.Adapter<TopicAdapter.ViewHolder>() {
 
@@ -249,8 +250,8 @@ class TopicAdapter(
             when {
                 mediaContainer.visibility == View.VISIBLE && inViewBounds(mediaContainer, ev) -> {
                     if (item.mediaType == "file" && isVideoFile(item.mediaName)) {
-                        // 视频：调用系统播放器
-                        if (!item.mediaUrl.isNullOrEmpty()) openFile(ctx, item)
+                        // 视频：APP 内部全屏播放
+                        onVideoClick?.invoke(item)
                     } else {
                         onImageClick?.invoke(item)
                     }
@@ -374,7 +375,7 @@ class TopicAdapter(
         // 统一恢复气泡背景（语音/文字用气泡，图片/视频去掉气泡）
         val dpRestore = holder.itemView.context.resources.displayMetrics.density
         holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
-        holder.llContent.setPadding((12*dpRestore).toInt(), (7*dpRestore).toInt(), (12*dpRestore).toInt(), (7*dpRestore).toInt())
+        holder.llContent.setPadding((10*dpRestore).toInt(), (5*dpRestore).toInt(), (10*dpRestore).toInt(), (5*dpRestore).toInt())
         holder.llContent.elevation = 1.5f * dpRestore
         if (isMedia) {
             when (item.mediaType) {
@@ -398,8 +399,8 @@ class TopicAdapter(
                     holder.llVoice.layoutDirection = if (isMine) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
                     holder.ivVoiceIcon.scaleX = if (isMine) 1f else -1f
                     val dp = holder.itemView.context.resources.displayMetrics.density
-                    val steps = ((dur - 1) / 5).coerceIn(0, 6)
-                    val widthDp = 90 + steps * 25
+                    val steps = ((dur - 1) / 2).coerceIn(0, 10)
+                    val widthDp = 72 + steps * 16
                     val lp = holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams
                     lp.width = (widthDp * dp).toInt()
                     holder.llVoice.layoutParams = lp
@@ -501,8 +502,8 @@ class TopicAdapter(
         lp.weight = 0f
         holder.llContent.layoutParams = lp
 
-        val padH = (12 * dp).toInt()
-        val padV = (7 * dp).toInt()
+        val padH = (10 * dp).toInt()
+        val padV = (5 * dp).toInt()
         holder.llContent.setPadding(padH, padV, padH, padV)
         holder.llContent.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
 
