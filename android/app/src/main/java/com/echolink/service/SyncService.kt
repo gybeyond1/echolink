@@ -71,6 +71,7 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         if (AuthManager.isLoggedIn) {
             WebSocketClient.connect()
         }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // 系统用 START_STICKY 重启 Service 时 intent == null，
