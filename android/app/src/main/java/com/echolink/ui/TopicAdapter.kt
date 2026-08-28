@@ -43,6 +43,7 @@ class TopicAdapter(
     private val onItemLongClick: (TopicMessage) -> Unit,
     private val onItemClick: (TopicMessage) -> Unit,
     private val onImageClick: ((TopicMessage) -> Unit)? = null,
+    private val onVideoClick: ((TopicMessage) -> Unit)? = null,
     private val onAvatarClick: ((TopicMessage) -> Unit)? = null
 ) : RecyclerView.Adapter<TopicAdapter.ViewHolder>() {
 
@@ -250,8 +251,8 @@ class TopicAdapter(
             when {
                 mediaContainer.visibility == View.VISIBLE && inViewBounds(mediaContainer, ev) -> {
                     if (item.mediaType == "file" && isVideoFile(item.mediaName)) {
-                        // 视频：调用系统播放器
-                        if (!item.mediaUrl.isNullOrEmpty()) openFile(ctx, item)
+                        // 视频：APP 内部全屏播放
+                        onVideoClick?.invoke(item)
                     } else {
                         onImageClick?.invoke(item)
                     }
@@ -361,8 +362,15 @@ class TopicAdapter(
         holder.tvTime.text = timeFormat.format(Date(item.timestamp))
 
         // Title and text
-        holder.tvTitle.text = item.title
-        holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
+        // 留言板：title 是访客 ID+联系方式，放到发送人位置单独显示，气泡里只放内容
+        if (isMessageWall && item.title.isNotEmpty()) {
+            holder.tvSender.text = item.title
+            holder.tvTitle.visibility = View.GONE
+            holder.llSenderInfo.visibility = View.VISIBLE
+        } else {
+            holder.tvTitle.text = item.title
+            holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
+        }
         holder.tvText.text = item.text
         holder.tvText.visibility = if (item.text.isNotEmpty()) View.VISIBLE else View.GONE
 
@@ -375,7 +383,7 @@ class TopicAdapter(
         // 统一恢复气泡背景（语音/文字用气泡，图片/视频去掉气泡）
         val dpRestore = holder.itemView.context.resources.displayMetrics.density
         holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
-        holder.bubbleInner.setPadding((12*dpRestore).toInt(), (7*dpRestore).toInt(), (12*dpRestore).toInt(), (7*dpRestore).toInt())
+        holder.bubbleInner.setPadding((8*dpRestore).toInt(), (4*dpRestore).toInt(), (8*dpRestore).toInt(), (4*dpRestore).toInt())
         holder.bubbleInner.elevation = 1.5f * dpRestore
         if (isMedia) {
             when (item.mediaType) {
@@ -399,8 +407,8 @@ class TopicAdapter(
                     holder.llVoice.layoutDirection = if (isMine) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
                     holder.ivVoiceIcon.scaleX = if (isMine) 1f else -1f
                     val dp = holder.itemView.context.resources.displayMetrics.density
-                    val steps = ((dur - 1) / 5).coerceIn(0, 6)
-                    val widthDp = 90 + steps * 25
+                    val steps = ((dur - 1) / 2).coerceIn(0, 10)
+                    val widthDp = 72 + steps * 16
                     val lp = holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams
                     lp.width = (widthDp * dp).toInt()
                     holder.llVoice.layoutParams = lp
@@ -502,8 +510,8 @@ class TopicAdapter(
         lp.weight = 0f
         holder.bubbleInner.layoutParams = lp
 
-        val padH = (12 * dp).toInt()
-        val padV = (7 * dp).toInt()
+        val padH = (8 * dp).toInt()
+        val padV = (4 * dp).toInt()
         holder.bubbleInner.setPadding(padH, padV, padH, padV)
         holder.bubbleInner.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
 
