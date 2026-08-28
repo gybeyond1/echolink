@@ -42,7 +42,7 @@ import java.util.Locale
 class TopicAdapter(
     private val onItemLongClick: (TopicMessage) -> Unit,
     private val onItemClick: (TopicMessage) -> Unit,
-    private val onImageClick: ((String) -> Unit)? = null,
+    private val onImageClick: ((TopicMessage) -> Unit)? = null,
     private val onAvatarClick: ((TopicMessage) -> Unit)? = null
 ) : RecyclerView.Adapter<TopicAdapter.ViewHolder>() {
 
@@ -246,7 +246,7 @@ class TopicAdapter(
             val ctx = itemView.context
             when {
                 ivMedia.visibility == View.VISIBLE && inViewBounds(ivMedia, ev) -> {
-                    if (!item.mediaUrl.isNullOrEmpty()) onImageClick?.invoke(fullUrl(item.mediaUrl))
+                    onImageClick?.invoke(item)
                 }
                 llVoice.visibility == View.VISIBLE && inViewBounds(llVoice, ev) -> {
                     if (!item.mediaUrl.isNullOrEmpty()) {
@@ -543,6 +543,9 @@ class TopicAdapter(
     }
 
     override fun getItemCount(): Int = items.size
+
+    /** 当前会话全部消息（用于全屏查看器收集图片列表） */
+    fun allItems(): List<TopicMessage> = items
 
     private fun fullUrl(path: String): String {
         if (path.startsWith("p2p:")) return path

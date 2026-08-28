@@ -253,7 +253,7 @@ class TopicFragment : Fragment() {
             onItemClick = { msg ->
                 if (chatAdapter.selectionMode) { chatAdapter.toggle(msg); updateSelectionUI() }
             },
-            onImageClick = { url -> showImageFullscreen(url) },
+            onImageClick = { msg -> showImagesViewer(msg) },
             onAvatarClick = { msg -> handleAvatarClick(msg) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -1399,63 +1399,154 @@ class TopicFragment : Fragment() {
 
     // ===== 图片全屏查看 + 长按保存到相册 =====
 
-    private fun showImageFullscreen(url: String) {
+    /** 点击图片：收集当前会话全部图片，打开可缩放的全屏查看器（左右滑切换 + 磁盘缓存） */
+    private fun showImagesViewer(current: TopicMessage) {
+        val images = chatAdapter.allItems()
+            .filter { it.mediaType == "image" && !it.mediaUrl.isNullOrEmpty() }
+        if (images.isEmpty()) return
+        val idx = images.indexOfFirst { it.id == current.id }.coerceAtLeast(0)
+        showImageFullscreen(images, idx)
+    }
+
+    private fun showImageFullscreen(images: List<TopicMessage>, startIndex: Int) {
         val ctx = requireContext()
         val dialog = AlertDialog.Builder(ctx, R.style.Theme_EchoLink_Dialog).create()
         val root = android.widget.FrameLayout(ctx)
         root.setBackgroundColor(0xFF000000.toInt())
 
-        val iv = android.widget.ImageView(ctx)
-        iv.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        iv.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-        iv.setOnClickListener { dialog.dismiss() }
-
-        // 长按保存图片到相册
-        iv.setOnLongClickListener {
-            val bmp = pendingSaveBitmap
-            if (bmp == null) {
-                Toast.makeText(ctx, "图片尚未加载完成，请稍候", Toast.LENGTH_SHORT).show()
-            } else {
-                vibrate()
-                trySaveImage(bmp)
-            }
-            true
+        // 顶部页码指示 + 关闭按钮
+        val topBar = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(16).toInt(), dp(16).toInt(), dp(8).toInt(), dp(8).toInt())
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = android.view.Gravity.TOP }
         }
+        val tvPage = android.widget.TextView(ctx).apply {
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            layoutParams = android.widget.LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val btnClose = android.widget.ImageButton(ctx).apply {
+            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setColorFilter(0xFFFFFFFF.toInt())
+        }
+        btnClose.setOnClickListener { dialog.dismiss() }
+        topBar.addView(tvPage)
+        topBar.addView(btnClose)
+        root.addView(topBar)
 
-        val progress = android.widget.ProgressBar(ctx)
-        progress.layoutParams = android.widget.FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { gravity = android.view.Gravity.CENTER }
-        root.addView(iv)
-        root.addView(progress)
+        // ViewPager2：左右滑动切换图片
+        val pager = androidx.viewpager2.widget.ViewPager2(ctx).apply {
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            orientation = androidx.viewpager2.widget.ViewPager2.ORIENTATION_HORIZONTAL
+            offscreenPageLimit = 1
+        }
+        root.addView(pager, 0)
+
+        val urls = images.map { fullServerUrl(it.mediaUrl!!) }
+        val adapter = object : androidx.recyclerview.widget.RecyclerView.Adapter<ImagePagerHolder>() {
+            override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): ImagePagerHolder {
+                val zoom = ZoomableImageView(parent.context)
+                zoom.layoutParams = android.view.ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                zoom.onTap = { dialog.dismiss() }
+                zoom.onScaleStateChanged = { zoomed -> pager.isUserInputEnabled = !zoomed }
+                zoom.setOnLongClickListener {
+                    val bmp = pendingSaveBitmap
+                    if (bmp == null) {
+                        Toast.makeText(ctx, "图片尚未加载完成，请稍候", Toast.LENGTH_SHORT).show()
+                    } else {
+                        vibrate()
+                        trySaveImage(bmp)
+                    }
+                    true
+                }
+                val holder = ImagePagerHolder(zoom)
+                holder.zoom = zoom
+                return holder
+            }
+
+            override fun onBindViewHolder(h: ImagePagerHolder, position: Int) {
+                h.zoom.reset()
+                loadViewerImage(urls[position], h.zoom) { bmp -> pendingSaveBitmap = bmp }
+                tvPage.text = "${position + 1} / ${urls.size}"
+            }
+
+            override fun getItemCount(): Int = urls.size
+        }
+        pager.adapter = adapter
+        pager.setCurrentItem(startIndex, false)
+        tvPage.text = "${startIndex + 1} / ${urls.size}"
 
         dialog.setView(root)
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
+    }
 
+    private class ImagePagerHolder(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
+        lateinit var zoom: ZoomableImageView
+    }
+
+    /** 全屏查看图片加载：优先磁盘缓存，未命中则下载并写入缓存 */
+    private fun loadViewerImage(url: String, zoom: ZoomableImageView, onLoaded: (android.graphics.Bitmap?) -> Unit) {
         lifecycleScope.launch {
             try {
-                val bmp = if (url.startsWith("p2p:")) {
-                    val local = P2pManager.localP2pFile(ctx, url)
-                    if (local == null) {
-                        Toast.makeText(ctx, "该图片经 P2P 直连传输，未落地本设备", Toast.LENGTH_SHORT).show()
-                        null
-                    } else withContext(Dispatchers.IO) { decodeSampledBitmap(local.absolutePath) }
-                } else downloadSampledBitmap(url)
-                progress.visibility = View.GONE
+                val bmp = withContext(Dispatchers.IO) { loadViewerBitmap(url) }
                 if (bmp != null) {
-                    iv.setImageBitmap(bmp)
-                    pendingSaveBitmap = bmp
-                } else if (dialog.isShowing) {
-                    Toast.makeText(ctx, "图片加载失败", Toast.LENGTH_SHORT).show()
+                    zoom.setImageBitmap(bmp)
+                    onLoaded(bmp)
+                } else {
+                    Toast.makeText(requireContext(), "图片加载失败", Toast.LENGTH_SHORT).show()
                 }
             } catch (_: Exception) {
-                progress.visibility = View.GONE
-                if (dialog.isShowing) Toast.makeText(ctx, "图片加载失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "图片加载失败", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun loadViewerBitmap(url: String): android.graphics.Bitmap? {
+        return try {
+            // 磁盘缓存：cacheDir/viewer_<md5>，加载过一次下次直接命中
+            val md5 = java.security.MessageDigest.getInstance("MD5")
+                .digest(url.toByteArray())
+                .joinToString("") { "%02x".format(it) }
+            val cache = java.io.File(requireContext().cacheDir, "viewer_$md5")
+            if (cache.exists() && cache.length() > 0) {
+                decodeSampledBitmap(cache.absolutePath)?.let { return it }
+            }
+            val bytes = if (url.startsWith("p2p:")) {
+                val local = P2pManager.localP2pFile(requireContext(), url)
+                if (local == null) {
+                    Toast.makeText(requireContext(), "该图片经 P2P 直连传输，未落地本设备", Toast.LENGTH_SHORT).show()
+                    return null
+                }
+                local.readBytes()
+            } else {
+                val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 10000
+                    readTimeout = 15000
+                    doInput = true
+                }
+                conn.inputStream.use { it.readBytes() }
+            }
+            cache.writeBytes(bytes)
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let {
+                // 全屏图：采样到合理尺寸避免 OOM
+                decodeSampledBitmap(cache.absolutePath)
+            }
+        } catch (_: Exception) { null }
+    }
+
+    /** 服务器相对路径 → 完整 URL */
+    private fun fullServerUrl(path: String): String {
+        if (path.startsWith("p2p:")) return path
+        val base = AuthManager.serverUrl.trimEnd('/')
+        return if (path.startsWith("http")) path else "$base$path"
     }
 
     /** 长按保存入口：API 29+ 免权限直存 MediaStore；API ≤28 先查/申请写存储权限 */
