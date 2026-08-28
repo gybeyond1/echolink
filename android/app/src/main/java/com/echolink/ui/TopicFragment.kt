@@ -1410,7 +1410,9 @@ class TopicFragment : Fragment() {
 
     private fun showImageFullscreen(images: List<TopicMessage>, startIndex: Int) {
         val ctx = requireContext()
-        val dialog = AlertDialog.Builder(ctx, R.style.Theme_EchoLink_Dialog).create()
+        // 用 AppCompatDialog 而非 AlertDialog：AlertDialog 自带 content padding，无法真正全屏
+        val dialog = androidx.appcompat.app.AppCompatDialog(ctx)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         val root = android.widget.FrameLayout(ctx)
         root.setBackgroundColor(0xFF000000.toInt())
 
@@ -1482,10 +1484,18 @@ class TopicFragment : Fragment() {
         pager.setCurrentItem(startIndex, false)
         tvPage.text = "${startIndex + 1} / ${urls.size}"
 
-        dialog.setView(root)
-        dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.setContentView(root)
         dialog.show()
+        // 真正全屏：清除 window 装饰 padding，铺满整个屏幕
+        dialog.window?.apply {
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0xFF000000.toInt()))
+            decorView.setPadding(0, 0, 0, 0)
+            val lp = attributes
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+            lp.height = ViewGroup.LayoutParams.MATCH_PARENT
+            attributes = lp
+        }
     }
 
     private class ImagePagerHolder(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
