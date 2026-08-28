@@ -70,7 +70,6 @@ class SettingsFragment : Fragment() {
     }
 
     companion object {
-        private const val REQ_SMS_PERMISSION = 1001
         private const val REQ_PICK_AVATAR = 1002
         private const val PROJECT_URL = "https://github.com/gybeyond1/echolink"
         private const val DONATE_URL = "wxp://f2f0gpIJomgrTKj2sOG8gc64wSBei7Z5YVgXgYNcDSZTzZpfpK3RX9ZC8fn2SW5LNCeT"
@@ -147,9 +146,6 @@ class SettingsFragment : Fragment() {
 
         // 通知监听权限状态
         updatePermissionStatus()
-
-        // 短信验证码自动提取
-        setupSmsCapture()
 
         // 通知监听权限按钮
         binding.btnNotificationPermission.setOnClickListener {
@@ -478,71 +474,7 @@ class SettingsFragment : Fragment() {
             .showDimmed()
     }
 
-    // ===== 短信验证码自动提取 =====
-
-    private fun setupSmsCapture() {
-        binding.swSmsCapture.isChecked = AuthManager.smsCaptureEnabled
-        binding.swSmsCapture.setOnCheckedChangeListener { _, isChecked ->
-            AuthManager.smsCaptureEnabled = isChecked
-            if (isChecked && !hasSmsPermission()) {
-                Toast.makeText(requireContext(), "请先授权读取短信", Toast.LENGTH_SHORT).show()
-            }
-            SyncService.start(requireContext())
-        }
-        binding.btnSmsPermission.setOnClickListener {
-            if (hasSmsPermission()) {
-                Toast.makeText(requireContext(), "已拥有读取短信权限", Toast.LENGTH_SHORT).show()
-            } else {
-                requestSmsPermission()
-            }
-        }
-        updateSmsStatus()
-    }
-
-    private fun hasSmsPermission(): Boolean =
-        ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_SMS) ==
-            PackageManager.PERMISSION_GRANTED &&
-        ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECEIVE_SMS) ==
-            PackageManager.PERMISSION_GRANTED
-
-    private fun requestSmsPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            requestPermissions(
-                arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS),
-                REQ_SMS_PERMISSION
-            )
-        } else {
-            Toast.makeText(requireContext(), "当前系统版本无需额外授权", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQ_SMS_PERMISSION) {
-            val granted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-            if (granted) {
-                AuthManager.smsCaptureEnabled = true
-                binding.swSmsCapture.isChecked = true
-                SyncService.start(requireContext())
-                Toast.makeText(requireContext(), "已授权，验证码将自动复制到剪贴板", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(requireContext(), "未授权读取短信", Toast.LENGTH_SHORT).show()
-            }
-            updateSmsStatus()
-        }
-    }
-
-    private fun updateSmsStatus() {
-        val granted = hasSmsPermission()
-        binding.tvSmsStatus.text = if (granted) "已授权" else "未授权"
-        binding.tvSmsStatus.setTextColor(
-            requireContext().getColor(if (granted) R.color.ok else R.color.danger)
-        )
-    }
+    // ===== 权限状态 =====
 
     override fun onResume() {
         super.onResume()
@@ -552,7 +484,6 @@ class SettingsFragment : Fragment() {
             Context.RECEIVER_NOT_EXPORTED
         )
         updatePermissionStatus()
-        updateSmsStatus()
     }
 
     override fun onPause() {
