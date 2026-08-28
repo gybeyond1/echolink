@@ -170,6 +170,7 @@ class TopicAdapter(
         val tvAvatar: TextView = view.findViewById(R.id.tvAvatar)
         val ivAvatar: ImageView = view.findViewById(R.id.ivAvatar)
         val llContent: View = view.findViewById(R.id.llContent)
+        val bubbleInner: View = view.findViewById(R.id.bubbleInner)
         val llSenderInfo: android.widget.LinearLayout = view.findViewById(R.id.llSenderInfo)
         val tvSender: TextView = view.findViewById(R.id.tvSender)
         val tvTime: TextView = view.findViewById(R.id.tvTime)
@@ -373,9 +374,9 @@ class TopicAdapter(
         holder.llFile.visibility = View.GONE
         // 统一恢复气泡背景（语音/文字用气泡，图片/视频去掉气泡）
         val dpRestore = holder.itemView.context.resources.displayMetrics.density
-        holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
-        holder.llContent.setPadding((12*dpRestore).toInt(), (7*dpRestore).toInt(), (12*dpRestore).toInt(), (7*dpRestore).toInt())
-        holder.llContent.elevation = 1.5f * dpRestore
+        holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
+        holder.bubbleInner.setPadding((12*dpRestore).toInt(), (7*dpRestore).toInt(), (12*dpRestore).toInt(), (7*dpRestore).toInt())
+        holder.bubbleInner.elevation = 1.5f * dpRestore
         if (isMedia) {
             when (item.mediaType) {
                 "image" -> {
@@ -385,9 +386,9 @@ class TopicAdapter(
                     if (local != null) loadLocalImage(local, holder.ivMedia)
                     else loadImage(fullUrl(item.mediaUrl!!), holder.ivMedia)
                     // 图片去掉气泡包裹
-                    holder.llContent.setBackgroundResource(0)
-                    holder.llContent.setPadding(0, 0, 0, 0)
-                    holder.llContent.elevation = 0f
+                    holder.bubbleInner.setBackgroundResource(0)
+                    holder.bubbleInner.setPadding(0, 0, 0, 0)
+                    holder.bubbleInner.elevation = 0f
                 }
                 "voice" -> {
                     holder.llVoice.visibility = View.VISIBLE
@@ -403,8 +404,8 @@ class TopicAdapter(
                     val lp = holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams
                     lp.width = (widthDp * dp).toInt()
                     holder.llVoice.layoutParams = lp
-                    holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
-                    holder.llContent.elevation = 1.5f * dp
+                    holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
+                    holder.bubbleInner.elevation = 1.5f * dp
                     val ctx = holder.itemView.context
                     holder.tvVoiceDuration.setTextColor(ctx.getColor(R.color.on_surface))
                     holder.ivVoiceIcon.setColorFilter(ctx.getColor(R.color.on_surface))
@@ -415,9 +416,9 @@ class TopicAdapter(
                         holder.mediaContainer.visibility = View.VISIBLE
                         holder.ivPlayOverlay.visibility = View.VISIBLE
                         loadVideoThumbnail(item, holder.ivMedia)
-                        holder.llContent.setBackgroundResource(0)
-                        holder.llContent.setPadding(0, 0, 0, 0)
-                        holder.llContent.elevation = 0f
+                        holder.bubbleInner.setBackgroundResource(0)
+                        holder.bubbleInner.setPadding(0, 0, 0, 0)
+                        holder.bubbleInner.elevation = 0f
                     } else {
                         holder.llFile.visibility = View.VISIBLE
                         val suffix = if (item.mediaUrl?.startsWith("p2p:") == true) " · P2P直传" else ""
@@ -496,26 +497,26 @@ class TopicAdapter(
         val maxW = (ctx.resources.displayMetrics.widthPixels * 0.72f).toInt()
         holder.tvTitle.maxWidth = maxW
         holder.tvText.maxWidth = maxW
-        val lp = holder.llContent.layoutParams as android.widget.LinearLayout.LayoutParams
+        val lp = holder.bubbleInner.layoutParams as android.widget.LinearLayout.LayoutParams
         lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
         lp.weight = 0f
-        holder.llContent.layoutParams = lp
+        holder.bubbleInner.layoutParams = lp
 
         val padH = (12 * dp).toInt()
         val padV = (7 * dp).toInt()
-        holder.llContent.setPadding(padH, padV, padH, padV)
-        holder.llContent.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
+        holder.bubbleInner.setPadding(padH, padV, padH, padV)
+        holder.bubbleInner.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
 
         if (isMine) {
             // Telegram 风：绿色气泡 + 深色正文 + 淡绿时间
-            holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
+            holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
             holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvText.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvSender.setTextColor(ctx.getColor(R.color.on_surface_variant))
             holder.tvTime.setTextColor(ctx.getColor(R.color.bubble_own_time))
         } else {
             // 对方气泡与自己一致（统一绿色气泡风格）
-            holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
+            holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
             holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvText.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvSender.setTextColor(ctx.getColor(R.color.on_surface_variant))
