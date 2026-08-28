@@ -170,7 +170,7 @@ class TopicAdapter(
         val avatarContainer: View = view.findViewById(R.id.avatarContainer)
         val tvAvatar: TextView = view.findViewById(R.id.tvAvatar)
         val ivAvatar: ImageView = view.findViewById(R.id.ivAvatar)
-        val llContent: View = view.findViewById(R.id.llContent)
+        val llContent: android.widget.LinearLayout = view.findViewById(R.id.llContent)
         val bubbleInner: View = view.findViewById(R.id.bubbleInner)
         val llSenderInfo: android.widget.LinearLayout = view.findViewById(R.id.llSenderInfo)
         val tvSender: TextView = view.findViewById(R.id.tvSender)
