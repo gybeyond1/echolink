@@ -43,7 +43,6 @@ class TopicAdapter(
     private val onItemLongClick: (TopicMessage) -> Unit,
     private val onItemClick: (TopicMessage) -> Unit,
     private val onImageClick: ((TopicMessage) -> Unit)? = null,
-    private val onVideoClick: ((TopicMessage) -> Unit)? = null,
     private val onAvatarClick: ((TopicMessage) -> Unit)? = null
 ) : RecyclerView.Adapter<TopicAdapter.ViewHolder>() {
 
@@ -250,8 +249,8 @@ class TopicAdapter(
             when {
                 mediaContainer.visibility == View.VISIBLE && inViewBounds(mediaContainer, ev) -> {
                     if (item.mediaType == "file" && isVideoFile(item.mediaName)) {
-                        // 视频：APP 内部全屏播放
-                        onVideoClick?.invoke(item)
+                        // 视频：调用系统播放器
+                        if (!item.mediaUrl.isNullOrEmpty()) openFile(ctx, item)
                     } else {
                         onImageClick?.invoke(item)
                     }
@@ -361,20 +360,8 @@ class TopicAdapter(
         holder.tvTime.text = timeFormat.format(Date(item.timestamp))
 
         // Title and text
-        // 留言板/访客消息：title 形如「gy (138xxxx)」，移到气泡上方发送人位置，气泡里只放内容
-        // 留言板访客消息 title 形如「gy（138xxxx）」；普通消息 title 为空，故无需判断是否自己发的
-        val hasContactTitle = item.title.isNotEmpty() &&
-            (item.title.contains("(") || item.title.contains("（")) &&
-            (item.title.contains(")") || item.title.contains("）"))
-        if (hasContactTitle) {
-            holder.tvSender.text = item.title
-            holder.tvTitle.visibility = View.GONE
-            holder.llSenderInfo.visibility = View.VISIBLE
-            holder.avatarContainer.visibility = View.VISIBLE
-        } else {
-            holder.tvTitle.text = item.title
-            holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
-        }
+        holder.tvTitle.text = item.title
+        holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
         holder.tvText.text = item.text
         holder.tvText.visibility = if (item.text.isNotEmpty()) View.VISIBLE else View.GONE
 
@@ -387,7 +374,7 @@ class TopicAdapter(
         // 统一恢复气泡背景（语音/文字用气泡，图片/视频去掉气泡）
         val dpRestore = holder.itemView.context.resources.displayMetrics.density
         holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
-        holder.llContent.setPadding((6*dpRestore).toInt(), (3*dpRestore).toInt(), (6*dpRestore).toInt(), (3*dpRestore).toInt())
+        holder.llContent.setPadding((12*dpRestore).toInt(), (7*dpRestore).toInt(), (12*dpRestore).toInt(), (7*dpRestore).toInt())
         holder.llContent.elevation = 1.5f * dpRestore
         if (isMedia) {
             when (item.mediaType) {
@@ -411,8 +398,8 @@ class TopicAdapter(
                     holder.llVoice.layoutDirection = if (isMine) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
                     holder.ivVoiceIcon.scaleX = if (isMine) 1f else -1f
                     val dp = holder.itemView.context.resources.displayMetrics.density
-                    val steps = ((dur - 1) / 2).coerceIn(0, 10)
-                    val widthDp = 72 + steps * 16
+                    val steps = ((dur - 1) / 5).coerceIn(0, 6)
+                    val widthDp = 90 + steps * 25
                     val lp = holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams
                     lp.width = (widthDp * dp).toInt()
                     holder.llVoice.layoutParams = lp
@@ -514,8 +501,8 @@ class TopicAdapter(
         lp.weight = 0f
         holder.llContent.layoutParams = lp
 
-        val padH = (6 * dp).toInt()
-        val padV = (3 * dp).toInt()
+        val padH = (12 * dp).toInt()
+        val padV = (7 * dp).toInt()
         holder.llContent.setPadding(padH, padV, padH, padV)
         holder.llContent.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
 
