@@ -361,8 +361,15 @@ class TopicAdapter(
         holder.tvTime.text = timeFormat.format(Date(item.timestamp))
 
         // Title and text
-        holder.tvTitle.text = item.title
-        holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
+        // 留言板：title 是访客 ID+联系方式，放到发送人位置单独显示，气泡里只放内容
+        if (isMessageWall && item.title.isNotEmpty()) {
+            holder.tvSender.text = item.title
+            holder.tvTitle.visibility = View.GONE
+            holder.llSenderInfo.visibility = View.VISIBLE
+        } else {
+            holder.tvTitle.text = item.title
+            holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
+        }
         holder.tvText.text = item.text
         holder.tvText.visibility = if (item.text.isNotEmpty()) View.VISIBLE else View.GONE
 
@@ -375,7 +382,7 @@ class TopicAdapter(
         // 统一恢复气泡背景（语音/文字用气泡，图片/视频去掉气泡）
         val dpRestore = holder.itemView.context.resources.displayMetrics.density
         holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
-        holder.llContent.setPadding((10*dpRestore).toInt(), (5*dpRestore).toInt(), (10*dpRestore).toInt(), (5*dpRestore).toInt())
+        holder.llContent.setPadding((8*dpRestore).toInt(), (4*dpRestore).toInt(), (8*dpRestore).toInt(), (4*dpRestore).toInt())
         holder.llContent.elevation = 1.5f * dpRestore
         if (isMedia) {
             when (item.mediaType) {
@@ -502,8 +509,8 @@ class TopicAdapter(
         lp.weight = 0f
         holder.llContent.layoutParams = lp
 
-        val padH = (10 * dp).toInt()
-        val padV = (5 * dp).toInt()
+        val padH = (8 * dp).toInt()
+        val padV = (4 * dp).toInt()
         holder.llContent.setPadding(padH, padV, padH, padV)
         holder.llContent.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
 

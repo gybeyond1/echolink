@@ -1560,7 +1560,7 @@ class TopicFragment : Fragment() {
         return if (path.startsWith("http")) path else "$base$path"
     }
 
-    /** 视频消息：APP 内部全屏播放（VideoView + 系统 MediaController） */
+    /** 视频消息：APP 内部全屏播放（自定义控制栏，支持拖动进度） */
     private fun showVideoPlayer(msg: TopicMessage) {
         val url = msg.mediaUrl ?: return
         val ctx = requireContext()
@@ -1578,10 +1578,19 @@ class TopicFragment : Fragment() {
         val root = android.widget.FrameLayout(ctx)
         root.setBackgroundColor(0xFF000000.toInt())
 
+        // 加载指示器
+        val progress = android.widget.ProgressBar(ctx).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = android.view.Gravity.CENTER }
+        }
+        root.addView(progress)
+
+        // VideoView 居中
         val videoView = android.widget.VideoView(ctx)
         videoView.layoutParams = android.widget.FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-        )
+        ).apply { gravity = android.view.Gravity.CENTER }
         root.addView(videoView)
 
         // 关闭按钮
@@ -1589,13 +1598,42 @@ class TopicFragment : Fragment() {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             setColorFilter(0xFFFFFFFF.toInt())
-            setPadding(dp(12).toInt(), dp(12).toInt(), dp(12).toInt(), dp(12).toInt())
+            setPadding(dp(14).toInt(), dp(14).toInt(), dp(14).toInt(), dp(14).toInt())
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.END }
         }
-        btnClose.layoutParams = android.widget.FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.END }
-        btnClose.setOnClickListener { dialog.dismiss() }
         root.addView(btnClose)
+
+        // 底部控制栏
+        val controlBar = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setBackgroundColor(0x99000000.toInt())
+            setPadding(dp(14).toInt(), dp(8).toInt(), dp(14).toInt(), dp(8).toInt())
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = android.view.Gravity.BOTTOM }
+        }
+        val btnPlay = android.widget.ImageButton(ctx).apply {
+            setImageResource(android.R.drawable.ic_media_pause)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setColorFilter(0xFFFFFFFF.toInt())
+            setPadding(dp(6).toInt(), dp(6).toInt(), dp(6).toInt(), dp(6).toInt())
+        }
+        val tvTime = android.widget.TextView(ctx).apply {
+            text = "0:00 / 0:00"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 12f
+            setPadding(dp(10).toInt(), 0, dp(10).toInt(), 0)
+        }
+        val seekBar = android.widget.SeekBar(ctx).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        controlBar.addView(btnPlay)
+        controlBar.addView(seekBar)
+        controlBar.addView(tvTime)
+        root.addView(controlBar)
 
         dialog.setContentView(root)
         dialog.show()
@@ -1609,24 +1647,83 @@ class TopicFragment : Fragment() {
             attributes = lp
         }
 
-        val controller = android.widget.MediaController(ctx)
-        controller.setAnchorView(videoView)
-        videoView.setMediaController(controller)
-        videoView.setVideoPath(videoPath)
-        videoView.setOnPreparedListener { mp ->
-            mp.isLooping = false
+        var duration = 0
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        fun formatTime(ms: Int): String {
+            val s = ms / 1000
+            return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
+        }
+        val updateRunnable = object : Runnable {
+            override fun run() {
+                if (videoView.isPlaying) {
+                    val pos = videoView.currentPosition
+                    seekBar.progress = pos
+                    tvTime.text = formatTime(pos) + " / " + formatTime(duration)
+                }
+                handler.postDelayed(this, 500)
+            }
+        }
+
+        videoView.setOnPreparedListener {
+            duration = videoView.duration
+            seekBar.max = duration
+            progress.visibility = View.GONE
             videoView.start()
+            btnPlay.setImageResource(android.R.drawable.ic_media_pause)
+            handler.post(updateRunnable)
+        }
+        videoView.setOnCompletionListener {
+            btnPlay.setImageResource(android.R.drawable.ic_media_play)
+            seekBar.progress = duration
+            handler.removeCallbacks(updateRunnable)
         }
         videoView.setOnErrorListener { _, _, _ ->
+            progress.visibility = View.GONE
             Toast.makeText(ctx, "视频播放失败", Toast.LENGTH_SHORT).show()
             dialog.dismiss()
             true
         }
+
+        btnPlay.setOnClickListener {
+            if (videoView.isPlaying) {
+                videoView.pause()
+                btnPlay.setImageResource(android.R.drawable.ic_media_play)
+            } else {
+                if (videoView.currentPosition >= duration && duration > 0) videoView.seekTo(0)
+                videoView.start()
+                btnPlay.setImageResource(android.R.drawable.ic_media_pause)
+                handler.post(updateRunnable)
+            }
+        }
+
+        seekBar.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: android.widget.SeekBar?, value: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    videoView.seekTo(value)
+                    tvTime.text = formatTime(value) + " / " + formatTime(duration)
+                }
+            }
+            override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {}
+        })
+
+        btnClose.setOnClickListener { dialog.dismiss() }
+
+        // 点屏幕任意位置切换控制栏显示
+        var controlsVisible = true
+        root.setOnClickListener {
+            controlsVisible = !controlsVisible
+            controlBar.visibility = if (controlsVisible) View.VISIBLE else View.GONE
+            btnClose.visibility = if (controlsVisible) View.VISIBLE else View.GONE
+        }
+
+        videoView.setVideoPath(videoPath)
+
         dialog.setOnDismissListener {
+            handler.removeCallbacks(updateRunnable)
             try { videoView.stopPlayback() } catch (_: Exception) {}
         }
     }
-
 
     /** 长按保存入口：API 29+ 免权限直存 MediaStore；API ≤28 先查/申请写存储权限 */
     private fun trySaveImage(bmp: android.graphics.Bitmap) {
