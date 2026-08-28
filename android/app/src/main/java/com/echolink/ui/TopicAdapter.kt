@@ -362,7 +362,8 @@ class TopicAdapter(
 
         // Title and text
         // 留言板/访客消息：title 形如「gy (138xxxx)」，移到气泡上方发送人位置，气泡里只放内容
-        val hasContactTitle = !isSelfMessage(item) && item.title.isNotEmpty() &&
+        // 留言板访客消息 title 形如「gy（138xxxx）」；普通消息 title 为空，故无需判断是否自己发的
+        val hasContactTitle = item.title.isNotEmpty() &&
             (item.title.contains("(") || item.title.contains("（")) &&
             (item.title.contains(")") || item.title.contains("）"))
         if (hasContactTitle) {
