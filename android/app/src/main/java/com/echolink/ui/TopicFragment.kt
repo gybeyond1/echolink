@@ -1450,7 +1450,7 @@ class TopicFragment : Fragment() {
         val adapter = object : androidx.recyclerview.widget.RecyclerView.Adapter<ImagePagerHolder>() {
             override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): ImagePagerHolder {
                 val zoom = ZoomableImageView(parent.context)
-                zoom.layoutParams = android.view.ViewGroup.LayoutParams(
+                zoom.layoutParams = androidx.recyclerview.widget.RecyclerView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                 )
                 zoom.onTap = { dialog.dismiss() }

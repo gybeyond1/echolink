@@ -100,9 +100,10 @@ class ZoomableImageView @JvmOverloads constructor(
 
     override fun setImageBitmap(bm: android.graphics.Bitmap?) {
         super.setImageBitmap(bm)
-        if (bm != null) {
-            post { resetToFit() }
+        if (bm != null && width > 0 && height > 0) {
+            resetToFit()
         }
+        // 若尺寸尚未就绪，等 onSizeChanged 触发时再 reset
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
