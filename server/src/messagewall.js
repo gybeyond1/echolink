@@ -170,16 +170,16 @@ function appendMessagewallMessage(title, text, description, imageDataUri, voiceD
   const result = db
     .prepare(
       `INSERT INTO topic_messages (topic, user_id, sender_name, title, text, media_type, media_url, media_name, media_size, timestamp)
-       VALUES (?, NULL, '留言板', ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, NULL, ?, '', ?, ?, ?, ?, ?, ?)`
     )
     .run(TOPIC_NAME, t, c, media.media_type, media.media_url, media.media_name || null, media.media_size, ts);
 
   const message = {
     id: result.lastInsertRowid,
     topic: TOPIC_NAME,
-    title: t,
+    title: "",
     text: c,
-    sender_name: "留言板",
+    sender_name: t,
     sender_display_name: null,
     sender_avatar: null,
     user_id: 0,
