@@ -231,6 +231,9 @@ class TopicFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // 初始化发送音效
+        SoundManager.init(requireContext())
+
         // 仅聊天模式（平板好友页右侧）：不加载左侧列表，直接进入聊天
         chatOnly = arguments?.getBoolean(EXTRA_CHAT_ONLY) ?: false
 
@@ -823,6 +826,9 @@ class TopicFragment : Fragment() {
                 val msg = parseTopicMessage(json.getJSONObject("topic_message"))
                 // 用真实消息替换临时消息
                 chatAdapter.replaceMessage(tempId, msg)
+                // 发送成功提示音：语音走"唰"声，其余（文字/图片）走清脆"嗒"声
+                if (mediaType == "voice") SoundManager.playVoiceSent()
+                else SoundManager.playMessageSent()
             } catch (e: Exception) {
                 // 发送失败：移除临时消息
                 chatAdapter.removeMessage(tempId)

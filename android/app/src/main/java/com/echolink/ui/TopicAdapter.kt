@@ -363,13 +363,11 @@ class TopicAdapter(
         holder.ivMedia.visibility = View.GONE
         holder.llVoice.visibility = View.GONE
         holder.llFile.visibility = View.GONE
-        // 先恢复默认气泡背景（防止 ViewHolder 复用时语音消息的透明背景残留）
-        if (item.mediaType != "voice") {
-            val dp = holder.itemView.context.resources.displayMetrics.density
-            holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
-            holder.llContent.setPadding((12*dp).toInt(), (7*dp).toInt(), (12*dp).toInt(), (7*dp).toInt())
-            holder.llContent.elevation = 1.5f * dp
-        }
+        // 统一恢复气泡背景（语音/图片/文字都用 bg_msg_own）
+        val dpRestore = holder.itemView.context.resources.displayMetrics.density
+        holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
+        holder.llContent.setPadding((12*dpRestore).toInt(), (7*dpRestore).toInt(), (12*dpRestore).toInt(), (7*dpRestore).toInt())
+        holder.llContent.elevation = 1.5f * dpRestore
         if (isMedia) {
             when (item.mediaType) {
                 "image" -> {
@@ -395,17 +393,12 @@ class TopicAdapter(
                     val lp = holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams
                     lp.width = (widthDp * dp).toInt()
                     holder.llVoice.layoutParams = lp
-                    // 语音消息：去掉外层气泡背景，纯语音条
-                    holder.llContent.setBackgroundResource(android.R.color.transparent)
-                    holder.llContent.setPadding(0, 0, 0, 0)
-                    holder.llContent.elevation = 0f
-                    // 适配暗色主题
-                    val isDark = android.content.res.Configuration.UI_MODE_NIGHT_MASK and
-                            (holder.itemView.context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                            android.content.res.Configuration.UI_MODE_NIGHT_YES
-                    holder.llVoice.setBackgroundResource(if (isDark) R.drawable.bg_voice_bubble_dark else R.drawable.bg_voice_bubble_light)
-                    holder.tvVoiceDuration.setTextColor(if (isDark) 0xFFE0E0E0.toInt() else 0xFF333333.toInt())
-                    holder.ivVoiceIcon.setColorFilter(if (isDark) 0xFFE0E0E0.toInt() else 0xFF333333.toInt())
+                    // 语音气泡与文字消息气泡一致（bg_msg_own），语音条不设独立背景
+                    holder.llContent.setBackgroundResource(R.drawable.bg_msg_own)
+                    holder.llContent.elevation = 1.5f * dp
+                    val ctx = holder.itemView.context
+                    holder.tvVoiceDuration.setTextColor(ctx.getColor(R.color.on_surface))
+                    holder.ivVoiceIcon.setColorFilter(ctx.getColor(R.color.on_surface))
                 }
                 "file" -> {
                     holder.llFile.visibility = View.VISIBLE

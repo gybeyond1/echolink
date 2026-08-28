@@ -103,14 +103,10 @@
             android:id="@+id/llVoice"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="@drawable/bg_voice_bubble_light"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:paddingTop="10dp"
-            android:paddingBottom="10dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:visibility="gone">
 
             <ImageView
@@ -131,7 +127,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0&quot;"
-                android:textColor="#333333"
+                android:textColor="@color/on_surface"
                 android:textSize="15sp" />
         </LinearLayout>
 
