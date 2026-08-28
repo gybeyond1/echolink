@@ -513,6 +513,11 @@ class TopicAdapter(
         lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
         lp.weight = 0f
         holder.bubbleInner.layoutParams = lp
+        // llContent 也用 wrap_content，让已读标志紧挨气泡、气泡与头像保持正常间距
+        val lpContent = holder.llContent.layoutParams as android.widget.LinearLayout.LayoutParams
+        lpContent.width = ViewGroup.LayoutParams.WRAP_CONTENT
+        lpContent.weight = 0f
+        holder.llContent.layoutParams = lpContent
 
         val padH = (8 * dp).toInt()
         val padV = (4 * dp).toInt()
