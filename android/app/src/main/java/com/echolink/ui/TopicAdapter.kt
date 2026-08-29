@@ -38,6 +38,7 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.echolink.util.MediaCacheManager
 
 class TopicAdapter(
     private val onItemLongClick: (TopicMessage) -> Unit,
@@ -260,8 +261,12 @@ class TopicAdapter(
                 llVoice.visibility == View.VISIBLE && inViewBounds(llVoice, ev) -> {
                     if (!item.mediaUrl.isNullOrEmpty()) {
                         val local = P2pManager.localP2pFile(ctx, item.mediaUrl)
+                            ?: MediaCacheManager.getCachedFile(fullUrl(item.mediaUrl))
                         if (local != null) playVoice(local.absolutePath, ivVoiceIcon)
-                        else playVoice(fullUrl(item.mediaUrl), ivVoiceIcon)
+                        else {
+                            MediaCacheManager.preload(fullUrl(item.mediaUrl))
+                            playVoice(fullUrl(item.mediaUrl), ivVoiceIcon)
+                        }
                     }
                 }
                 llFile.visibility == View.VISIBLE && inViewBounds(llFile, ev) -> {
@@ -399,8 +404,12 @@ class TopicAdapter(
                     holder.mediaContainer.visibility = View.VISIBLE
                     holder.ivPlayOverlay.visibility = View.GONE
                     val local = P2pManager.localP2pFile(holder.itemView.context, item.mediaUrl)
+                        ?: MediaCacheManager.getCachedFile(fullUrl(item.mediaUrl!!))
                     if (local != null) loadLocalImage(local, holder.ivMedia)
-                    else loadImage(fullUrl(item.mediaUrl!!), holder.ivMedia)
+                    else {
+                        MediaCacheManager.preload(fullUrl(item.mediaUrl!!))
+                        loadImage(fullUrl(item.mediaUrl!!), holder.ivMedia)
+                    }
                     // 图片去掉气泡包裹
                     holder.bubbleInner.setBackgroundResource(0)
                     holder.bubbleInner.setPadding(0, 0, 0, 0)
@@ -662,6 +671,9 @@ class TopicAdapter(
                 try {
                     val retriever = android.media.MediaMetadataRetriever()
                     val local = P2pManager.localP2pFile(iv.context, item.mediaUrl!!)
+                        ?: MediaCacheManager.getCachedFile(fullUrl(item.mediaUrl!!))
+                    // 没有本地缓存时先预加载
+                    if (local == null) MediaCacheManager.preload(fullUrl(item.mediaUrl!!))
                     if (local != null) {
                         retriever.setDataSource(local.absolutePath)
                     } else {

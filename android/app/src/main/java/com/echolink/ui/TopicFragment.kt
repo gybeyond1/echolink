@@ -775,6 +775,14 @@ class TopicFragment : Fragment() {
             try {
                 val messages = ApiClient.getTopicMessages(topic, 50)
                 chatAdapter.setItems(messages)
+                // 后台预加载所有媒体（图片/视频/语音），二次打开走本地缓存
+                MediaCacheManager.init(requireContext())
+                messages.forEach { msg ->
+                    if (!msg.mediaUrl.isNullOrEmpty() && msg.mediaType != "text") {
+                        val url = if (msg.mediaUrl.startsWith("http")) msg.mediaUrl else ApiClient.serverUrl.trimEnd('/') + msg.mediaUrl
+                        MediaCacheManager.preload(url)
+                    }
+                }
                 binding.tvEmptyChat.visibility = if (messages.isEmpty()) View.VISIBLE else View.GONE
                 binding.recyclerView.visibility = if (messages.isEmpty()) View.GONE else View.VISIBLE
                 scrollToBottom()
@@ -1571,7 +1579,14 @@ class TopicFragment : Fragment() {
                 return
             }
             local.absolutePath
-        } else fullServerUrl(url)
+        } else {
+            val serverUrl = fullServerUrl(url)
+            val cached = MediaCacheManager.getCachedFile(serverUrl)
+            if (cached != null) cached.absolutePath else {
+                MediaCacheManager.preload(serverUrl)
+                serverUrl
+            }
+        }
 
         val dialog = androidx.appcompat.app.AppCompatDialog(ctx)
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
