@@ -66,6 +66,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.regex.Pattern
+import com.echolink.util.MediaCacheManager
 
 class TopicFragment : Fragment() {
     private var _binding: FragmentTopicBinding? = null
