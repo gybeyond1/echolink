@@ -779,7 +779,7 @@ class TopicFragment : Fragment() {
                 MediaCacheManager.init(requireContext())
                 messages.forEach { msg ->
                     if (!msg.mediaUrl.isNullOrEmpty() && msg.mediaType != "text") {
-                        val url = if (msg.mediaUrl.startsWith("http")) msg.mediaUrl else ApiClient.serverUrl.trimEnd('/') + msg.mediaUrl
+                        val url = if (msg.mediaUrl.startsWith("http")) msg.mediaUrl else AuthManager.serverUrl.trimEnd('/') + msg.mediaUrl
                         MediaCacheManager.preload(url)
                     }
                 }
