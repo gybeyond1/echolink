@@ -17,26 +17,24 @@
             android:layout_width="0dp"
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/colorSurface"
-            android:clipChildren="false"
-            android:clipToPadding="false"
             app:titleTextColor="?attr/colorOnSurface"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
+            app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- 左侧当前登录用户圆形头像：替代三横线，点击打开侧滑栏 -->
-            <ImageView
-                android:id="@+id/toolbarAvatar"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:layout_gravity="bottom"
-                android:layout_marginStart="20dp"
-                android:layout_marginBottom="2dp"
-                android:scaleType="centerCrop"
-                android:background="@drawable/bg_circle_avatar"
-                android:src="@drawable/ic_default_avatar"
-                android:contentDescription="打开菜单" />
-        </com.google.android.material.appbar.MaterialToolbar>
+        <!-- 左侧当前登录用户圆形头像：替代三横线，点击打开侧滑栏；底部对齐 toolbar 并向下移 -->
+        <ImageView
+            android:id="@+id/toolbarAvatar"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginBottom="-8dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/bg_circle_avatar"
+            android:src="@drawable/ic_default_avatar"
+            android:contentDescription="打开菜单"
+            app:layout_constraintBottom_toBottomOf="@id/toolbar"
+            app:layout_constraintStart_toStartOf="parent" />
 
         <!-- Fragment 容器 -->
         <FrameLayout
