@@ -395,7 +395,7 @@ class TopicAdapter(
         holder.llFile.visibility = View.GONE
         // 统一恢复气泡背景（语音/文字用气泡，图片/视频去掉气泡）
         val dpRestore = holder.itemView.context.resources.displayMetrics.density
-        holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
+        holder.bubbleInner.setBackgroundResource(if (isMine) R.drawable.bg_msg_own else R.drawable.bg_msg_other)
         holder.bubbleInner.setPadding((8*dpRestore).toInt(), (4*dpRestore).toInt(), (8*dpRestore).toInt(), (4*dpRestore).toInt())
         holder.bubbleInner.elevation = 1.5f * dpRestore
         if (isMedia) {
@@ -429,7 +429,7 @@ class TopicAdapter(
                     val lp = holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams
                     lp.width = (widthDp * dp).toInt()
                     holder.llVoice.layoutParams = lp
-                    holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
+                    holder.bubbleInner.setBackgroundResource(if (isMine) R.drawable.bg_msg_own else R.drawable.bg_msg_other)
                     holder.bubbleInner.elevation = 1.5f * dp
                     val ctx = holder.itemView.context
                     holder.tvVoiceDuration.setTextColor(ctx.getColor(R.color.on_surface))
@@ -556,8 +556,8 @@ class TopicAdapter(
             holder.tvSender.setTextColor(ctx.getColor(R.color.on_surface_variant))
             holder.tvTime.setTextColor(ctx.getColor(R.color.bubble_own_time))
         } else {
-            // 对方气泡与自己一致（统一绿色气泡风格）
-            holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
+            // 对方气泡：同色浅绿 + 左下尾角（仅翻转气泡方向，内容不变）
+            holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_other)
             holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvText.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvSender.setTextColor(ctx.getColor(R.color.on_surface_variant))

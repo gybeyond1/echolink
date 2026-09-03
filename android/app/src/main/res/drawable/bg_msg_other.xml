@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 他人消息气泡：白色卡片 + 左下小尾角，配合 elevation 形成悬浮感 -->
+<!-- 他人消息气泡：与己方同色（浅绿）+ 左下小尾角，配合 elevation 形成悬浮感 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="@color/bubble_other" />
+    <solid android:color="@color/bubble_own" />
     <corners
         android:topLeftRadius="18dp"
         android:topRightRadius="18dp"
