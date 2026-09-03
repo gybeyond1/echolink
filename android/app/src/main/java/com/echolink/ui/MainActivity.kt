@@ -145,9 +145,13 @@ class MainActivity : AppCompatActivity() {
         toolbar.setPadding(toolbar.paddingStart + left8, statusBarH, toolbar.paddingEnd, toolbar.paddingBottom)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
-        toolbar.setNavigationOnClickListener {
+        // 左侧圆形头像（当前登录用户）替代三横线：点击打开侧滑栏
+        binding.toolbarAvatar?.setOnClickListener {
             drawer?.openDrawer(GravityCompat.START)
         }
+        com.echolink.data.AvatarLoader.load(
+            com.echolink.data.ApiClient.fullAvatarUrl(AuthManager.avatarUrl), binding.toolbarAvatar!!
+        )
         // 侧滑栏头部用户信息
         val header = navView.getHeaderView(0)
         if (header != null) {
@@ -241,15 +245,10 @@ class MainActivity : AppCompatActivity() {
             .replace(binding.fragmentContainer.id, fragment)
             .commit()
         // FAB 可见性由各 Fragment 在 onResume 中自行控制（聊天态隐藏、列表态显示）
-        // 平板：更新标题和侧滑栏选中状态
+        // 平板：去掉顶部工具栏标题（标题由各 Fragment 内部显示：消息页"消息"、好友页"通讯录"），
+        // 仅更新侧滑栏选中状态
         if (isTablet) {
-            binding.toolbar?.title = when (fragment) {
-                is TopicFragment -> "消息"
-                is FriendsFragment -> "好友"
-                is SettingsFragment -> "设置"
-                is NotificationsFragment -> "通知"
-                else -> "EchoLink"
-            }
+            binding.toolbar?.title = ""
             val navItem = when (fragment) {
                 is FriendsFragment -> R.id.nav_friends
                 is SettingsFragment -> R.id.nav_settings
