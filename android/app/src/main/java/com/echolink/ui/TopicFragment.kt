@@ -549,7 +549,6 @@ class TopicFragment : Fragment() {
         showGlobalFabMenu(
             owner = this,
             onDiscover = { showDiscoverDialog(this) { t -> (activity as? MainActivity)?.openTopic(t) } },
-            onCreateTopic = { showCreateTopicDialog(this) { t -> (activity as? MainActivity)?.openTopic(t) } },
             onAddFriend = { showAddFriendDialog(this) },
             onSettings = { (activity as? MainActivity)?.openSettings() }
         )
