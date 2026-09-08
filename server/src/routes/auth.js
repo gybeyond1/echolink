@@ -7,12 +7,41 @@ const { authMiddleware } = require("../middleware/auth");
 
 const router = express.Router();
 
+// 查询注册两步验证是否启用（公开接口，用于注册页显示验证码输入框）
+router.get("/totp-status", (req, res) => {
+  try {
+    const { getSettings } = require("../db");
+    const settings = getSettings();
+    const enabled = settings.totp_enabled === true || settings.totp_enabled === "true";
+    res.json({ enabled });
+  } catch (e) {
+    res.json({ enabled: false });
+  }
+});
+
 // 注册
 router.post("/register", (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, totp_code } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({ error: "Username and password are required" });
+  }
+
+  // TOTP 两步验证（如果管理员启用了）
+  try {
+    const { getSettings } = require("../db");
+    const settings = getSettings();
+    if (settings.totp_enabled === true || settings.totp_enabled === "true") {
+      const secret = settings.totp_secret;
+      if (!secret) return res.status(500).json({ error: "TOTP 配置错误" });
+      const { verifyTOTP } = require("../totp");
+      if (!totp_code || !verifyTOTP(secret, totp_code)) {
+        return res.status(403).json({ error: "两步验证码错误或已过期，请重新输入" });
+      }
+    }
+  } catch (e) {
+    console.error("[auth] TOTP check error:", e.message);
+    return res.status(500).json({ error: "两步验证失败" });
   }
   if (username.length < 3 || username.length > 32) {
     return res.status(400).json({ error: "Username must be 3-32 characters" });
