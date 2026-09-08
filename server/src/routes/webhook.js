@@ -1,5 +1,5 @@
 const express = require("express");
-const { appendMessagewallMessage, DEFAULT_WALL_USER } = require("../messagewall");
+const { appendMessagewallMessage, DEFAULT_WALL_USER, getMessagewallEnabledUsers } = require("../messagewall");
 
 const router = express.Router();
 
@@ -19,9 +19,34 @@ router.post("/messagewall/:username", (req, res) => {
   handleMessagewall(req, res, req.params.username);
 });
 
-// 留言板 Webhook 接收（兼容旧地址，不带用户名）→ 默认 gybeyond 用户
+// 留言板 Webhook 接收（兼容旧地址，不带用户名）→ 推送给所有开启了留言功能的用户
 router.post("/messagewall", (req, res) => {
-  handleMessagewall(req, res, DEFAULT_WALL_USER);
+  const body = req.body || {};
+  if (body.source !== "messagewall") {
+    return res.status(400).json({ error: "unsupported source (expected 'messagewall')" });
+  }
+  const title = String(body.title || "").trim();
+  const content = String(body.content || "").trim();
+  const image = body.image ? String(body.image) : "";
+  const voice = body.voice ? String(body.voice) : "";
+  if (!title) return res.status(400).json({ error: "title is required" });
+  if (!content && !image && !voice) return res.status(400).json({ error: "content or image or voice is required" });
+  const sourceName = String(body.sourceName || "留言板");
+  const sourceDesc = String(body.sourceDesc || `来自「${sourceName}」的留言`);
+
+  const enabledUsers = getMessagewallEnabledUsers();
+  let delivered = 0;
+  const errors = [];
+  for (const username of enabledUsers) {
+    try {
+      const r = appendMessagewallMessage(title, content, sourceDesc, image || null, voice || null, username);
+      if (r.error) errors.push(username + ": " + r.error);
+      else delivered++;
+    } catch (e) {
+      errors.push(username + ": " + e.message);
+    }
+  }
+  return res.status(200).json({ ok: true, delivered, users: enabledUsers, errors: errors.length ? errors : undefined });
 });
 
 function handleMessagewall(req, res, username) {
