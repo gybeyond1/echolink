@@ -23,31 +23,18 @@ import java.security.MessageDigest
 
 /**
  * 共享头像加载器：内存缓存 + 磁盘缓存 + 异步下载 + 圆形裁剪。
- *
- * 关键点（解决「切换页面头像变白/重新加载」+「换了头像不更新」）：
- *  1. 内存缓存（进程内，同会话切换瞬时命中，不重拉）；
- *  2. 磁盘缓存（cacheDir/avatars/<md5>.png，进程被杀/冷启动也能瞬时命中，不重拉）；
- *  3. 只有当内存和磁盘都没有时，才显示默认占位图并发起网络请求；
- *  4. 条件 GET（If-None-Match / If-Modified-Since）：服务端头像变化（哪怕同一 URL）
- *     也能被探知——304 复用缓存、200 更新缓存，绝不会长期展示过期头像；
- *  5. invalidate(url) / refresh(url, iv)：换头像后主动让旧缓存失效并立即拉新图。
- *
- * 注意：头像只在 cacheDir 磁盘缓存，绝不会写进 APK。换头像后服务端文件名带时间戳，
- * URL 会变，新 URL 自然命中新缓存；本类的条件 GET 与 invalidate 进一步兜底同 URL 的更新。
- *
- * 用法：AvatarLoader.load(ApiClient.fullAvatarUrl(path), imageView)
+ * 支持多个 ImageView 同时请求同一 URL（下载完成后统一更新所有等待者）。
  */
 object AvatarLoader {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    // 内存缓存：最多 128 张圆头像（约 44dp，每张 20KB 上下）
     private val cache = object : LruCache<String, Bitmap>(128) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
     }
 
-    private val loading = mutableSetOf<String>()
+    // 正在下载的 URL -> 等待的 ImageView 列表（解决同一 URL 被多个 ImageView 同时请求时第二个被丢弃的问题）
+    private val waiting = mutableMapOf<String, MutableList<ImageView>>()
 
-    /** 磁盘缓存根目录 */
     private fun diskDir(): File? = try {
         val ctx = com.echolink.App.appContext
         File(ctx.cacheDir, "avatars").apply { mkdirs() }
@@ -72,16 +59,13 @@ object AvatarLoader {
         load(url, iv, false)
     }
 
-    /**
-     * @param forceRefresh true 时忽略内存/磁盘缓存，强制重新下载（用于换头像后立即生效）
-     */
     fun load(url: String?, iv: ImageView, forceRefresh: Boolean) {
         if (url.isNullOrBlank()) {
             iv.setImageResource(R.drawable.ic_default_avatar)
             return
         }
 
-        // 1) 内存命中：瞬时设置，绝不闪白（除非强制刷新）
+        // 1) 内存命中
         if (!forceRefresh) {
             cache.get(url)?.let {
                 iv.setImageBitmap(it)
@@ -89,33 +73,40 @@ object AvatarLoader {
             }
         }
 
-        // 2) 磁盘命中：后台解码后设置（不显示占位，避免闪白）
+        // 2) 磁盘命中
         if (!forceRefresh) {
             val df = diskFile(url)
             if (df != null && df.exists() && df.length() > 100) {
-                if (!loading.add(url)) return
+                if (waiting.containsKey(url)) {
+                    // 已在下载/解码中，加入等待列表
+                    waiting.getOrPut(url) { mutableListOf() }.add(iv)
+                    return
+                }
+                waiting.getOrPut(url) { mutableListOf() }.add(iv)
                 scope.launch {
                     try {
                         val bmp = withContext(Dispatchers.IO) { decodeCircle(df) }
                         if (bmp != null) {
                             cache.put(url, bmp)
-                            iv.setImageBitmap(bmp)
+                            dispatch(url, bmp)
                         } else {
-                            iv.setImageResource(R.drawable.ic_default_avatar)
+                            dispatchDefault(url)
                         }
                     } catch (_: Exception) {
-                        iv.setImageResource(R.drawable.ic_default_avatar)
-                    } finally {
-                        loading.remove(url)
+                        dispatchDefault(url)
                     }
                 }
                 return
             }
         }
 
-        // 3) 全 miss（或强制刷新）：显示占位 → 条件 GET 下载 → 存磁盘 + 内存
+        // 3) 全 miss：显示占位 → 下载
         iv.setImageResource(R.drawable.ic_default_avatar)
-        if (!loading.add(url)) return
+        if (waiting.containsKey(url)) {
+            waiting.getOrPut(url) { mutableListOf() }.add(iv)
+            return
+        }
+        waiting.getOrPut(url) { mutableListOf() }.add(iv)
 
         scope.launch {
             try {
@@ -131,43 +122,51 @@ object AvatarLoader {
                         saveDisk(url, circle)
                         writeSidecar(etagFile(url), result.etag)
                         writeSidecar(lmFile(url), result.lm)
-                        iv.setImageBitmap(circle)
+                        dispatch(url, circle)
                     }
                     is DownloadResult.NotModified -> {
-                        // 304：服务端头像没变，沿用磁盘缓存
                         val df = diskFile(url)
                         if (df != null && df.exists() && df.length() > 100) {
                             val bmp = withContext(Dispatchers.IO) { decodeCircle(df) }
                             if (bmp != null) {
                                 cache.put(url, bmp)
-                                iv.setImageBitmap(bmp)
+                                dispatch(url, bmp)
                             } else {
-                                iv.setImageResource(R.drawable.ic_default_avatar)
+                                val bmp2 = withContext(Dispatchers.IO) { download(url, null, null) }
+                                if (bmp2 is DownloadResult.Ok) {
+                                    val circle = cropCircle(bmp2.bmp)
+                                    cache.put(url, circle)
+                                    saveDisk(url, circle)
+                                    dispatch(url, circle)
+                                } else {
+                                    dispatchDefault(url)
+                                }
                             }
                         } else {
-                            // 磁盘缓存意外丢失：降级为普通下载
-                            val bmp = withContext(Dispatchers.IO) { download(url, null, null) }
-                            if (bmp is DownloadResult.Ok) {
-                                val circle = cropCircle(bmp.bmp)
-                                cache.put(url, circle)
-                                saveDisk(url, circle)
-                                iv.setImageBitmap(circle)
-                            } else {
-                                iv.setImageResource(R.drawable.ic_default_avatar)
-                            }
+                            dispatchDefault(url)
                         }
                     }
-                    else -> iv.setImageResource(R.drawable.ic_default_avatar)
+                    else -> dispatchDefault(url)
                 }
             } catch (_: Exception) {
-                iv.setImageResource(R.drawable.ic_default_avatar)
-            } finally {
-                loading.remove(url)
+                dispatchDefault(url)
             }
         }
     }
 
-    /** 主动让某个 URL 的缓存失效（换头像后调用，避免旧图残留） */
+    /** 下载完成后更新所有等待的 ImageView */
+    private fun dispatch(url: String, bmp: Bitmap) {
+        waiting.remove(url)?.forEach { iv ->
+            iv.setImageBitmap(bmp)
+        }
+    }
+
+    private fun dispatchDefault(url: String) {
+        waiting.remove(url)?.forEach { iv ->
+            iv.setImageResource(R.drawable.ic_default_avatar)
+        }
+    }
+
     fun invalidate(url: String?) {
         if (url.isNullOrBlank()) return
         cache.remove(url)
@@ -176,7 +175,6 @@ object AvatarLoader {
         try { lmFile(url)?.delete() } catch (_: Exception) {}
     }
 
-    /** 失效并立即重新下载显示（换头像后立即生效的最直接入口） */
     fun refresh(url: String?, iv: ImageView) {
         invalidate(url)
         load(url, iv, true)
