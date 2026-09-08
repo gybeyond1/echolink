@@ -186,7 +186,9 @@ router.get("/messagewall", async (req, res) => {
     const db = require("../db").getDB();
     const users = db.prepare("SELECT id, username, display_name, role FROM users ORDER BY id ASC").all();
     const enabled = getMessagewallEnabledUsers();
-    res.json({ users, enabledUsers: enabled, webhookUrl: "/api/webhook/messagewall" });
+    const baseRow = db.prepare("SELECT value FROM settings WHERE key = 'messagewall_webhook_base'").get();
+    const webhookBase = baseRow ? baseRow.value : "";
+    res.json({ users, enabledUsers: enabled, webhookBase });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -196,10 +198,15 @@ router.get("/messagewall", async (req, res) => {
 router.put("/messagewall", async (req, res) => {
   try {
     const { setMessagewallEnabledUsers } = require("../messagewall");
-    const { enabledUsers } = req.body || {};
-    if (!Array.isArray(enabledUsers)) return res.status(400).json({ error: "enabledUsers must be array" });
-    setMessagewallEnabledUsers(enabledUsers);
-    res.json({ ok: true, enabledUsers });
+    const { enabledUsers, webhookBase } = req.body || {};
+    if (enabledUsers !== undefined && !Array.isArray(enabledUsers)) return res.status(400).json({ error: "enabledUsers must be array" });
+    if (enabledUsers !== undefined) setMessagewallEnabledUsers(enabledUsers);
+    if (webhookBase !== undefined) {
+      const val = (webhookBase || "").trim().replace(/\/+$/, "");
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('messagewall_webhook_base', ?)").run(val);
+    }
+    const baseRow = db.prepare("SELECT value FROM settings WHERE key = 'messagewall_webhook_base'").get();
+    res.json({ ok: true, enabledUsers: getMessagewallEnabledUsers(), webhookBase: baseRow ? baseRow.value : "" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
