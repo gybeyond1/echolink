@@ -143,6 +143,12 @@ class MainActivity : AppCompatActivity() {
         ).coerceAtLeast(0)
         val left8 = (8 * resources.displayMetrics.density).toInt()
         toolbar.setPadding(toolbar.paddingStart + left8, statusBarH, toolbar.paddingEnd, toolbar.paddingBottom)
+        // 头像顶部 margin = 状态栏高度 + 10dp，避开状态栏
+        val avatarLp = binding.toolbarAvatar?.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+        if (avatarLp != null) {
+            avatarLp.topMargin = statusBarH + (10 * resources.displayMetrics.density).toInt()
+            binding.toolbarAvatar?.layoutParams = avatarLp
+        }
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
         // 左侧圆形头像（当前登录用户）替代三横线：点击打开侧滑栏
@@ -160,7 +166,7 @@ class MainActivity : AppCompatActivity() {
             header.findViewById<android.widget.TextView>(R.id.navUsername)?.text =
                 "@${AuthManager.username ?: ""}"
             // 加载用户头像
-            val avatarIv = header.findViewById<android.widget.ImageView>(R.id.navAvatar)
+            val avatarIv = navView.findViewById<android.widget.ImageView>(R.id.navAvatar)
             if (avatarIv != null) {
                 com.echolink.data.AvatarLoader.load(
                     com.echolink.data.ApiClient.fullAvatarUrl(AuthManager.avatarUrl), avatarIv
@@ -172,6 +178,18 @@ class MainActivity : AppCompatActivity() {
                 openAccountSettings()
             }
         }
+
+        // 侧滑栏打开时重新加载头像（防止 header 重建后丢失）
+        drawer?.addDrawerListener(object : androidx.drawerlayout.widget.DrawerLayout.SimpleDrawerListener() {
+            override fun onDrawerOpened(drawerView: android.view.View) {
+                val iv = navView.findViewById<android.widget.ImageView>(R.id.navAvatar)
+                if (iv != null) {
+                    com.echolink.data.AvatarLoader.load(
+                        com.echolink.data.ApiClient.fullAvatarUrl(AuthManager.avatarUrl), iv
+                    )
+                }
+            }
+        })
 
         navView.setNavigationItemSelectedListener { item ->
             drawer?.closeDrawer(GravityCompat.START)
@@ -185,8 +203,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** 平板端：隐藏 toolbar 头像 */
+    fun hideToolbarAvatar() {
+        if (isTablet) binding.toolbarAvatar?.visibility = android.view.View.GONE
+    }
+
+    /** 平板端：恢复 toolbar 头像显示 */
+    fun showToolbarAvatar() {
+        if (isTablet) binding.toolbarAvatar?.visibility = android.view.View.VISIBLE
+    }
+
     /** 侧滑栏底部用户信息 → 账号设置 */
     fun openAccountSettings() {
+        if (isTablet) binding.toolbarAvatar?.visibility = android.view.View.GONE
         supportFragmentManager
             .beginTransaction()
             .replace(binding.fragmentContainer.id, AccountSettingsFragment())
