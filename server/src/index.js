@@ -137,6 +137,10 @@ setupWebSocket(server);
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 
+
+  // 迁移旧的 messagewall 话题
+  try { require("./messagewall").migrateLegacyMessagewallTopic(); } catch (e) { console.error("messagewall migrate failed:", e.message); }
+
 server.listen(PORT, HOST, () => {
   console.log(`\n========================================`);
   console.log(`  EchoLink Server`);
