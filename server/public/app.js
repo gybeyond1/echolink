@@ -536,12 +536,12 @@
         const t = state.topics.find(x => x.name === el.dataset.topic);
         if (t) openChat(t);
       };
+        el.oncontextmenu = (e) => {
+          e.preventDefault();
+          const t = state.topics.find(x => x.name === el.dataset.topic);
+          if (t) showSessionContextMenu(e, t);
+        };
     });
-      el.oncontextmenu = (e) => {
-        e.preventDefault();
-        const t = state.topics.find(x => x.name === el.dataset.topic);
-        if (t) showSessionContextMenu(e, t);
-      };
     list.querySelectorAll("[data-special]").forEach(el => {
       el.onclick = () => {
         if (el.dataset.special === "notifications") openNotifications();

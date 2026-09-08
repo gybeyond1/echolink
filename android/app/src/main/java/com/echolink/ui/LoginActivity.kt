@@ -90,9 +90,8 @@ class LoginActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 try {
                     val response = if (isRegisterMode) {
-                    val totpCode = if (isRegisterMode) binding.etTotp.text.toString().trim() else ""
-                    // 两步验证留空也可提交，服务器端会验证是否必填
-                        ApiClient.register(username, password)
+                        val totpCode = binding.etTotp.text.toString().trim()
+                        ApiClient.register(username, password, totpCode)
                     } else {
                         ApiClient.login(username, password)
                     }
