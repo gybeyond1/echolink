@@ -377,7 +377,6 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
         showGlobalFabMenu(
             owner = this,
             onDiscover = { showDiscoverDialog(this) { t -> (activity as? MainActivity)?.openTopic(t) } },
-            onCreateTopic = { showCreateTopicDialog(this) { t -> (activity as? MainActivity)?.openTopic(t) } },
             onAddFriend = { showAddFriendDialog(this) },
             onSettings = { (requireActivity() as? MainActivity)?.openSettings() }
         )
