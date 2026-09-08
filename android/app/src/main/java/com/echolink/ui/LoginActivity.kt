@@ -151,8 +151,8 @@ class LoginActivity : AppCompatActivity() {
             binding.btnLogin.text = "登录"
             binding.btnToggleMode.text = "没有账号？去注册"
             binding.tvTitle.text = "欢迎回来"
-        updateTotpVisibility()
         }
+        updateTotpVisibility()
     }
 
 
