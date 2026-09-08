@@ -62,20 +62,18 @@ fun AlertDialog.Builder.showDimmed(): AlertDialog {
 fun showGlobalFabMenu(
     owner: LifecycleOwner,
     onDiscover: () -> Unit,
-    onCreateTopic: () -> Unit,
     onAddFriend: () -> Unit,
     onSettings: () -> Unit
 ) {
     val ctx = contextOf(owner)
-    val options = arrayOf("创建话题", "发现 / 加入话题", "添加好友", "设置")
+    val options = arrayOf("话题", "添加好友", "设置")
     AlertDialog.Builder(ctx, R.style.Theme_EchoLink_Dialog)
         .setTitle("菜单")
         .setItems(options) { _, which ->
             when (which) {
-                0 -> onCreateTopic()
-                1 -> onDiscover()
-                2 -> onAddFriend()
-                3 -> onSettings()
+                0 -> onDiscover()
+                1 -> onAddFriend()
+                2 -> onSettings()
             }
         }
         .setNegativeButton("取消", null)
@@ -128,7 +126,7 @@ fun showDiscoverDialog(owner: LifecycleOwner, openTopic: (String) -> Unit) {
     val btnJoin = layout.findViewById<android.widget.Button>(R.id.btnJoinByName)
     btnJoin.text = "创建/加入"
 
-    val dialog = AlertDialog.Builder(ctx, R.style.Theme_EchoLink_Dialog).setTitle("发现 / 创建话题").setView(layout).setNegativeButton("关闭", null).buildDimmed()
+    val dialog = AlertDialog.Builder(ctx, R.style.Theme_EchoLink_Dialog).setTitle("话题").setView(layout).setNegativeButton("关闭", null).buildDimmed()
 
     val items = mutableListOf<DiscoverTopic>()
     val adapterList = ArrayAdapter(ctx, android.R.layout.simple_list_item_1, mutableListOf<String>())
