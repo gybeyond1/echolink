@@ -375,9 +375,9 @@ class TopicAdapter(
         holder.itemView.layoutParams = rootLp
 
         // Title and text
-        // 留言板：title 是访客 ID+联系方式，放到发送人位置单独显示，气泡里只放内容
-        if (isMessageWall && item.title.isNotEmpty()) {
-            holder.tvSender.text = item.title
+        // 留言板：访客名字存在 sender_name，title 为空，发送人位置显示 senderName，气泡里只放内容
+        if (isMessageWall) {
+            holder.tvSender.text = item.senderName.ifEmpty { "匿名访客" }
             holder.tvTitle.visibility = View.GONE
             holder.llSenderInfo.visibility = View.VISIBLE
         } else {
