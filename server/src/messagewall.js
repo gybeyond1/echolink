@@ -3,12 +3,10 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-// 留言板 Webhook 的全局话题名（topics.name 唯一）。所有授权账号都是它的成员，
-// 留言统一汇进这一个会话，不与通知/私聊/设备会话混淆。
-const TOPIC_NAME = "messagewall";
+// 默认留言板用户（兼容旧的 /webhook/messagewall 不带用户名的地址）
+const DEFAULT_WALL_USER = "gybeyond";
 
 // 将留言板图片（base64 data URI）落盘到 data/uploads，返回媒体字段。
-// 仅支持 image/jpeg | image/png | image/webp；失败时抛错由调用方决定如何响应。
 function saveMessagewallImage(dataUri) {
   if (!dataUri) return null;
   const m = /^data:image\/(jpeg|png|webp);base64,(.+)$/i.exec(dataUri.trim());
@@ -16,11 +14,7 @@ function saveMessagewallImage(dataUri) {
   const sub = m[1].toLowerCase();
   const ext = sub === "jpeg" ? "jpg" : sub;
   let buf;
-  try {
-    buf = Buffer.from(m[2], "base64");
-  } catch (_) {
-    throw new Error("image base64 decode failed");
-  }
+  try { buf = Buffer.from(m[2], "base64"); } catch (_) { throw new Error("image base64 decode failed"); }
   if (!buf || buf.length === 0) throw new Error("empty image");
   if (buf.length > 10 * 1024 * 1024) throw new Error("image too large (>10MB)");
 
@@ -29,16 +23,10 @@ function saveMessagewallImage(dataUri) {
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   const fname = crypto.randomBytes(12).toString("hex") + "." + ext;
   fs.writeFileSync(path.join(uploadsDir, fname), buf);
-  return {
-    media_type: "image",
-    media_url: "/uploads/" + fname,
-    media_name: fname,
-    media_size: buf.length,
-  };
+  return { media_type: "image", media_url: "/uploads/" + fname, media_name: fname, media_size: buf.length };
 }
 
 // 将留言板语音（base64 data URI）落盘到 data/uploads，返回媒体字段。
-// 支持 audio/webm | audio/mp4 | audio/ogg | audio/amr | audio/x-m4a；失败时抛错。
 function saveMessagewallVoice(dataUri) {
   if (!dataUri) return null;
   const m = /^data:audio\/(webm|mp4|ogg|amr|x-m4a|mpeg|wav)(?:;.*)?;base64,(.+)$/i.exec(dataUri.trim());
@@ -46,11 +34,7 @@ function saveMessagewallVoice(dataUri) {
   let sub = m[1].toLowerCase();
   const ext = sub === "x-m4a" ? "m4a" : sub === "mpeg" ? "mp3" : sub;
   let buf;
-  try {
-    buf = Buffer.from(m[2], "base64");
-  } catch (_) {
-    throw new Error("voice base64 decode failed");
-  }
+  try { buf = Buffer.from(m[2], "base64"); } catch (_) { throw new Error("voice base64 decode failed"); }
   if (!buf || buf.length === 0) throw new Error("empty voice");
   if (buf.length > 20 * 1024 * 1024) throw new Error("voice too large (>20MB)");
 
@@ -59,97 +43,54 @@ function saveMessagewallVoice(dataUri) {
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   const fname = crypto.randomBytes(12).toString("hex") + "." + ext;
   fs.writeFileSync(path.join(uploadsDir, fname), buf);
-  return {
-    media_type: "voice",
-    media_url: "/uploads/" + fname,
-    media_name: fname,
-    media_size: buf.length,
-  };
+  return { media_type: "voice", media_url: "/uploads/" + fname, media_name: fname, media_size: buf.length };
 }
 
-// 读取「接收留言板通知的账号」配置（settings.messagewall_targets，JSON 字符串数组）。
-// 为空 / 缺失 → 默认对【全部账号】开放（开箱即用）。
-function getMessagewallTargets() {
+// 根据用户名查找用户 id
+function getUserIdByUsername(username) {
   const db = getDB();
-  const row = db.prepare("SELECT value FROM settings WHERE key = 'messagewall_targets'").get();
-  if (!row || !row.value) return [];
-  try {
-    const arr = JSON.parse(row.value);
-    return Array.isArray(arr) ? arr : [];
-  } catch (_) {
-    return [];
-  }
+  const row = db.prepare("SELECT id FROM users WHERE username = ?").get(username);
+  return row ? row.id : null;
 }
 
-// 解析应接收留言板消息的用户 id 列表
-function resolveMessagewallUserIds() {
+// 确保某用户的留言板话题存在，话题名为 messagewall_<username>，该用户是唯一成员。
+function ensureUserMessagewallTopic(userId, username, description) {
   const db = getDB();
-  const targets = getMessagewallTargets();
-  if (targets.length === 0) {
-    return db.prepare("SELECT id FROM users").all().map((r) => r.id);
-  }
-  const placeholders = targets.map(() => "?").join(",");
-  return db
-    .prepare(`SELECT id FROM users WHERE username IN (${placeholders})`)
-    .all(...targets)
-    .map((r) => r.id);
-}
-
-// 确保留言板话题存在，并把成员同步为 targetIds（不在其中的成员移除）。
-// description 为首次建话题时的描述（来自留言板应用的 sourceDesc）。
-function ensureMessagewallTopic(targetIds, description) {
-  const db = getDB();
-  let topic = db.prepare("SELECT * FROM topics WHERE name = ?").get(TOPIC_NAME);
+  const topicName = "messagewall_" + username;
+  let topic = db.prepare("SELECT * FROM topics WHERE name = ?").get(topicName);
   if (!topic) {
-    const ownerId = targetIds.length > 0 ? targetIds[0] : 1;
     db.prepare(
       "INSERT INTO topics (name, owner_id, title, description, kind) VALUES (?, ?, ?, ?, 'messagewall')"
-    ).run(TOPIC_NAME, ownerId, "留言板", description || "门边留言板推送的访客留言");
-    topic = db.prepare("SELECT * FROM topics WHERE name = ?").get(TOPIC_NAME);
+    ).run(topicName, userId, "留言板", description || "门边留言板推送的访客留言");
+    topic = db.prepare("SELECT * FROM topics WHERE name = ?").get(topicName);
   } else {
     db.prepare("UPDATE topics SET title = ?, description = ?, kind = 'messagewall' WHERE id = ?").run(
-      "留言板",
-      description || topic.description || "门边留言板推送的访客留言",
-      topic.id
+      "留言板", description || topic.description || "门边留言板推送的访客留言", topic.id
     );
   }
-
-  const existing = db
-    .prepare("SELECT user_id FROM topic_members WHERE topic_id = ?")
-    .all(topic.id)
-    .map((r) => r.user_id);
-  const toAdd = targetIds.filter((id) => !existing.includes(id));
-  const toRemove = existing.filter((id) => !targetIds.includes(id));
-  for (const id of toAdd) {
-    db.prepare("INSERT OR IGNORE INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'member')").run(
-      topic.id,
-      id
-    );
-  }
-  for (const id of toRemove) {
-    db.prepare("DELETE FROM topic_members WHERE topic_id = ? AND user_id = ?").run(topic.id, id);
-  }
+  // 确保该用户是成员
+  db.prepare("INSERT OR IGNORE INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'member')").run(topic.id, userId);
   return topic;
 }
 
-// 写入一条留言板消息，并实时推送给所有目标账号的设备。
-// title = 留言人（如「张三（13800138000）」），text = 留言正文（可空），
-// imageDataUri = 可选 base64 图片，voiceDataUri = 可选 base64 语音。
-// 同时有图和语音时优先展示语音（表结构单 media 字段限制）。
+// 写入一条留言板消息，并实时推送给目标用户的所有在线设备。
+// username 决定消息进入哪个用户的留言板话题；为空则用默认 gybeyond。
 // 返回 { delivered: 账号数, message } 或 { delivered:0, message:null, error }
-function appendMessagewallMessage(title, text, description, imageDataUri, voiceDataUri) {
+function appendMessagewallMessage(title, text, description, imageDataUri, voiceDataUri, username) {
   const db = getDB();
-  const targetIds = resolveMessagewallUserIds();
-  if (targetIds.length === 0) {
-    return { delivered: 0, message: null };
+  const wallUser = (username && username.trim()) ? username.trim() : DEFAULT_WALL_USER;
+  const userId = getUserIdByUsername(wallUser);
+  if (!userId) {
+    return { delivered: 0, message: null, error: "用户不存在: " + wallUser };
   }
 
-  const topic = ensureMessagewallTopic(targetIds, description);
+  const topic = ensureUserMessagewallTopic(userId, wallUser, description);
+  const topicName = topic.name;
   const ts = Date.now();
   const t = String(title || "").slice(0, 500);
   const c = String(text || "").slice(0, 2000);
 
-  // 媒体（可选）：语音优先，其次图片，均为 base64 data URI → 落盘到 data/uploads
+  // 媒体（可选）：语音优先，其次图片
   let media = { media_type: "text", media_url: null, media_name: null, media_size: 0 };
   if (voiceDataUri) {
     try {
@@ -172,11 +113,11 @@ function appendMessagewallMessage(title, text, description, imageDataUri, voiceD
       `INSERT INTO topic_messages (topic, user_id, sender_name, title, text, media_type, media_url, media_name, media_size, timestamp)
        VALUES (?, NULL, ?, '', ?, ?, ?, ?, ?, ?)`
     )
-    .run(TOPIC_NAME, t, c, media.media_type, media.media_url, media.media_name || null, media.media_size, ts);
+    .run(topicName, t, c, media.media_type, media.media_url, media.media_name || null, media.media_size, ts);
 
   const message = {
     id: result.lastInsertRowid,
-    topic: TOPIC_NAME,
+    topic: topicName,
     title: "",
     text: c,
     sender_name: t,
@@ -193,36 +134,28 @@ function appendMessagewallMessage(title, text, description, imageDataUri, voiceD
     peer_avatar: null,
   };
 
-  // 推送给每个目标账号的所有在线设备（安卓 / Windows / WebUI 都覆盖）
+  // 推送给目标用户的所有在线设备
   const { broadcastToUser, publishToTopic } = require("./websocket");
-  for (const uid of targetIds) {
-    try {
-      broadcastToUser(uid, { type: "topic_message", topic: TOPIC_NAME, data: message });
-    } catch (_) {
-      /* WS 不可用忽略 */
-    }
-  }
-  // 同时经话题订阅广播（若有连接已显式订阅该话题）
   try {
-    publishToTopic(TOPIC_NAME, message, {});
-  } catch (_) {
-    /* 忽略 */
-  }
+    broadcastToUser(userId, { type: "topic_message", topic: topicName, data: message });
+  } catch (_) { /* WS 不可用忽略 */ }
+  try {
+    publishToTopic(topicName, message, {});
+  } catch (_) { /* 忽略 */ }
 
-  // 清理旧消息（与全局上限一致）
+  // 清理旧消息
   const maxHistory = parseInt(process.env.MAX_TOPIC_HISTORY || "200");
   db.prepare(
     `DELETE FROM topic_messages WHERE topic = ? AND id NOT IN (
        SELECT id FROM topic_messages WHERE topic = ? ORDER BY id DESC LIMIT ?)`
-  ).run(TOPIC_NAME, TOPIC_NAME, maxHistory);
+  ).run(topicName, topicName, maxHistory);
 
-  return { delivered: targetIds.length, message };
+  return { delivered: 1, message };
 }
 
 module.exports = {
-  TOPIC_NAME,
-  getMessagewallTargets,
-  resolveMessagewallUserIds,
-  ensureMessagewallTopic,
+  DEFAULT_WALL_USER,
+  getUserIdByUsername,
+  ensureUserMessagewallTopic,
   appendMessagewallMessage,
 };
