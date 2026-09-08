@@ -179,8 +179,30 @@ router.delete("/notifications/:id", (req, res) => {
 
 // 留言板 Webhook 配置（已废弃）：留言板现在按 webhook 地址中的用户名自动路由到对应用户，
 // 无需管理员手动配置接收账号。保留接口仅为向后兼容，返回空列表。
-router.get("/messagewall", (req, res) => {
-  res.json({ targets: [], users: [], deprecated: true, note: "留言板已改为按 webhook 地址 /:username 自动路由，无需配置接收账号" });
+// 留言板配置：获取所有用户 + 开启了留言功能的用户列表
+router.get("/messagewall", async (req, res) => {
+  try {
+    const { getMessagewallEnabledUsers } = require("../messagewall");
+    const db = require("../db").getDB();
+    const users = db.prepare("SELECT id, username, display_name, role FROM users ORDER BY id ASC").all();
+    const enabled = getMessagewallEnabledUsers();
+    res.json({ users, enabledUsers: enabled, webhookUrl: "/api/webhook/messagewall" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 留言板配置：保存开启了留言功能的用户列表
+router.put("/messagewall", async (req, res) => {
+  try {
+    const { setMessagewallEnabledUsers } = require("../messagewall");
+    const { enabledUsers } = req.body || {};
+    if (!Array.isArray(enabledUsers)) return res.status(400).json({ error: "enabledUsers must be array" });
+    setMessagewallEnabledUsers(enabledUsers);
+    res.json({ ok: true, enabledUsers });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.put("/messagewall", (req, res) => {
