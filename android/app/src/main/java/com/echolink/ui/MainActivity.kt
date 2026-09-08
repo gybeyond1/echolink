@@ -249,6 +249,8 @@ class MainActivity : AppCompatActivity() {
         // 仅更新侧滑栏选中状态
         if (isTablet) {
             binding.toolbar?.title = ""
+            // 设置页不需要左上角头像，其他页面显示
+            binding.toolbarAvatar?.visibility = if (fragment is SettingsFragment) android.view.View.GONE else android.view.View.VISIBLE
             val navItem = when (fragment) {
                 is FriendsFragment -> R.id.nav_friends
                 is SettingsFragment -> R.id.nav_settings
