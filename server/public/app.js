@@ -1406,8 +1406,12 @@
           <div><label>话题历史保留（条）</label><input id="s-hist" type="number" min="0" step="10" /></div>
         </div>
         <div class="hint" style="margin-top:8px">数值 0 表示不限制（但服务端硬性上限为 100MB/单个文件）。超出上限的文件会被拒绝上传。</div>
-        <button class="btn" id="s-save" style="margin-top:14px">保存设置</button>
       </div>
+      <div class="card" style="max-width:560px;margin-top:16px">
+        <label>MessageWall 同步地址（留言板内网地址，注册新用户时自动同步到留言板）</label>
+        <input id="s-mwurl" type="text" placeholder="http://192.168.x.x:13000" style="width:100%" />
+        <div class="hint" style="margin-top:6px">填留言板的内网地址即可。注册新用户时会自动调用此地址创建对应的留言板用户。留空则不同步。</div>
+        <button class="btn" id="s-save" style="margin-top:14px">保存设置</button>
       <div id="s-status" style="margin-top:12px"></div>`;
     const status = document.getElementById("s-status");
     try {
@@ -1417,6 +1421,7 @@
       document.getElementById("s-voice").value = s.max_voice_size ?? 5;
       document.getElementById("s-file").value = s.max_file_size ?? 20;
       document.getElementById("s-hist").value = s.max_topic_history ?? 200;
+      document.getElementById("s-mwurl").value = s.messagewall_sync_url || '';
     } catch (e) { status.innerHTML = `<div class="empty">读取设置失败：${esc(e.message)}</div>`; }
     document.getElementById("s-save").onclick = async () => {
       const patch = {
@@ -1424,6 +1429,7 @@
         max_voice_size: document.getElementById("s-voice").value,
         max_file_size: document.getElementById("s-file").value,
         max_topic_history: document.getElementById("s-hist").value,
+        messagewall_sync_url: document.getElementById("s-mwurl").value.trim(),
       };
       const btn = document.getElementById("s-save");
       btn.disabled = true;
