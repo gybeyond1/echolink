@@ -216,4 +216,46 @@ router.put("/messagewall", (req, res) => {
   res.json({ ok: true, targets: [], deprecated: true, note: "留言板已改为按 webhook 地址 /:username 自动路由，无需配置接收账号" });
 });
 
+
+// ========== TOTP 两步验证（注册时需要输入动态码） ==========
+const totp = require("../totp");
+
+// 获取当前 TOTP 配置
+router.get("/totp", (req, res) => {
+  const settings = getSettings();
+  const enabled = settings.totp_enabled === true || settings.totp_enabled === "true";
+  const secret = settings.totp_secret || "";
+  res.json({
+    enabled,
+    secret,
+    otpauth_url: secret ? totp.otpauthUrl(secret, "EchoLink", "admin") : "",
+  });
+});
+
+// 生成新的 TOTP 密钥（未启用，需验证后启用）
+router.post("/totp/generate", (req, res) => {
+  const secret = totp.generateSecret();
+  res.json({
+    secret,
+    otpauth_url: totp.otpauthUrl(secret, "EchoLink", "admin"),
+  });
+});
+
+// 启用 TOTP（需要输入当前6位码验证）
+router.post("/totp/enable", (req, res) => {
+  const { secret, code } = req.body || {};
+  if (!secret || !code) return res.status(400).json({ error: "secret and code required" });
+  if (!totp.verifyTOTP(secret, code)) {
+    return res.status(400).json({ error: "验证码错误，请检查 OTP 应用时间是否同步" });
+  }
+  setSettings({ totp_secret: secret, totp_enabled: true });
+  res.json({ ok: true, message: "TOTP 两步验证已启用" });
+});
+
+// 禁用 TOTP
+router.post("/totp/disable", (req, res) => {
+  setSettings({ totp_enabled: false });
+  res.json({ ok: true, message: "TOTP 两步验证已禁用" });
+});
+
 module.exports = router;
