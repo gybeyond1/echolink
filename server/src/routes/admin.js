@@ -177,42 +177,14 @@ router.delete("/notifications/:id", (req, res) => {
   res.json({ message: "Notification deleted" });
 });
 
-// 留言板 Webhook 配置：查看账号列表与当前接收账号，勾选开放通知的账号
+// 留言板 Webhook 配置（已废弃）：留言板现在按 webhook 地址中的用户名自动路由到对应用户，
+// 无需管理员手动配置接收账号。保留接口仅为向后兼容，返回空列表。
 router.get("/messagewall", (req, res) => {
-  const db = getDB();
-  const users = db.prepare("SELECT id, username, role FROM users ORDER BY created_at DESC").all();
-  let targets = [];
-  try {
-    const row = db.prepare("SELECT value FROM settings WHERE key = 'messagewall_targets'").get();
-    if (row && row.value) targets = JSON.parse(row.value);
-  } catch (e) {
-    targets = [];
-  }
-  res.json({ targets: Array.isArray(targets) ? targets : [], users });
+  res.json({ targets: [], users: [], deprecated: true, note: "留言板已改为按 webhook 地址 /:username 自动路由，无需配置接收账号" });
 });
 
 router.put("/messagewall", (req, res) => {
-  const db = getDB();
-  const raw = Array.isArray(req.body && req.body.targets) ? req.body.targets : [];
-  // 只保留真实存在的用户名
-  const valid = [];
-  for (const name of raw) {
-    const u = db.prepare("SELECT id FROM users WHERE username = ?").get(String(name));
-    if (u) valid.push(String(name));
-  }
-  db.prepare(
-    "INSERT INTO settings (key, value) VALUES ('messagewall_targets', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
-  ).run(JSON.stringify(valid));
-
-  // 同步留言板话题成员（不在列表中的账号移出，新勾选的加入）
-  try {
-    const { ensureMessagewallTopic } = require("../messagewall");
-    const ids = valid.map((n) => db.prepare("SELECT id FROM users WHERE username = ?").get(n).id);
-    ensureMessagewallTopic(ids, null);
-  } catch (e) {
-    console.error("[admin] sync messagewall topic failed:", e);
-  }
-  res.json({ ok: true, targets: valid });
+  res.json({ ok: true, targets: [], deprecated: true, note: "留言板已改为按 webhook 地址 /:username 自动路由，无需配置接收账号" });
 });
 
 module.exports = router;
