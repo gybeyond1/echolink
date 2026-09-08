@@ -315,6 +315,9 @@ const SETTINGS_DEFAULTS = {
   max_voice_size: "0", // MB，0 = 不限制
   max_file_size: "0",  // MB，0 = 不限制
   max_topic_history: "200",
+  messagewall_sync_url: "", // MessageWall 同步地址
+  totp_enabled: "false", // 注册两步验证
+  totp_secret: "", // TOTP 密钥
 };
 
 let settingsCache = null;
