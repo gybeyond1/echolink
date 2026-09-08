@@ -76,8 +76,22 @@ router.delete("/users/:id", (req, res) => {
   const db = getDB();
   const id = parseInt(req.params.id);
   if (id === req.userId) return res.status(400).json({ error: "Cannot delete yourself" });
-  const user = db.prepare("SELECT id FROM users WHERE id = ?").get(id);
+  const user = db.prepare("SELECT id, username FROM users WHERE id = ?").get(id);
   if (!user) return res.status(404).json({ error: "User not found" });
+
+  // 联动删除留言板对应用户（异步，不阻塞删除）
+  try {
+    const { getSettings } = require("../db");
+    const settings = getSettings();
+    const mwSyncUrl = settings.messagewall_sync_url || '';
+    if (mwSyncUrl && user.username) {
+      fetch(mwSyncUrl.replace(/\/$/, '') + '/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.username })
+      }).catch(e => console.error("[admin] delete messagewall user failed:", e.message));
+    }
+  } catch (e) { console.error("[admin] delete messagewall user error:", e.message); }
 
   // 1. 清理默认设备会话 u{id}-devices
   const deviceTopic = `u${id}-devices`;
