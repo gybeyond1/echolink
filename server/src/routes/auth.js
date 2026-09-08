@@ -37,15 +37,19 @@ router.post("/register", (req, res) => {
     console.error("[auth] ensureDeviceTopic failed:", e);
   }
 
-  // 同步到留言板（如果配置了 MESSAGEWALL_SYNC_URL）
-  const mwSyncUrl = process.env.MESSAGEWALL_SYNC_URL || '';
-  if (mwSyncUrl) {
-    fetch(mwSyncUrl.replace(/\/$/, '') + '/api/sync-user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username })
-    }).catch(e => console.error("[auth] sync to messagewall failed:", e.message));
-  }
+  // 同步到留言板（如果配置了 messagewall_sync_url）
+  try {
+    const { getSettings } = require("../db");
+    const settings = getSettings();
+    const mwSyncUrl = settings.messagewall_sync_url || '';
+    if (mwSyncUrl) {
+      fetch(mwSyncUrl.replace(/\/$/, '') + '/api/sync-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      }).catch(e => console.error("[auth] sync to messagewall failed:", e.message));
+    }
+  } catch (e) { console.error("[auth] sync messagewall error:", e.message); }
 
   const token = jwt.sign(
     { userId: result.lastInsertRowid, username, role: "user" },
