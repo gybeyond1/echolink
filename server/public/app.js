@@ -28,9 +28,8 @@
   function isTauri() { return !!(window.__TAURI__ && window.__TAURI__.core); }
   const BELL_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:60%;height:60%" aria-hidden="true"><path d="M18 16v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-5.5 4c0 .55-.45 1-1 1s-1-.45-1-1h2z"/></svg>';
 
-  // 桌面端（Tauri/Windows）：禁用右键菜单与 F5 刷新，强化原生体验
+  // 桌面端（Tauri/Windows）：禁用 F5 刷新，右键菜单保留（输入框需复制粘贴）
   if (window.__TAURI__ || window.__TAURI_INTERNALS__) {
-    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     window.addEventListener("keydown", function (e) {
       if (e.key === "F5" || (e.ctrlKey && (e.key === "r" || e.key === "R"))) e.preventDefault();
     });
