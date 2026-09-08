@@ -210,11 +210,16 @@ class MainActivity : AppCompatActivity() {
 
     /** 平板端：恢复 toolbar 头像显示 */
     fun showToolbarAvatar() {
+        if (isTablet) binding.toolbar?.title = ""
         if (isTablet) binding.toolbarAvatar?.visibility = android.view.View.VISIBLE
     }
 
     /** 侧滑栏底部用户信息 → 账号设置 */
     fun openAccountSettings() {
+        if (isTablet) {
+            binding.toolbar?.title = ""
+            binding.toolbarAvatar?.visibility = android.view.View.GONE
+        }
         if (isTablet) binding.toolbarAvatar?.visibility = android.view.View.GONE
         supportFragmentManager
             .beginTransaction()
