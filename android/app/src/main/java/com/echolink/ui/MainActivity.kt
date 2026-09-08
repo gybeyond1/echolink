@@ -205,7 +205,6 @@ class MainActivity : AppCompatActivity() {
 
     /** 平板端：隐藏 toolbar 头像 */
     fun hideToolbarAvatar() {
-        if (isTablet) binding.toolbarAvatar?.visibility = android.view.View.GONE
     }
 
     /** 平板端：恢复 toolbar 头像显示 */
@@ -220,13 +219,11 @@ class MainActivity : AppCompatActivity() {
             binding.toolbar?.title = ""
             binding.toolbarAvatar?.visibility = android.view.View.GONE
         }
-        if (isTablet) binding.toolbarAvatar?.visibility = android.view.View.GONE
         supportFragmentManager
             .beginTransaction()
             .replace(binding.fragmentContainer.id, AccountSettingsFragment())
             .addToBackStack(null)
             .commit()
-        binding.toolbar?.title = "账号设置"
     }
 
     /** 切换主题对话框（跟随系统/浅色/深色） */
