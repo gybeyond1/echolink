@@ -50,6 +50,16 @@ class AccountSettingsFragment : Fragment() {
         return binding.root
     }
 
+    override fun onResume() {
+        super.onResume()
+        (activity as? MainActivity)?.hideToolbarAvatar()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        (activity as? MainActivity)?.showToolbarAvatar()
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
