@@ -269,13 +269,18 @@
             <p style="font-size:12px;opacity:.7;margin-top:4px"><a href="https://github.com/gybeyond1/echolink" target="_blank" style="color:inherit;text-decoration:underline">github.com/gybeyond1/echolink</a></p>
           </div>
           <div id="auth-form">
+            <div id="au-server-wrap" style="display:none">
+              <label>服务器地址</label>
+              <input id="au-server" type="text" placeholder="http://192.168.x.x:4000 或公网域名" autocomplete="off" style="width:100%" />
+              <div class="hint" style="font-size:11px;margin:4px 0 10px">桌面端需填写服务器地址，登录和注册共用</div>
+            </div>
             <label>用户名</label>
             <input id="au-user" type="text" placeholder="3-32 个字符" autocomplete="username" />
             <label>密码</label>
             <input id="au-pass" type="password" placeholder="至少 6 位" autocomplete="current-password" />
             <div id="au-totp-wrap" style="display:none;margin-top:12px">
               <label>两步验证码</label>
-              <input id="au-totp" type="text" placeholder="6位动态码" maxlength="6" autocomplete="off" style="letter-spacing:4px;text-align:center;width:100%" />
+              <input id="au-totp" type="text" placeholder="6位动态码（服务器启用了两步验证则必填）" maxlength="6" autocomplete="off" style="letter-spacing:4px;text-align:center;width:100%" />
             </div>
             <button id="au-submit" class="btn block" style="margin-top:18px">登录</button>
             <p style="text-align:center;margin-top:14px">
@@ -289,12 +294,28 @@
     let totpRequired = false;
     function updateTotpVisibility() {
       const wrap = document.getElementById("au-totp-wrap");
-      if (wrap) wrap.style.display = (mode === "register" && totpRequired) ? "block" : "none";
+      // 注册模式始终显示两步验证（如服务器启用则必填，未启用可留空）
+      if (wrap) wrap.style.display = (mode === "register") ? "block" : "none";
     }
     fetch(API_BASE + "/api/auth/totp-status").then(r => r.json()).then(r => {
       totpRequired = !!r.enabled;
       updateTotpVisibility();
     }).catch(() => {});
+    // 桌面端（Tauri）：显示服务器地址输入框，读取已保存的地址
+    if (isTauri()) {
+      const wrap = document.getElementById("au-server-wrap");
+      if (wrap) wrap.style.display = "block";
+      (async () => {
+        try {
+          const cfg = await window.__TAURI__.core.invoke("get_config");
+          if (cfg && cfg.server_url) {
+            const input = document.getElementById("au-server");
+            if (input) input.value = cfg.server_url;
+            API_BASE = cfg.server_url.replace(/\/+$/, "");
+          }
+        } catch (e) { /* 忽略 */ }
+      })();
+    }
     let mode = "login";
     const submit = document.getElementById("au-submit");
     const toggle = document.getElementById("au-toggle");
@@ -306,11 +327,20 @@
       updateTotpVisibility();
     };
     submit.onclick = async () => {
+      // 桌面端：先保存服务器地址
+      if (isTauri()) {
+        const serverUrl = document.getElementById("au-server") ? document.getElementById("au-server").value.trim() : "";
+        if (!serverUrl) { toast("请填写服务器地址", "err"); return; }
+        try {
+          await window.__TAURI__.core.invoke("save_server_url", { url: serverUrl });
+          API_BASE = serverUrl.replace(/\/+$/, "");
+        } catch (e) { toast("保存服务器地址失败", "err"); return; }
+      }
       const username = document.getElementById("au-user").value.trim();
       const password = document.getElementById("au-pass").value;
       const totp_code = document.getElementById("au-totp") ? document.getElementById("au-totp").value.trim() : "";
       if (!username || !password) return toast("请输入用户名和密码", "err");
-      if (mode === "register" && totpRequired && !totp_code) return toast("请输入两步验证码", "err");
+      // 两步验证留空也可提交，服务器端会验证是否必填
       submit.disabled = true;
       try {
         const ep = mode === "login" ? "/api/auth/login" : "/api/auth/register";
@@ -1539,6 +1569,7 @@
       } catch (e) { status.innerHTML = `<div class="empty">保存失败：${esc(e.message)}</div>`; }
       finally { btn.disabled = false; }
     };
+    loadTotpConfig();
   }
 
   async function loadTotpConfig() {

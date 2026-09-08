@@ -91,11 +91,7 @@ class LoginActivity : AppCompatActivity() {
                 try {
                     val response = if (isRegisterMode) {
                     val totpCode = if (isRegisterMode) binding.etTotp.text.toString().trim() else ""
-                    if (isRegisterMode && totpRequired && totpCode.isEmpty()) {
-                        setLoading(false)
-                        Toast.makeText(this@LoginActivity, "请输入两步验证码", Toast.LENGTH_SHORT).show()
-                        return@launch
-                    }
+                    // 两步验证留空也可提交，服务器端会验证是否必填
                         ApiClient.register(username, password)
                     } else {
                         ApiClient.login(username, password)
@@ -161,7 +157,8 @@ class LoginActivity : AppCompatActivity() {
 
 
     private fun updateTotpVisibility() {
-        binding.tilTotp.visibility = if (isRegisterMode && totpRequired) View.VISIBLE else View.GONE
+        // 注册模式始终显示两步验证输入框（如服务器启用则必填，未启用可留空）
+        binding.tilTotp.visibility = if (isRegisterMode) View.VISIBLE else View.GONE
     }
 
     private fun setLoading(loading: Boolean) {
