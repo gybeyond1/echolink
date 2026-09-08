@@ -1443,9 +1443,9 @@
     main.innerHTML = `<h2 class="page-title">留言板 Webhook</h2>
       <p class="page-sub">门边留言板应用可把访客留言推送到这里。默认 Webhook 地址会推送给所有开启了留言功能的用户，每个用户也有独立地址 <code>/api/webhook/messagewall/用户名</code>。</p>
       <div class="card" style="margin-bottom:16px">
-        <label>默认 Webhook 地址（推送给所有开启用户）</label>
+        <label>Webhook 基础地址（留空=自动用当前页面地址；填了就用你填的，如反代后的公网地址）</label>
         <div class="row" style="align-items:flex-end">
-          <input id="mw-url" readonly value="" style="flex:1" />
+          <input id="mw-url" value="" placeholder="留空则自动用当前页面地址，如 https://your-domain.com" style="flex:1" />
           <button class="btn ghost" id="mw-copy">复制</button>
         </div>
         <div style="margin-top:16px">
@@ -1465,12 +1465,14 @@
       if (navigator.clipboard) navigator.clipboard.writeText(v).then(() => toast("已复制", "ok")).catch(() => {});
     };
 
-    let users = [], enabledUsers = [];
+    let users = [], enabledUsers = [], webhookBase = "";
     try {
       const r = await api("/api/admin/messagewall");
       users = r.users || [];
       enabledUsers = r.enabledUsers || [];
+      webhookBase = r.webhookBase || "";
     } catch (e) { status.innerHTML = `<div class="empty">读取失败：${esc(e.message)}</div>`; }
+    document.getElementById("mw-url").value = webhookBase || location.origin;
 
     const box = document.getElementById("mw-users");
     if (!users.length) { box.innerHTML = `<div class="empty">暂无用户。</div>`; }
@@ -1486,18 +1488,19 @@
 
     document.getElementById("mw-save").onclick = async () => {
       const sel = Array.from(box.querySelectorAll("input[data-user]:checked")).map(c => c.dataset.user);
+      const wb = document.getElementById("mw-url").value.trim();
       const btn = document.getElementById("mw-save");
       btn.disabled = true;
       try {
-        const r = await api("/api/admin/messagewall", { method: "PUT", body: { enabledUsers: sel } });
-        status.innerHTML = `<div class="label" style="color:#1a7f37;font-weight:600">已保存。开启留言功能的用户：${r.enabledUsers.length ? esc(r.enabledUsers.join("、")) : "无"}</div>`;
+        const r = await api("/api/admin/messagewall", { method: "PUT", body: { enabledUsers: sel, webhookBase: wb } });
+        status.innerHTML = `<div class="label" style="color:#1a7f37;font-weight:600">已保存。开启留言功能的用户：${r.enabledUsers.length ? esc(r.enabledUsers.join("、")) : "无"}${r.webhookBase ? "；Webhook 地址：" + esc(r.webhookBase) : "；Webhook 地址：自动"}</div>`;
         toast("已保存", "ok");
       } catch (e) { status.innerHTML = `<div class="empty">保存失败：${esc(e.message)}</div>`; }
       finally { btn.disabled = false; }
     };
 
     document.getElementById("mw-test").onclick = async () => {
-      const url = document.getElementById("mw-url").value;
+      const url = (document.getElementById("mw-url").value.trim() || location.origin) + "/api/webhook/messagewall";
       try {
         const resp = await fetch(url, {
           method: "POST",
