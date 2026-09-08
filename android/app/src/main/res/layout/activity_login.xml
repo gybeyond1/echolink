@@ -94,6 +94,26 @@
             android:singleLine="true" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilTotp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:visibility="gone"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etTotp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="两步验证码（6位动态码）"
+            android:inputType="number"
+            android:maxLength="6"
+            android:singleLine="true"
+            android:letterSpacing="0.2"
+            android:gravity="center" />
+    </com.google.android.material.textfield.TextInputLayout>
+
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnLogin"
         android:layout_width="match_parent"
