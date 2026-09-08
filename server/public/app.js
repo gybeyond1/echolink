@@ -1441,15 +1441,15 @@
   // ---------- Admin: 留言板 Webhook 配置 ----------
   async function renderAdminMessagewall(main) {
     main.innerHTML = `<h2 class="page-title">留言板 Webhook</h2>
-      <p class="page-sub">门边留言板应用可把访客留言推送到这里，作为独立会话显示，不与通知 / 私聊 / 设备会话混淆。勾选要接收留言的账号（留空 = 全部账号）。</p>
+      <p class="page-sub">门边留言板应用可把访客留言推送到这里。默认 Webhook 地址会推送给所有开启了留言功能的用户，每个用户也有独立地址 <code>/api/webhook/messagewall/用户名</code>。</p>
       <div class="card" style="margin-bottom:16px">
-        <label>Webhook 地址（填到留言板应用的「Webhook URL」）</label>
+        <label>默认 Webhook 地址（推送给所有开启用户）</label>
         <div class="row" style="align-items:flex-end">
           <input id="mw-url" readonly value="" style="flex:1" />
           <button class="btn ghost" id="mw-copy">复制</button>
         </div>
-        <div style="margin-top:12px">
-          <label>接收留言的账号</label>
+        <div style="margin-top:16px">
+          <label>开启留言功能的用户（勾选后该用户会有独立的留言板会话）</label>
           <div id="mw-users" class="chips">加载中…</div>
         </div>
         <div style="margin-top:14px;display:flex;gap:10px">
@@ -1465,11 +1465,11 @@
       if (navigator.clipboard) navigator.clipboard.writeText(v).then(() => toast("已复制", "ok")).catch(() => {});
     };
 
-    let users = [], targets = [];
+    let users = [], enabledUsers = [];
     try {
       const r = await api("/api/admin/messagewall");
       users = r.users || [];
-      targets = r.targets || [];
+      enabledUsers = r.enabledUsers || [];
     } catch (e) { status.innerHTML = `<div class="empty">读取失败：${esc(e.message)}</div>`; }
 
     const box = document.getElementById("mw-users");
@@ -1477,8 +1477,10 @@
     else {
       box.innerHTML = users.map(u => `
         <label class="chip">
-          <input type="checkbox" data-user="${esc(u.username)}" ${targets.includes(u.username) ? "checked" : ""}/>
-          ${esc(u.username)}${u.role === "admin" ? ' <span class="badge admin">管理员</span>' : ""}
+          <input type="checkbox" data-user="${esc(u.username)}" ${enabledUsers.includes(u.username) ? "checked" : ""}/>
+          ${esc(u.display_name || u.username)}
+          <span style="color:var(--on-surface-variant);font-size:12px">@${esc(u.username)}</span>
+          ${u.role === "admin" ? ' <span class="badge admin">管理员</span>' : ""}
         </label>`).join("");
     }
 
@@ -1487,8 +1489,8 @@
       const btn = document.getElementById("mw-save");
       btn.disabled = true;
       try {
-        const r = await api("/api/admin/messagewall", { method: "PUT", body: { targets: sel } });
-        status.innerHTML = `<div class="label" style="color:#1a7f37;font-weight:600">已保存。接收账号：${r.targets.length ? esc(r.targets.join("、")) : "全部账号"}</div>`;
+        const r = await api("/api/admin/messagewall", { method: "PUT", body: { enabledUsers: sel } });
+        status.innerHTML = `<div class="label" style="color:#1a7f37;font-weight:600">已保存。开启留言功能的用户：${r.enabledUsers.length ? esc(r.enabledUsers.join("、")) : "无"}</div>`;
         toast("已保存", "ok");
       } catch (e) { status.innerHTML = `<div class="empty">保存失败：${esc(e.message)}</div>`; }
       finally { btn.disabled = false; }
@@ -1503,7 +1505,7 @@
           body: JSON.stringify({ source: "messagewall", sourceName: "留言板", sourceDesc: "测试", title: "测试用户", content: "这是一条测试留言，请忽略。" }),
         });
         const j = await resp.json().catch(() => ({}));
-        if (resp.ok && j.ok) status.innerHTML = `<div class="label" style="color:#1a7f37;font-weight:600">测试留言已发送（推送给 ${j.delivered} 个账号）。去「消息」里看留言板会话吧。</div>`;
+        if (resp.ok && j.ok) status.innerHTML = `<div class="label" style="color:#1a7f37;font-weight:600">测试留言已发送（推送给 ${j.delivered} 个用户）。去「消息」里看留言板会话吧。</div>`;
         else status.innerHTML = `<div class="empty">测试失败：${esc(j.error || resp.status)}</div>`;
       } catch (e) { status.innerHTML = `<div class="empty">测试失败：${esc(e.message)}</div>`; }
     };
