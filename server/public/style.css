@@ -588,3 +588,30 @@ tr:hover td { background: var(--primary-soft); }
   .chat-back { display: inline-flex; }
   .bubble { max-width: 84%; }
 }
+
+/* 右键菜单 */
+.ctx-menu {
+  position: fixed;
+  z-index: 10000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  min-width: 140px;
+  padding: 6px 0;
+}
+.ctx-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--on-surface);
+}
+.ctx-item:hover {
+  background: var(--surface-variant);
+}
+.ctx-item.danger {
+  color: #d1242f;
+}
+.ctx-item.danger:hover {
+  background: rgba(209,36,47,0.08);
+}
