@@ -153,9 +153,53 @@ function appendMessagewallMessage(title, text, description, imageDataUri, voiceD
   return { delivered: 1, message };
 }
 
+// 获取开启了留言板功能的用户列表
+function getMessagewallEnabledUsers() {
+  const db = getDB();
+  try {
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'messagewall_enabled_users'").get();
+    if (row && row.value) {
+      return JSON.parse(row.value);
+    }
+  } catch (_) {}
+  // 默认所有用户都开启
+  const users = db.prepare("SELECT username FROM users").all();
+  return users.map(u => u.username);
+}
+
+// 设置开启了留言板功能的用户列表
+function setMessagewallEnabledUsers(usernames) {
+  const db = getDB();
+  const val = JSON.stringify(usernames || []);
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('messagewall_enabled_users', ?)").run(val);
+}
+
+// 迁移旧的 messagewall 话题 → messagewall_gybeyond
+function migrateLegacyMessagewallTopic() {
+  const db = getDB();
+  const oldTopic = db.prepare("SELECT * FROM topics WHERE name = 'messagewall'").get();
+  if (!oldTopic) return;
+  const newName = "messagewall_" + DEFAULT_WALL_USER;
+  const existing = db.prepare("SELECT id FROM topics WHERE name = ?").get(newName);
+  if (existing) {
+    // 新话题已存在，把旧话题的消息移过去然后删除旧话题
+    db.prepare("UPDATE topic_messages SET topic = ? WHERE topic = 'messagewall'").run(newName);
+    db.prepare("DELETE FROM topic_members WHERE topic_id = ?").run(oldTopic.id);
+    db.prepare("DELETE FROM topics WHERE id = ?").run(oldTopic.id);
+    console.log("[migrate] 旧 messagewall 话题消息已合并到 " + newName);
+  } else {
+    db.prepare("UPDATE topics SET name = ? WHERE id = ?").run(newName, oldTopic.id);
+    db.prepare("UPDATE topic_messages SET topic = ? WHERE topic = 'messagewall'").run(newName);
+    console.log("[migrate] 旧 messagewall 话题已重命名为 " + newName);
+  }
+}
+
 module.exports = {
   DEFAULT_WALL_USER,
   getUserIdByUsername,
   ensureUserMessagewallTopic,
   appendMessagewallMessage,
+  getMessagewallEnabledUsers,
+  setMessagewallEnabledUsers,
+  migrateLegacyMessagewallTopic,
 };
