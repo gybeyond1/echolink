@@ -48,30 +48,32 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <!-- Sender + time row (GONE for consecutive messages) - ABOVE bubble -->
+        <!-- 时间轴：居中显示，间隔超过15分钟才可见 -->
+        <TextView
+            android:id="@+id/tvTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/on_surface_variant"
+            android:textSize="11sp"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone" />
+
+        <!-- Sender row (GONE for consecutive messages) - ABOVE bubble -->
         <LinearLayout
             android:id="@+id/llSenderInfo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
             android:layout_marginBottom="2dp">
 
             <TextView
                 android:id="@+id/tvSender"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="@color/brand_primary"
                 android:textSize="13sp"
                 android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvTime"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:textColor="@color/on_surface_variant"
-                android:textSize="11sp" />
         </LinearLayout>
 
         <!-- Actual bubble (background + padding here) -->
