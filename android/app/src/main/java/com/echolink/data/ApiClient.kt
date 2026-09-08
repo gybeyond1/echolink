@@ -65,10 +65,20 @@ object ApiClient {
 
     // ===== 认证 =====
 
-    suspend fun register(username: String, password: String): AuthResponse {
+    suspend fun register(username: String, password: String, totpCode: String = ""): AuthResponse {
         val body = JSONObject().put("username", username).put("password", password)
+        if (totpCode.isNotEmpty()) body.put("totp_code", totpCode)
         val json = execute(buildRequest("/api/auth/register", "POST", body, withAuth = false))
         return parseAuthResponse(json)
+    }
+
+    suspend fun isTotpRequired(): Boolean {
+        return try {
+            val json = execute(buildRequest("/api/auth/totp-status", "GET", withAuth = false))
+            json.optBoolean("enabled", false)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     suspend fun login(username: String, password: String): AuthResponse {

@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
     private var isRegisterMode = false
+    private var totpRequired = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +37,12 @@ class LoginActivity : AppCompatActivity() {
 
     private fun setupViews() {
         updateMode()
+
+        // 检查是否启用了注册两步验证
+        lifecycleScope.launch {
+            totpRequired = ApiClient.isTotpRequired()
+            updateTotpVisibility()
+        }
 
         // 预填上次保存的服务器地址（便于切换设备后快速登录）
         binding.etServerUrl.setText(AuthManager.serverUrl)
@@ -83,6 +90,12 @@ class LoginActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 try {
                     val response = if (isRegisterMode) {
+                    val totpCode = if (isRegisterMode) binding.etTotp.text.toString().trim() else ""
+                    if (isRegisterMode && totpRequired && totpCode.isEmpty()) {
+                        setLoading(false)
+                        Toast.makeText(this@LoginActivity, "请输入两步验证码", Toast.LENGTH_SHORT).show()
+                        return@launch
+                    }
                         ApiClient.register(username, password)
                     } else {
                         ApiClient.login(username, password)
@@ -142,7 +155,13 @@ class LoginActivity : AppCompatActivity() {
             binding.btnLogin.text = "登录"
             binding.btnToggleMode.text = "没有账号？去注册"
             binding.tvTitle.text = "欢迎回来"
+        updateTotpVisibility()
         }
+    }
+
+
+    private fun updateTotpVisibility() {
+        binding.tilTotp.visibility = if (isRegisterMode && totpRequired) View.VISIBLE else View.GONE
     }
 
     private fun setLoading(loading: Boolean) {

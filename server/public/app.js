@@ -273,6 +273,10 @@
             <input id="au-user" type="text" placeholder="3-32 个字符" autocomplete="username" />
             <label>密码</label>
             <input id="au-pass" type="password" placeholder="至少 6 位" autocomplete="current-password" />
+            <div id="au-totp-wrap" style="display:none;margin-top:12px">
+              <label>两步验证码</label>
+              <input id="au-totp" type="text" placeholder="6位动态码" maxlength="6" autocomplete="off" style="letter-spacing:4px;text-align:center;width:100%" />
+            </div>
             <button id="au-submit" class="btn block" style="margin-top:18px">登录</button>
             <p style="text-align:center;margin-top:14px">
               <span class="link" id="au-toggle">还没有账号？注册一个</span>
@@ -281,6 +285,16 @@
         </div>
       </div>`;
 
+    // 检查是否启用了注册两步验证
+    let totpRequired = false;
+    function updateTotpVisibility() {
+      const wrap = document.getElementById("au-totp-wrap");
+      if (wrap) wrap.style.display = (mode === "register" && totpRequired) ? "block" : "none";
+    }
+    fetch(API_BASE + "/api/auth/totp-status").then(r => r.json()).then(r => {
+      totpRequired = !!r.enabled;
+      updateTotpVisibility();
+    }).catch(() => {});
     let mode = "login";
     const submit = document.getElementById("au-submit");
     const toggle = document.getElementById("au-toggle");
@@ -289,15 +303,19 @@
       mode = mode === "login" ? "register" : "login";
       submit.textContent = mode === "login" ? "登录" : "注册并进入";
       toggle.textContent = mode === "login" ? "还没有账号？注册一个" : "已有账号？去登录";
+      updateTotpVisibility();
     };
     submit.onclick = async () => {
       const username = document.getElementById("au-user").value.trim();
       const password = document.getElementById("au-pass").value;
+      const totp_code = document.getElementById("au-totp") ? document.getElementById("au-totp").value.trim() : "";
       if (!username || !password) return toast("请输入用户名和密码", "err");
+      if (mode === "register" && totpRequired && !totp_code) return toast("请输入两步验证码", "err");
       submit.disabled = true;
       try {
         const ep = mode === "login" ? "/api/auth/login" : "/api/auth/register";
-        const r = await api(ep, { method: "POST", body: { username, password } });
+        const body = mode === "register" ? { username, password, totp_code } : { username, password };
+        const r = await api(ep, { method: "POST", body });
         if (!r || !r.token || !r.user || !r.user.username) {
           throw new Error("登录失败：服务器未返回有效用户信息，请检查服务器地址是否正确");
         }
@@ -489,12 +507,87 @@
         if (t) openChat(t);
       };
     });
+      el.oncontextmenu = (e) => {
+        e.preventDefault();
+        const t = state.topics.find(x => x.name === el.dataset.topic);
+        if (t) showSessionContextMenu(e, t);
+      };
     list.querySelectorAll("[data-special]").forEach(el => {
       el.onclick = () => {
         if (el.dataset.special === "notifications") openNotifications();
         else openRequests();
       };
     });
+  }
+
+  // 会话右键菜单
+  function showSessionContextMenu(e, t) {
+    hideContextMenu();
+    const kind = t.kind || "normal";
+    const isOwner = t.my_role === "owner";
+    const isAdmin = state.role === "admin";
+    if (kind === "devices" || kind === "messagewall") return;
+
+    const menu = document.createElement("div");
+    menu.id = "ctx-menu";
+    menu.className = "ctx-menu";
+    menu.style.left = e.pageX + "px";
+    menu.style.top = e.pageY + "px";
+
+    let items = [];
+    if (kind === "normal") {
+      if (isOwner || isAdmin) {
+        items.push({ label: "删除话题", danger: true, action: () => deleteTopic(t) });
+      } else {
+        items.push({ label: "退出话题", action: () => leaveTopic(t) });
+      }
+    } else if (kind === "dm") {
+      items.push({ label: "删除会话", danger: true, action: () => leaveTopic(t) });
+    }
+    if (!items.length) return;
+
+    menu.innerHTML = items.map((it, idx) =>
+      `<div class="ctx-item ${it.danger ? "danger" : ""}" data-idx="${idx}">${it.label}</div>`
+    ).join("");
+    document.body.appendChild(menu);
+
+    menu.querySelectorAll(".ctx-item").forEach((el, idx) => {
+      el.onclick = () => {
+        hideContextMenu();
+        items[idx].action();
+      };
+    });
+    setTimeout(() => {
+      document.addEventListener("click", hideContextMenu, { once: true });
+    }, 10);
+  }
+
+  function hideContextMenu() {
+    const m = document.getElementById("ctx-menu");
+    if (m) m.remove();
+  }
+
+  async function leaveTopic(t) {
+    const msg = t.kind === "dm"
+      ? "确定删除该私聊会话？仅从你的列表移除，好友关系不受影响。"
+      : "确定退出该话题？退出后不再接收该话题消息。";
+    if (!confirm(msg)) return;
+    try {
+      await api("/api/topics/" + encodeURIComponent(t.name) + "/leave", { method: "POST" });
+      toast("操作成功", "ok");
+      state.chat = null;
+      renderMessages(document.getElementById("main"));
+    } catch (e) { toast(e.message, "err"); }
+  }
+
+  async function deleteTopic(t) {
+    if (!confirm("确定删除该话题？所有消息将被清除，且不可恢复。")) return;
+    try {
+      await api("/api/topics/" + encodeURIComponent(t.name), { method: "DELETE" });
+      toast("话题已删除", "ok");
+      state.chat = null;
+      renderMessages(document.getElementById("main"));
+    } catch (e) { toast(e.message, "err"); }
   }
 
   function setChatOpen(open) {
@@ -1412,7 +1505,12 @@
         <input id="s-mwurl" type="text" placeholder="http://192.168.x.x:13000" style="width:100%" />
         <div class="hint" style="margin-top:6px">填留言板的内网地址即可。注册新用户时会自动调用此地址创建对应的留言板用户。留空则不同步。</div>
         <button class="btn" id="s-save" style="margin-top:14px">保存设置</button>
-      <div id="s-status" style="margin-top:12px"></div>`;
+      <div id="s-status" style="margin-top:12px"></div>
+      <div class="card" style="max-width:560px;margin-top:16px">
+        <h3 style="margin:0 0 10px 0">注册两步验证（TOTP）</h3>
+        <div class="hint" style="margin-bottom:12px">启用后，新用户注册时需要输入管理员 OTP 应用中的6位动态码。防止陌生人随意注册账号。</div>
+        <div id="totp-status">加载中…</div>
+      </div>`;
     const status = document.getElementById("s-status");
     try {
       const r = await api("/api/admin/settings");
@@ -1441,6 +1539,63 @@
       } catch (e) { status.innerHTML = `<div class="empty">保存失败：${esc(e.message)}</div>`; }
       finally { btn.disabled = false; }
     };
+  }
+
+  async function loadTotpConfig() {
+    const box = document.getElementById("totp-status");
+    if (!box) return;
+    try {
+      const r = await api("/api/admin/totp");
+      if (r.enabled) {
+        box.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <span style="color:#1a7f37;font-weight:600">已启用</span>
+            <button class="btn danger sm" id="totp-disable">禁用</button>
+          </div>
+          <div class="hint">当前密钥：<code style="user-select:all">${esc(r.secret)}</code></div>`;
+        document.getElementById("totp-disable").onclick = async () => {
+          if (!confirm("确定禁用注册两步验证？禁用后任何人都可以注册。")) return;
+          try { await api("/api/admin/totp/disable", { method: "POST" }); toast("已禁用", "ok"); loadTotpConfig(); }
+          catch (e) { toast(e.message, "err"); }
+        };
+      } else {
+        box.innerHTML = `
+          <div style="margin-bottom:12px"><span style="color:#d1242f;font-weight:600">未启用</span></div>
+          <button class="btn" id="totp-setup">设置两步验证</button>
+          <div id="totp-setup-area" style="margin-top:14px;display:none">
+            <div class="hint" style="margin-bottom:8px">1. 用 Google Authenticator / Microsoft Authenticator 扫描下方二维码，或手动输入密钥</div>
+            <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:12px">
+              <img id="totp-qr" style="width:140px;height:140px;border:1px solid var(--border);border-radius:8px" />
+              <div>
+                <div class="hint">密钥（手动输入用）：</div>
+                <code id="totp-secret" style="user-select:all;font-size:14px;letter-spacing:1px"></code>
+              </div>
+            </div>
+            <div class="hint" style="margin-bottom:8px">2. 输入 OTP 应用中显示的6位码，验证并启用</div>
+            <div style="display:flex;gap:8px">
+              <input id="totp-verify-code" type="text" placeholder="6位动态码" maxlength="6" style="width:120px;letter-spacing:4px;text-align:center" />
+              <button class="btn" id="totp-enable">验证并启用</button>
+            </div>
+          </div>`;
+        document.getElementById("totp-setup").onclick = async () => {
+          try {
+            const r = await api("/api/admin/totp/generate", { method: "POST" });
+            document.getElementById("totp-setup-area").style.display = "block";
+            document.getElementById("totp-secret").textContent = r.secret;
+            document.getElementById("totp-qr").src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(r.otpauth_url);
+            document.getElementById("totp-enable").onclick = async () => {
+              const code = document.getElementById("totp-verify-code").value.trim();
+              if (!code) return toast("请输入6位验证码", "err");
+              try {
+                await api("/api/admin/totp/enable", { method: "POST", body: { secret: r.secret, code } });
+                toast("两步验证已启用", "ok");
+                loadTotpConfig();
+              } catch (e) { toast(e.message, "err"); }
+            };
+          } catch (e) { toast(e.message, "err"); }
+        };
+      }
+    } catch (e) { box.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`; }
   }
 
   // ---------- Admin: 留言板 Webhook 配置 ----------
