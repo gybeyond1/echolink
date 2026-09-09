@@ -24,7 +24,6 @@ class TopicListAdapter(
 
     fun setItems(list: List<MyTopic>) {
         items.clear()
-        // 直接采用服务端排序：devices（置顶）→ dm → normal（按最近消息时间）
         items.addAll(list)
         notifyDataSetChanged()
     }
@@ -32,24 +31,32 @@ class TopicListAdapter(
     fun getItem(position: Int): MyTopic = items[position]
     fun getItems(): List<MyTopic> = items
 
-    // 头像：设备会话→手机图标；留言板→信封图标；私聊→好友头像（有则图片，无则首字母）；群聊→首字母
+    // 头像：设备/留言板/MP/通知→新拟态PNG图标；私聊→好友头像；群聊→首字母
     private fun bindAvatar(holder: ViewHolder, item: MyTopic, display: String) {
         when {
             item.kind == "devices" -> {
-                holder.ivAvatar.visibility = View.GONE
-                holder.tvAvatar.visibility = View.VISIBLE
-                holder.tvAvatar.text = "\uD83D\uDCF1"
-                holder.tvAvatar.setBackgroundResource(R.drawable.bg_mw_avatar)
-                holder.tvAvatar.setTextColor(holder.itemView.context.getColor(R.color.on_surface))
-                holder.tvAvatar.textSize = 23f
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                holder.ivAvatar.setImageResource(R.drawable.ic_my_device_neo)
+                holder.ivAvatar.setBackgroundResource(0)
             }
             item.kind == "messagewall" -> {
-                holder.ivAvatar.visibility = View.GONE
-                holder.tvAvatar.visibility = View.VISIBLE
-                holder.tvAvatar.text = "\uD83D\uDCEC"
-                holder.tvAvatar.setBackgroundResource(R.drawable.bg_mw_avatar)
-                holder.tvAvatar.setTextColor(holder.itemView.context.getColor(R.color.on_surface))
-                holder.tvAvatar.textSize = 23f // 比默认 18sp 放大约 30%
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                holder.ivAvatar.setImageResource(R.drawable.ic_messagewall_neo)
+                holder.ivAvatar.setBackgroundResource(0)
+            }
+            item.kind == "moviepilot" -> {
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                holder.ivAvatar.setImageResource(R.drawable.ic_moviepilot_neo)
+                holder.ivAvatar.setBackgroundResource(0)
+            }
+            item.kind == "notification" -> {
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                holder.ivAvatar.setImageResource(R.drawable.ic_notification_neo)
+                holder.ivAvatar.setBackgroundResource(0)
             }
             !item.avatarUrl.isNullOrBlank() -> {
                 holder.tvAvatar.visibility = View.GONE
@@ -83,7 +90,6 @@ class TopicListAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
-        // 特殊会话展示名前端兜底（即使服务端返回内部标识也显示中文名）
         val display = when (item.kind) {
             "devices" -> "我的设备"
             "messagewall" -> "留言板"
@@ -94,7 +100,6 @@ class TopicListAdapter(
         holder.tvName.text = display
         bindAvatar(holder, item, display)
 
-        // 角色标签（设备/私聊会话不显示）
         if (item.myRole == "owner" && item.kind == "normal") {
             holder.tvRole.visibility = View.VISIBLE
             holder.tvRole.text = "创建者"
@@ -102,10 +107,8 @@ class TopicListAdapter(
             holder.tvRole.visibility = View.GONE
         }
 
-        // 预览
         holder.tvPreview.text = if (!item.lastMessage.isNullOrEmpty()) item.lastMessage else "暂无消息"
 
-        // 待审批红点（仅创建者）
         if (item.myRole == "owner" && item.pendingRequests > 0) {
             holder.tvPending.visibility = View.VISIBLE
             holder.tvPending.text = item.pendingRequests.toString()
@@ -113,7 +116,6 @@ class TopicListAdapter(
             holder.tvPending.visibility = View.GONE
         }
 
-        // 未读数气泡：优先显示未读数；没有未读时显示总消息数
         if (item.unreadCount > 0) {
             holder.tvUnread.visibility = View.VISIBLE
             holder.tvUnread.text = item.unreadCount.toString()
