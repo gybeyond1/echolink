@@ -505,7 +505,7 @@
       parts.push(sessionEntryHtml(reqActive, {
         attrs: `data-special="requests"`,
         html: `
-          <div class="avatar avatar-txt req-ic">✋</div>
+          <img class="avatar" style="width:46px;height:46px" src="/new_friends.png" />
           <div class="sess-body">
             <div class="sess-row"><b>新的申请</b><span class="sess-badge">${state.reqCount}</span></div>
             <div class="sess-preview">好友申请 / 加群申请</div>
