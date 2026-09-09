@@ -50,12 +50,14 @@ function getOrCreateChannel(userId) {
   return channel;
 }
 
-// 更新用户的 MP 通道配置（callback_url 等）
+// 更新用户的 MP 通道配置（callback_url、public_base_url、mp_api_key 等）
 function updateChannel(userId, updates) {
   const db = getDB();
   const fields = [];
   const values = [];
   if (updates.callback_url !== undefined) { fields.push("callback_url = ?"); values.push(updates.callback_url); }
+  if (updates.public_base_url !== undefined) { fields.push("public_base_url = ?"); values.push(updates.public_base_url); }
+  if (updates.mp_api_key !== undefined) { fields.push("mp_api_key = ?"); values.push(updates.mp_api_key); }
   if (updates.enabled !== undefined) { fields.push("enabled = ?"); values.push(updates.enabled ? 1 : 0); }
   if (updates.token !== undefined) { fields.push("token = ?"); values.push(updates.token); }
   if (fields.length === 0) return getOrCreateChannel(userId);
@@ -158,12 +160,12 @@ function appendMoviepilotMessage(username, cardData, text) {
 }
 
 // 向 MP 插件发送 HTTP 请求（按钮回调或用户消息）
-function _postToMP(callbackUrl, path, body) {
-  const mpBase = (callbackUrl || "").trim();
+function _postToMP(channel, path, body) {
+  const mpBase = (channel.callback_url || "").trim();
   if (!mpBase) {
-    return { error: "未配置 MoviePilot 回调地址，请在 MP 通道设置中填写" };
+    return { error: "未配置 MoviePilot 回调地址，请在用户的 MP 通道设置中填写" };
   }
-  const mpApiKey = getSetting("moviepilot_api_key") || "";
+  const mpApiKey = (channel.mp_api_key || "").trim();
   let url;
   try {
     const base = mpBase.replace(/\/+$/, "");
@@ -210,7 +212,7 @@ async function callbackButton(username, callbackData, messageId) {
   const userId = getUserIdByUsername(username);
   if (!userId) return { error: "用户不存在: " + username };
   const channel = getOrCreateChannel(userId);
-  return await _postToMP(channel.callback_url, "/api/v1/plugin/echolink/callback", {
+  return await _postToMP(channel, "/api/v1/plugin/echolink/callback", {
     username,
     callback_data: callbackData,
     message_id: messageId,
@@ -223,7 +225,7 @@ async function sendUserMessageToMP(username, text) {
   const userId = getUserIdByUsername(username);
   if (!userId) return { error: "用户不存在: " + username };
   const channel = getOrCreateChannel(userId);
-  return await _postToMP(channel.callback_url, "/api/v1/plugin/echolink/message", {
+  return await _postToMP(channel, "/api/v1/plugin/echolink/message", {
     username,
     text,
     timestamp: Date.now(),

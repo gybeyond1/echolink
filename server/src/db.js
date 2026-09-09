@@ -118,13 +118,17 @@ function initDB() {
       user_id INTEGER NOT NULL,
       token TEXT UNIQUE NOT NULL,
       callback_url TEXT DEFAULT '',
+      public_base_url TEXT DEFAULT '',
+      mp_api_key TEXT DEFAULT '',
       enabled INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
-  // 迁移：旧表加 callback_url 字段
+  // 迁移：旧表加字段
   try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN callback_url TEXT DEFAULT ''"); } catch (_) {}
+  try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN public_base_url TEXT DEFAULT ''"); } catch (_) {}
+  try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN mp_api_key TEXT DEFAULT ''"); } catch (_) {}
 
   // 话题消息「软删除」标记表（per-user）：某用户删除某条消息只在本侧隐藏，不影响他人。
   // 当该话题全部成员都软删除同一条消息时，由删除路由物理清除该消息。

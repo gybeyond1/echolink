@@ -315,13 +315,15 @@ router.put("/moviepilot/channels/:userId/toggle", (req, res) => {
   res.json({ ok: true, enabled: enabled ? 1 : 0 });
 });
 
-// 更新通道配置（callback_url 等）
+// 更新通道配置（callback_url、public_base_url、mp_api_key 等）
 router.put("/moviepilot/channels/:userId", (req, res) => {
   const userId = parseInt(req.params.userId);
   if (!userId) return res.status(400).json({ error: "invalid user id" });
-  const { callback_url, enabled } = req.body || {};
+  const { callback_url, public_base_url, mp_api_key, enabled } = req.body || {};
   const updates = {};
   if (callback_url !== undefined) updates.callback_url = callback_url;
+  if (public_base_url !== undefined) updates.public_base_url = public_base_url;
+  if (mp_api_key !== undefined) updates.mp_api_key = mp_api_key;
   if (enabled !== undefined) updates.enabled = enabled ? 1 : 0;
   const channel = updateChannel(userId, updates);
   const db = getDB();
