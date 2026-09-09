@@ -473,6 +473,17 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
     peer_avatar: peerAvatarForPublish,
   };
 
+  // DEBUG: 记录发送消息详情
+  if (name.startsWith("moviepilot_")) {
+    console.log("[DEBUG] publishMessage", {
+      topic: name,
+      msgId: result.lastInsertRowid,
+      userId: req.userId,
+      sender: sender,
+      text: (text || "").slice(0, 50)
+    });
+  }
+
   const sent = publishToTopic(name, message, { excludeDeviceId: deviceId });
 
   const maxHistory = parseInt(process.env.MAX_TOPIC_HISTORY || "200");
@@ -519,6 +530,21 @@ router.get("/:topic/messages", authMiddleware, (req, res) => {
 
   // 给每条消息补上 peer_avatar（dm 才有意义），客户端用于兜底头像
   messages.forEach((m) => { m.peer_avatar = peerAvatar; });
+
+  // DEBUG: 记录消息详情，排查 MP 话题消息错乱
+  if (name.startsWith("moviepilot_")) {
+    console.log("[DEBUG] getTopicMessages", {
+      topic: name,
+      userId: req.userId,
+      count: messages.length,
+      last3: messages.slice(-3).map(m => ({
+        id: m.id,
+        user_id: m.user_id,
+        sender_name: m.sender_name,
+        text: (m.text || "").slice(0, 50)
+      }))
+    });
+  }
 
   // dm 私聊：把「对方发来且未读」的消息标记为已读，并通知对方（已读回执）
   if (topic.kind === "dm") {
