@@ -111,6 +111,18 @@ function initDB() {
     )
   `);
 
+  // MoviePilot 通道：每个用户独立的 MP 通知通道配置
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS moviepilot_channels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      enabled INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
   // 话题消息「软删除」标记表（per-user）：某用户删除某条消息只在本侧隐藏，不影响他人。
   // 当该话题全部成员都软删除同一条消息时，由删除路由物理清除该消息。
   db.exec(`
@@ -247,6 +259,11 @@ function initDB() {
     db.exec("ALTER TABLE topic_messages ADD COLUMN read INTEGER DEFAULT 0");
   }
 
+  // 富文本卡片数据列（JSON：海报URL、详情字段、交互按钮等，用于 MoviePilot 等卡片消息）
+  if (!tmCols.includes("card_data")) {
+    db.exec("ALTER TABLE topic_messages ADD COLUMN card_data TEXT");
+  }
+
   // 话题类型列：normal=普通群聊 | devices=同账号设备默认会话（置顶不可删）| dm=好友两人私聊
   const topicCols = db.pragma("table_info(topics)").map((c) => c.name);
   if (!topicCols.includes("kind")) {
@@ -318,6 +335,7 @@ const SETTINGS_DEFAULTS = {
   messagewall_sync_url: "", // MessageWall 同步地址
   totp_enabled: "false", // 注册两步验证
   totp_secret: "", // TOTP 密钥
+  moviepilot_callback_url: "", // MoviePilot 插件回调地址（如 http://192.168.1.100:3001）
 };
 
 let settingsCache = null;

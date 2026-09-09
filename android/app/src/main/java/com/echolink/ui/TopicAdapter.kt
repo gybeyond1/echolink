@@ -189,6 +189,13 @@ class TopicAdapter(
         val statusContainer: View = view.findViewById(R.id.statusContainer)
         val ivStatus: ImageView = view.findViewById(R.id.ivStatus)
         val pbSending: View = view.findViewById(R.id.pbSending)
+        // MoviePilot 富文本卡片
+        val cardContainer: android.widget.LinearLayout = view.findViewById(R.id.cardContainer)
+        val ivCardPoster: ImageView = view.findViewById(R.id.ivCardPoster)
+        val tvCardTitle: TextView = view.findViewById(R.id.tvCardTitle)
+        val llCardDetails: android.widget.LinearLayout = view.findViewById(R.id.llCardDetails)
+        val tvCardText: TextView = view.findViewById(R.id.tvCardText)
+        val llCardButtons: android.widget.LinearLayout = view.findViewById(R.id.llCardButtons)
         var item: TopicMessage? = null
         private var selectionTapHandled = false
         var lastMine: Boolean? = null
@@ -388,7 +395,7 @@ class TopicAdapter(
         holder.tvText.visibility = if (item.text.isNotEmpty()) View.VISIBLE else View.GONE
 
         // Media rendering
-        val isMedia = item.mediaType != "text" && !item.mediaUrl.isNullOrEmpty()
+        val isMedia = item.mediaType != "text" && (!item.mediaUrl.isNullOrEmpty() || item.mediaType == "card")
         holder.mediaContainer.visibility = View.GONE
         holder.ivPlayOverlay.visibility = View.GONE
         holder.llVoice.visibility = View.GONE
@@ -449,6 +456,9 @@ class TopicAdapter(
                         val suffix = if (item.mediaUrl?.startsWith("p2p:") == true) " · P2P直传" else ""
                         holder.tvFile.text = "\uD83D\uDCC4 ${item.mediaName ?: "文件"}  (${formatSize(item.mediaSize)})$suffix"
                     }
+                }
+                "card" -> {
+                    bindCard(holder, item)
                 }
             }
         }
@@ -780,6 +790,131 @@ class TopicAdapter(
             mp.prepareAsync()
         } catch (e: Exception) {
             icon.setImageResource(R.drawable.ic_voice_3)
+        }
+    }
+
+    /**
+     * 渲染 MoviePilot 富文本卡片消息
+     */
+    private fun bindCard(holder: ViewHolder, item: TopicMessage) {
+        val ctx = holder.itemView.context
+        holder.bubbleInner.visibility = View.GONE
+        holder.tvText.visibility = View.GONE
+        holder.tvTitle.visibility = View.GONE
+        holder.mediaContainer.visibility = View.GONE
+        holder.llVoice.visibility = View.GONE
+        holder.llFile.visibility = View.GONE
+        holder.cardContainer.visibility = View.VISIBLE
+
+        holder.llCardDetails.removeAllViews()
+        holder.llCardButtons.removeAllViews()
+
+        val cardJson = item.cardData ?: run {
+            holder.tvCardTitle.text = item.title
+            holder.ivCardPoster.visibility = View.GONE
+            holder.tvCardText.visibility = View.GONE
+            return
+        }
+
+        try {
+            val card = org.json.JSONObject(cardJson)
+            val title = card.optString("title", item.title)
+            holder.tvCardTitle.text = title
+            holder.tvCardTitle.visibility = if (title.isNotEmpty()) View.VISIBLE else View.GONE
+
+            val poster = card.optString("poster", "")
+            if (poster.isNotEmpty()) {
+                holder.ivCardPoster.visibility = View.VISIBLE
+                loadImage(poster, holder.ivCardPoster)
+            } else {
+                holder.ivCardPoster.visibility = View.GONE
+            }
+
+            val details = card.optJSONArray("details")
+            if (details != null && details.length() > 0) {
+                holder.llCardDetails.visibility = View.VISIBLE
+                val dp = ctx.resources.displayMetrics.density
+                for (i in 0 until details.length()) {
+                    val d = details.getJSONObject(i)
+                    val key = d.optString("key", "")
+                    val value = d.optString("value", "")
+                    if (key.isEmpty() && value.isEmpty()) continue
+                    val row = android.widget.LinearLayout(ctx).apply {
+                        orientation = android.widget.LinearLayout.HORIZONTAL
+                        setPadding(0, (2 * dp).toInt(), 0, (2 * dp).toInt())
+                    }
+                    val keyTv = android.widget.TextView(ctx).apply {
+                        text = "$key: "
+                        textSize = 12f
+                        setTextColor(ctx.getColor(R.color.on_surface_variant))
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                    }
+                    val valTv = android.widget.TextView(ctx).apply {
+                        text = value
+                        textSize = 12f
+                        setTextColor(ctx.getColor(R.color.on_surface))
+                    }
+                    row.addView(keyTv)
+                    row.addView(valTv)
+                    holder.llCardDetails.addView(row)
+                }
+            } else {
+                holder.llCardDetails.visibility = View.GONE
+            }
+
+            val extraText = card.optString("text", "")
+            if (extraText.isNotEmpty()) {
+                holder.tvCardText.text = extraText
+                holder.tvCardText.visibility = View.VISIBLE
+            } else {
+                holder.tvCardText.visibility = View.GONE
+            }
+
+            val buttons = card.optJSONArray("buttons")
+            if (buttons != null && buttons.length() > 0) {
+                holder.llCardButtons.visibility = View.VISIBLE
+                val dp = ctx.resources.displayMetrics.density
+                for (i in 0 until buttons.length()) {
+                    val b = buttons.getJSONObject(i)
+                    val btnText = b.optString("text", "按钮")
+                    val callbackData = b.optString("callback_data", "")
+                    val btn = android.widget.Button(ctx).apply {
+                        text = btnText
+                        textSize = 13f
+                        setTextColor(ctx.getColor(R.color.white))
+                        setBackgroundResource(R.drawable.bg_role_badge)
+                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
+                        setOnClickListener {
+                            scope.launch(Dispatchers.IO) {
+                                try {
+                                    ApiClient.post("/api/moviepilot/callback", mapOf(
+                                        "callback_data" to callbackData,
+                                        "message_id" to item.id
+                                    ))
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(ctx, "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    val lp = android.widget.LinearLayout.LayoutParams(
+                        0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                    ).apply {
+                        marginEnd = (6 * dp).toInt()
+                    }
+                    holder.llCardButtons.addView(btn, lp)
+                }
+            } else {
+                holder.llCardButtons.visibility = View.GONE
+            }
+        } catch (e: Exception) {
+            holder.tvCardTitle.text = "卡片解析失败"
+            holder.ivCardPoster.visibility = View.GONE
+            holder.llCardDetails.visibility = View.GONE
+            holder.tvCardText.visibility = View.GONE
+            holder.llCardButtons.visibility = View.GONE
         }
     }
 

@@ -63,6 +63,13 @@ object ApiClient {
         }
     }
 
+    // 通用 POST（用于按钮回调等动态接口）
+    suspend fun post(path: String, params: Map<String, Any>): JSONObject {
+        val body = JSONObject()
+        for ((k, v) in params) body.put(k, v)
+        return execute(buildRequest(path, "POST", body))
+    }
+
     // ===== 认证 =====
 
     suspend fun register(username: String, password: String, totpCode: String = ""): AuthResponse {

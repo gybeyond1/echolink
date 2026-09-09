@@ -69,7 +69,8 @@ data class TopicMessage(
     val senderDisplayName: String? = null,
     val peerAvatar: String? = null,
     val read: Boolean = false,
-    val sending: Boolean = false  // 本地发送中状态（仅客户端用，不参与序列化）
+    val sending: Boolean = false,  // 本地发送中状态（仅客户端用，不参与序列化）
+    val cardData: String? = null  // 富文本卡片 JSON（MoviePilot 等）
 )
 
 // ===== JSON 解析扩展 =====
@@ -143,7 +144,8 @@ fun parseTopicMessages(jsonArray: JSONArray): List<TopicMessage> {
                 senderAvatar = obj.optNullable("sender_avatar"),
                 senderDisplayName = obj.optNullable("sender_display_name"),
                 peerAvatar = obj.optNullable("peer_avatar"),
-                read = obj.optInt("read", 0) == 1
+                read = obj.optInt("read", 0) == 1,
+                cardData = obj.optNullable("card_data")
             )
         )
     }
@@ -169,7 +171,8 @@ fun parseTopicMessage(json: JSONObject): TopicMessage {
         senderAvatar = json.optNullable("sender_avatar"),
         senderDisplayName = json.optNullable("sender_display_name"),
         peerAvatar = json.optNullable("peer_avatar"),
-        read = json.optInt("read", 0) == 1
+        read = json.optInt("read", 0) == 1,
+        cardData = json.optNullable("card_data")
     )
 }
 

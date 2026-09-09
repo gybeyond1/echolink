@@ -1,7 +1,10 @@
 const express = require("express");
 const { appendMessagewallMessage, DEFAULT_WALL_USER, getMessagewallEnabledUsers } = require("../messagewall");
+const { appendMoviepilotMessage, verifyToken, DEFAULT_MP_USER } = require("../moviepilot");
 
 const router = express.Router();
+
+// ===== MessageWall =====
 
 // 健康/说明：GET 用于确认端点可达
 router.get("/messagewall", (req, res) => {
@@ -75,6 +78,64 @@ function handleMessagewall(req, res, username) {
     return res.status(200).json({ ok: true, delivered: r.delivered, user: username });
   } catch (e) {
     console.error("[webhook] messagewall error:", e);
+    return res.status(500).json({ error: "internal error" });
+  }
+}
+
+// ===== MoviePilot =====
+
+// 健康/说明
+router.get("/moviepilot", (req, res) => {
+  res.json({
+    ok: true,
+    endpoint: "moviepilot",
+    method: "POST",
+    defaultUser: DEFAULT_MP_USER,
+    note: "POST /webhook/moviepilot/:username，Header X-API-Token 或 body.token 鉴权。body: { source: 'moviepilot', card: { title, poster, details:[{key,value}], buttons:[{text,callback_data}], text } }",
+  });
+});
+
+// MP Webhook 接收（指定用户名）
+router.post("/moviepilot/:username", (req, res) => {
+  handleMoviepilot(req, res, req.params.username);
+});
+
+// MP Webhook 接收（兼容旧地址，默认用户）
+router.post("/moviepilot", (req, res) => {
+  handleMoviepilot(req, res, DEFAULT_MP_USER);
+});
+
+function handleMoviepilot(req, res, username) {
+  const body = req.body || {};
+  if (body.source !== "moviepilot") {
+    return res.status(400).json({ error: "unsupported source (expected 'moviepilot')" });
+  }
+
+  // 鉴权：Header X-API-Token 优先，其次 body.token
+  const token = req.get("X-API-Token") || body.token || "";
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "invalid or missing token" });
+  }
+  // token 对应用户必须和 URL 里的 username 一致
+  if (channel.username !== username) {
+    return res.status(403).json({ error: "token does not match user" });
+  }
+
+  const card = body.card || {};
+  const text = String(body.text || card.text || "").trim();
+  if (!card.title && !text) {
+    return res.status(400).json({ error: "card.title or text is required" });
+  }
+
+  try {
+    const r = appendMoviepilotMessage(username, card, text);
+    if (r.error) {
+      return res.status(400).json({ error: r.error });
+    }
+    return res.status(200).json({ ok: true, delivered: r.delivered, user: username, message_id: r.message.id });
+  } catch (e) {
+    console.error("[webhook] moviepilot error:", e);
     return res.status(500).json({ error: "internal error" });
   }
 }

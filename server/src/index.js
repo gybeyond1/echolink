@@ -82,6 +82,7 @@ app.use("/api", require("./routes/friends"));
 app.use("/api/user", require("./routes/user"));
 app.use("/api/admin", require("./routes/admin"));
 app.use("/api/webhook", require("./routes/webhook"));
+app.use("/api/moviepilot", require("./routes/moviepilot"));
 
 // 静态管理界面（WebUI）
 const publicDir = path.join(__dirname, "..", "public");

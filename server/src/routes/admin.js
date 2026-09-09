@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const { getDB, getSettings, setSettings } = require("../db");
 const { authMiddleware, requireAdmin } = require("../middleware/auth");
+const { getAllChannels, getOrCreateChannel, deleteChannel, toggleChannel } = require("../moviepilot");
 
 const router = express.Router();
 
@@ -270,6 +271,48 @@ router.post("/totp/enable", (req, res) => {
 router.post("/totp/disable", (req, res) => {
   setSettings({ totp_enabled: false });
   res.json({ ok: true, message: "TOTP 两步验证已禁用" });
+});
+
+// ===== MoviePilot 通道管理 =====
+
+// 获取所有用户的 MP 通道
+router.get("/moviepilot/channels", (req, res) => {
+  try {
+    const channels = getAllChannels();
+    res.json({ channels });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 为用户创建/重置 MP 通道（生成新 token）
+router.post("/moviepilot/channels/:userId", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  const db = getDB();
+  const user = db.prepare("SELECT id, username FROM users WHERE id = ?").get(userId);
+  if (!user) return res.status(404).json({ error: "用户不存在" });
+  // 先删旧的再创建新的（重置 token）
+  deleteChannel(userId);
+  const channel = getOrCreateChannel(userId);
+  res.json({ ok: true, channel: { ...channel, username: user.username } });
+});
+
+// 删除用户的 MP 通道
+router.delete("/moviepilot/channels/:userId", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  deleteChannel(userId);
+  res.json({ ok: true, message: "通道已删除" });
+});
+
+// 切换通道启用状态
+router.put("/moviepilot/channels/:userId/toggle", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  const { enabled } = req.body || {};
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  toggleChannel(userId, enabled ? 1 : 0);
+  res.json({ ok: true, enabled: enabled ? 1 : 0 });
 });
 
 module.exports = router;
