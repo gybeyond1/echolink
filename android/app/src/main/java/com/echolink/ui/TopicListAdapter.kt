@@ -87,6 +87,8 @@ class TopicListAdapter(
         val display = when (item.kind) {
             "devices" -> "我的设备"
             "messagewall" -> "留言板"
+            "moviepilot" -> "MoviePilot"
+            "notification" -> "通知"
             else -> item.displayName ?: item.name
         }
         holder.tvName.text = display
