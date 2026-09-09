@@ -838,6 +838,12 @@ class TopicFragment : Fragment() {
                 // 发送成功提示音：语音走"唰"声，其余（文字/图片）走清脆"嗒"声
                 if (mediaType == "voice") SoundManager.playVoiceSent()
                 else SoundManager.playMessageSent()
+                // MP 话题：文字消息额外转发给 MoviePilot
+                if (topic.startsWith("moviepilot_") && mediaType == "text" && text.isNotEmpty()) {
+                    try {
+                        ApiClient.post("/api/moviepilot/send", mapOf("text" to text))
+                    } catch (_: Exception) { /* 转发失败不影响本地消息 */ }
+                }
             } catch (e: Exception) {
                 // 发送失败：移除临时消息
                 chatAdapter.removeMessage(tempId)
