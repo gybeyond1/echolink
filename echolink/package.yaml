@@ -1,0 +1,10 @@
+name: EchoLink
+description: 通过 EchoLink 接收 MoviePilot 通知并远程控制，支持富文本卡片和交互按钮
+version: 1.0.0
+author: gybeyond
+# 插件图标（可选）
+# icon: /static/img/echolink.png
+# 插件颜色
+color: "#4a8fe7"
+# 是否需要登录才能访问配置页
+login: true
