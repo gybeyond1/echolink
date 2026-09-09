@@ -69,8 +69,17 @@ class TopicAdapter(
      *  彻底杜绝历史消息头像缺失导致的「首条没头像」。群聊/设备会话不设。 */
     var isDm: Boolean = false
 
-    /** 是否为留言板会话：访客消息统一显示 📮 头像（与 WebUI 一致），不加载 sender_avatar */
+    /** 是否为留言板会话：访客消息统一显示留言板新拟态图标，不加载 sender_avatar */
     var isMessageWall: Boolean = false
+
+    /** 是否为 MoviePilot 会话：对方消息统一显示 MP 新拟态图标 */
+    var isMoviePilot: Boolean = false
+
+    /** 是否为通知会话：对方消息统一显示通知新拟态图标 */
+    var isNotification: Boolean = false
+
+    /** 是否为我的设备会话：对方消息统一显示设备新拟态图标 */
+    var isMyDevice: Boolean = false
 
     var selectionMode = false
         private set
@@ -712,15 +721,24 @@ class TopicAdapter(
      *  彻底摆脱「peerAvatarUrl 外部未传/传空导致老消息无兜底」的隐患。
      */
     private fun loadAvatar(item: TopicMessage, holder: ViewHolder) {
-        // 留言板访客消息：统一显示 📮 emoji + 灰色新拟态圆底（与 WebUI 一致）
-        if (isMessageWall && !isSelfMessage(item)) {
-            holder.ivAvatar.visibility = View.GONE
-            holder.tvAvatar.visibility = View.VISIBLE
-            holder.tvAvatar.text = "\uD83D\uDCEC"
-            holder.tvAvatar.setBackgroundResource(R.drawable.bg_mw_avatar)
-            holder.tvAvatar.setTextColor(holder.itemView.context.getColor(R.color.on_surface))
-            holder.tvAvatar.textSize = 22f // 比默认 17sp 放大约 30%
-            return
+        // 特殊会话对方消息：统一显示对应新拟态图标
+        if (!isSelfMessage(item)) {
+            val iconRes = when {
+                isMoviePilot -> R.drawable.ic_moviepilot_neo
+                isMessageWall -> R.drawable.ic_messagewall_neo
+                isNotification -> R.drawable.ic_notification_neo
+                isMyDevice -> R.drawable.ic_my_device_neo
+                else -> null
+            }
+            if (iconRes != null) {
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                holder.ivAvatar.setImageResource(iconRes)
+                holder.ivAvatar.setBackgroundResource(R.drawable.bg_circle_avatar)
+                holder.ivAvatar.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                holder.ivAvatar.setPadding(8, 8, 8, 8)
+                return
+            }
         }
         val url = if (isSelfMessage(item)) {
             ApiClient.fullAvatarUrl(AuthManager.avatarUrl)

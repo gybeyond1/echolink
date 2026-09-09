@@ -486,8 +486,14 @@ class TopicFragment : Fragment() {
         chatAdapter.peerAvatarUrl = topic.avatarUrl
         // DM 标记：私聊里「非自己」消息头像一律回退到对方实时头像，根治首条没头像
         chatAdapter.isDm = topic.kind == "dm"
-        // 留言板标记：访客消息统一显示 📮 头像（与 WebUI 一致）
+        // 留言板标记：访客消息统一显示留言板新拟态图标
         chatAdapter.isMessageWall = topic.kind == "messagewall"
+        // MoviePilot 标记：对方消息显示 MP 新拟态图标
+        chatAdapter.isMoviePilot = topic.kind == "moviepilot"
+        // 通知标记：对方消息显示通知新拟态图标
+        chatAdapter.isNotification = topic.kind == "notification" || topic.name.startsWith("notification_")
+        // 我的设备标记：对方消息显示设备新拟态图标
+        chatAdapter.isMyDevice = topic.kind == "devices"
         // 已读回执：仅 dm 私聊开启（通知/我的设备/群组不显示单双勾）
         chatAdapter.showReadReceipts = topic.kind == "dm"
         // 聊天标题显示昵称（优先外部传入的展示名），特殊会话前端兜底中文名，并强制水平居中
