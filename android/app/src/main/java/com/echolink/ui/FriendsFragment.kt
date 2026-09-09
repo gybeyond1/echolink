@@ -139,6 +139,28 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                 if (_binding == null) return@launch
                 friendAdapter.setItems(friends)
                 binding.tvEmptyFriends.visibility = if (friends.isEmpty()) View.VISIBLE else View.GONE
+                // 检查是否有 MoviePilot 话题，有则显示 MP 入口
+                try {
+                    val topics = ApiClient.getMyTopics()
+                    val mpTopic = topics.firstOrNull { it.name.startsWith("moviepilot_") }
+                    binding.rowMoviePilot.visibility = if (mpTopic != null) View.VISIBLE else View.GONE
+                    if (mpTopic != null) {
+                        binding.rowMoviePilot.setOnClickListener {
+                            if (isWide) {
+                                // 平板：右侧打开 MP 话题
+                                val frag = TopicFragment.chatOnly(mpTopic.name, "MoviePilot")
+                                childFragmentManager.beginTransaction()
+                                    .replace(binding.chatContainer.id, frag)
+                                    .commit()
+                                binding.chatContainer.visibility = View.VISIBLE
+                                binding.tvChatPlaceholder.visibility = View.GONE
+                            } else {
+                                // 手机：打开 MP 话题
+                                (activity as? MainActivity)?.openTopic(mpTopic.name, "MoviePilot")
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
                 // 平板双栏：首次加载后自动选中第一个好友，让右侧立即显示聊天（镜像消息页体验）
                 if (isWide && !initialAutoSelectDone && friends.isNotEmpty()) {
                     initialAutoSelectDone = true
