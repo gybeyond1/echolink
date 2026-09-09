@@ -770,11 +770,16 @@ class TopicFragment : Fragment() {
 
     private fun loadMessages() {
         val topic = currentTopic ?: return
+        com.echolink.util.DebugLogger.d("TopicFragment", "loadMessages: topic=$topic")
         resetUnreadPill()
         binding.progressBar.visibility = View.VISIBLE
         lifecycleScope.launch {
             try {
                 val messages = ApiClient.getTopicMessages(topic, 50)
+                com.echolink.util.DebugLogger.d("TopicFragment", "loadMessages got ${messages.size} messages")
+                messages.forEachIndexed { idx, m ->
+                    com.echolink.util.DebugLogger.d("TopicFragment", "  msg[$idx]: id=${m.id}, sender=${m.senderName}, userId=${m.senderUserId}, text=${m.text.take(30)}, isSelf=${m.senderUserId > 0 && m.senderUserId == com.echolink.data.AuthManager.userId}")
+                }
                 chatAdapter.setItems(messages)
                 // 后台预加载所有媒体（图片/视频/语音），二次打开走本地缓存
                 MediaCacheManager.init(requireContext())
@@ -841,9 +846,13 @@ class TopicFragment : Fragment() {
                 else SoundManager.playMessageSent()
                 // MP 话题：文字消息额外转发给 MoviePilot
                 if (topic.startsWith("moviepilot_") && mediaType == "text" && text.isNotEmpty()) {
+                    com.echolink.util.DebugLogger.d("TopicFragment", "MP转发消息: topic=$topic, text=$text, msgId=${msg.id}, sender=${msg.senderName}, userId=${msg.senderUserId}")
                     try {
-                        ApiClient.post("/api/moviepilot/send", mapOf("text" to text))
-                    } catch (_: Exception) { /* 转发失败不影响本地消息 */ }
+                        val resp = ApiClient.post("/api/moviepilot/send", mapOf("text" to text))
+                        com.echolink.util.DebugLogger.d("TopicFragment", "MP转发响应: $resp")
+                    } catch (e: Exception) {
+                        com.echolink.util.DebugLogger.e("TopicFragment", "MP转发失败", e)
+                    }
                 }
             } catch (e: Exception) {
                 // 发送失败：移除临时消息

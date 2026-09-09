@@ -7,6 +7,7 @@ import android.os.Build
 import com.echolink.data.AuthManager
 import com.echolink.data.AppFilterStore
 import com.echolink.data.ThemePrefs
+import com.echolink.util.DebugLogger
 
 class App : Application() {
     override fun onCreate() {
@@ -14,6 +15,7 @@ class App : Application() {
         instance = this
         AuthManager.init(this)
         AppFilterStore.init(this)
+        DebugLogger.init(this)
         applyThemeMode()
         createNotificationChannels()
     }

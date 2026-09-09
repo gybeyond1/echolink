@@ -209,6 +209,28 @@ class SettingsFragment : Fragment() {
             }
         }
 
+        // 调试开关
+        binding.swDebugEnabled.isChecked = com.echolink.util.DebugLogger.isEnabled()
+        binding.btnExportDebugLog.isEnabled = com.echolink.util.DebugLogger.isEnabled()
+        binding.swDebugEnabled.setOnCheckedChangeListener { _, isChecked ->
+            com.echolink.util.DebugLogger.setEnabled(requireContext(), isChecked)
+            binding.btnExportDebugLog.isEnabled = isChecked
+            if (isChecked) {
+                android.widget.Toast.makeText(requireContext(), "调试日志已启用", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                android.widget.Toast.makeText(requireContext(), "调试日志已关闭", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+        binding.btnExportDebugLog.setOnClickListener {
+            val logContent = com.echolink.util.DebugLogger.getLogContent()
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(android.content.Intent.EXTRA_TEXT, logContent)
+                putExtra(android.content.Intent.EXTRA_SUBJECT, "EchoLink 调试日志")
+            }
+            startActivity(android.content.Intent.createChooser(intent, "导出调试日志"))
+        }
+
         // 退出登录
         binding.btnLogout.setOnClickListener {
             SyncService.stop(requireContext())
