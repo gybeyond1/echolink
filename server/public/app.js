@@ -1529,6 +1529,13 @@
         </div>
         <div style="margin-top:8px;color:var(--muted);font-size:12px">填你 EchoLink 的公网访问地址，例如 https://echolink.yourdomain.com。不填则用当前访问地址生成。每个用户的 MP 回调地址在下方列表中单独设置。</div>
       </div>
+      <div class="card" style="margin-bottom:16px">
+        <label>MoviePilot API Key（EchoLink 回调 MP 时用，在 MP 设置页获取）</label>
+        <div class="row" style="align-items:flex-end">
+          <input id="mp-api-key" placeholder="MP 的 API Token" type="password" style="flex:1" />
+          <button class="btn" id="mp-api-save">保存</button>
+        </div>
+      </div>
       <div class="card">
         <label>用户通道列表</label>
         <div id="mp-list">加载中…</div>
@@ -1537,6 +1544,7 @@
     try {
       const s = await api("/api/admin/settings");
       document.getElementById("mp-public-url").value = s.settings.public_base_url || "";
+      document.getElementById("mp-api-key").value = s.settings.moviepilot_api_key || "";
     } catch (e) {}
 
     document.getElementById("mp-public-save").onclick = async () => {
@@ -1545,6 +1553,13 @@
         await api("/api/admin/settings", { method: "PUT", body: { public_base_url: url } });
         toast("公网地址已保存", "ok");
         load();
+      } catch (e) { toast(e.message, "err"); }
+    };
+    document.getElementById("mp-api-save").onclick = async () => {
+      const key = document.getElementById("mp-api-key").value.trim();
+      try {
+        await api("/api/admin/settings", { method: "PUT", body: { moviepilot_api_key: key } });
+        toast("MP API Key 已保存", "ok");
       } catch (e) { toast(e.message, "err"); }
     };
 

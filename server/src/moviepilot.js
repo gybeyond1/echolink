@@ -163,10 +163,15 @@ function _postToMP(callbackUrl, path, body) {
   if (!mpBase) {
     return { error: "未配置 MoviePilot 回调地址，请在 MP 通道设置中填写" };
   }
+  const mpApiKey = getSetting("moviepilot_api_key") || "";
   let url;
   try {
     const base = mpBase.replace(/\/+$/, "");
     url = new URL(base + path);
+    if (mpApiKey) {
+      url.searchParams.set("apikey", mpApiKey);
+      url.searchParams.set("request", JSON.stringify({ method: "POST", headers: {}, body: JSON.stringify(body) }));
+    }
   } catch (e) {
     return { error: "MoviePilot 地址格式错误: " + e.message };
   }
