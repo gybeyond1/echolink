@@ -44,10 +44,24 @@ function getOrCreateChannel(userId) {
   let channel = db.prepare("SELECT * FROM moviepilot_channels WHERE user_id = ?").get(userId);
   if (!channel) {
     const token = generateToken();
-    db.prepare("INSERT INTO moviepilot_channels (user_id, token, enabled) VALUES (?, ?, 1)").run(userId, token);
+    db.prepare("INSERT INTO moviepilot_channels (user_id, token, callback_url, enabled) VALUES (?, ?, '', 1)").run(userId, token);
     channel = db.prepare("SELECT * FROM moviepilot_channels WHERE user_id = ?").get(userId);
   }
   return channel;
+}
+
+// 更新用户的 MP 通道配置（callback_url 等）
+function updateChannel(userId, updates) {
+  const db = getDB();
+  const fields = [];
+  const values = [];
+  if (updates.callback_url !== undefined) { fields.push("callback_url = ?"); values.push(updates.callback_url); }
+  if (updates.enabled !== undefined) { fields.push("enabled = ?"); values.push(updates.enabled ? 1 : 0); }
+  if (updates.token !== undefined) { fields.push("token = ?"); values.push(updates.token); }
+  if (fields.length === 0) return getOrCreateChannel(userId);
+  values.push(userId);
+  db.prepare(`UPDATE moviepilot_channels SET ${fields.join(", ")} WHERE user_id = ?`).run(...values);
+  return db.prepare("SELECT * FROM moviepilot_channels WHERE user_id = ?").get(userId);
 }
 
 // 根据 token 验证通道，返回通道信息
@@ -144,10 +158,10 @@ function appendMoviepilotMessage(username, cardData, text) {
 }
 
 // 向 MP 插件发送 HTTP 请求（按钮回调或用户消息）
-function _postToMP(path, body) {
-  const mpBase = getSetting("moviepilot_callback_url") || "";
+function _postToMP(callbackUrl, path, body) {
+  const mpBase = (callbackUrl || "").trim();
   if (!mpBase) {
-    return { error: "未配置 MoviePilot 回调地址，请在管理员设置页填写" };
+    return { error: "未配置 MoviePilot 回调地址，请在 MP 通道设置中填写" };
   }
   let url;
   try {
@@ -188,7 +202,10 @@ function _postToMP(path, body) {
 
 // 按钮点击回调，转发给 MP 插件
 async function callbackButton(username, callbackData, messageId) {
-  return await _postToMP("/api/v1/plugin/echolink/callback", {
+  const userId = getUserIdByUsername(username);
+  if (!userId) return { error: "用户不存在: " + username };
+  const channel = getOrCreateChannel(userId);
+  return await _postToMP(channel.callback_url, "/api/v1/plugin/echolink/callback", {
     username,
     callback_data: callbackData,
     message_id: messageId,
@@ -198,7 +215,10 @@ async function callbackButton(username, callbackData, messageId) {
 
 // 用户在 EchoLink 发文字给 MP
 async function sendUserMessageToMP(username, text) {
-  return await _postToMP("/api/v1/plugin/echolink/message", {
+  const userId = getUserIdByUsername(username);
+  if (!userId) return { error: "用户不存在: " + username };
+  const channel = getOrCreateChannel(userId);
+  return await _postToMP(channel.callback_url, "/api/v1/plugin/echolink/message", {
     username,
     text,
     timestamp: Date.now(),
@@ -211,6 +231,7 @@ module.exports = {
   ensureUserMoviepilotTopic,
   generateToken,
   getOrCreateChannel,
+  updateChannel,
   verifyToken,
   getAllChannels,
   deleteChannel,

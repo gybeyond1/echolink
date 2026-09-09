@@ -2,7 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const { getDB, getSettings, setSettings } = require("../db");
 const { authMiddleware, requireAdmin } = require("../middleware/auth");
-const { getAllChannels, getOrCreateChannel, deleteChannel, toggleChannel } = require("../moviepilot");
+const { getAllChannels, getOrCreateChannel, deleteChannel, toggleChannel, updateChannel } = require("../moviepilot");
 
 const router = express.Router();
 
@@ -313,6 +313,20 @@ router.put("/moviepilot/channels/:userId/toggle", (req, res) => {
   if (!userId) return res.status(400).json({ error: "invalid user id" });
   toggleChannel(userId, enabled ? 1 : 0);
   res.json({ ok: true, enabled: enabled ? 1 : 0 });
+});
+
+// 更新通道配置（callback_url 等）
+router.put("/moviepilot/channels/:userId", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  const { callback_url, enabled } = req.body || {};
+  const updates = {};
+  if (callback_url !== undefined) updates.callback_url = callback_url;
+  if (enabled !== undefined) updates.enabled = enabled ? 1 : 0;
+  const channel = updateChannel(userId, updates);
+  const db = getDB();
+  const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId);
+  res.json({ ok: true, channel: { ...channel, username: user ? user.username : null } });
 });
 
 module.exports = router;

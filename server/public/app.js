@@ -1522,12 +1522,12 @@
     main.innerHTML = `<h2 class="page-title">MoviePilot 通道</h2>
       <p class="page-sub">为每个用户生成独立的 MoviePilot 通知通道，支持富文本卡片和交互按钮。每个通道有独立 Token，在 MoviePilot 插件里配置即可。</p>
       <div class="card" style="margin-bottom:16px">
-        <label>MoviePilot 回调地址（MP 插件的访问地址，EchoLink 点击按钮/发消息时回调这里）</label>
+        <label>EchoLink 公网地址（用于生成 Webhook 地址，MP 插件推送到这里）</label>
         <div class="row" style="align-items:flex-end">
-          <input id="mp-cb-url" placeholder="http://192.168.1.100:3001" style="flex:1" />
-          <button class="btn" id="mp-cb-save">保存</button>
+          <input id="mp-public-url" placeholder="https://你的域名:端口" style="flex:1" />
+          <button class="btn" id="mp-public-save">保存</button>
         </div>
-        <div style="margin-top:8px;color:var(--muted);font-size:12px">填 MoviePilot 的地址即可，EchoLink 会自动拼 /api/v1/plugin/echolink/callback 和 /message</div>
+        <div style="margin-top:8px;color:var(--muted);font-size:12px">填你 EchoLink 的公网访问地址，例如 https://echolink.yourdomain.com。不填则用当前访问地址生成。每个用户的 MP 回调地址在下方列表中单独设置。</div>
       </div>
       <div class="card">
         <label>用户通道列表</label>
@@ -1536,20 +1536,23 @@
 
     try {
       const s = await api("/api/admin/settings");
-      document.getElementById("mp-cb-url").value = s.settings.moviepilot_callback_url || "";
+      document.getElementById("mp-public-url").value = s.settings.public_base_url || "";
     } catch (e) {}
 
-    document.getElementById("mp-cb-save").onclick = async () => {
-      const url = document.getElementById("mp-cb-url").value.trim();
+    document.getElementById("mp-public-save").onclick = async () => {
+      const url = document.getElementById("mp-public-url").value.trim();
       try {
-        await api("/api/admin/settings", { method: "PUT", body: { moviepilot_callback_url: url } });
-        toast("回调地址已保存", "ok");
+        await api("/api/admin/settings", { method: "PUT", body: { public_base_url: url } });
+        toast("公网地址已保存", "ok");
+        load();
       } catch (e) { toast(e.message, "err"); }
     };
 
     const box = document.getElementById("mp-list");
     const load = async () => {
       try {
+        const s = await api("/api/admin/settings");
+        window._mpPublicUrl = s.settings.public_base_url || "";
         const r = await api("/api/admin/moviepilot/channels");
         const channels = r.channels || [];
         if (!channels.length) {
@@ -1557,11 +1560,13 @@
         } else {
           box.innerHTML = `<table><thead><tr><th>用户</th><th>Token</th><th>Webhook 地址</th><th>状态</th><th></th></tr></thead><tbody>
             ${channels.map(c => {
-              const webhookUrl = location.origin + "/api/webhook/moviepilot/" + c.username;
+              const publicUrl = (window._mpPublicUrl || location.origin).replace(/\/$/, "");
+              const webhookUrl = publicUrl + "/api/webhook/moviepilot/" + c.username;
+              const cbUrl = c.callback_url || "";
               return `<tr>
                 <td><b>${esc(c.display_name || c.username)}</b><div style="color:var(--muted);font-size:12px">@${esc(c.username)}</div></td>
                 <td><code style="font-size:11px">${esc(c.token.substring(0, 12))}…</code> <button class="btn ghost sm" data-copy="${esc(c.token)}">复制</button></td>
-                <td><code style="font-size:11px;word-break:break-all">${esc(webhookUrl)}</code></td>
+                <td><code style="font-size:11px;word-break:break-all">${esc(webhookUrl)}</code><br><button class="btn ghost sm" data-edit-cb="${c.user_id}" data-cb="${esc(cbUrl)}" style="margin-top:4px;font-size:11px">设置MP回调地址</button></td>
                 <td><span class="badge ${c.enabled ? "admin" : "member"}">${c.enabled ? "启用" : "禁用"}</span></td>
                 <td style="text-align:right;white-space:nowrap">
                   <button class="btn ghost sm" data-toggle="${c.user_id}" data-enabled="${c.enabled ? 1 : 0}">${c.enabled ? "禁用" : "启用"}</button>
@@ -1612,6 +1617,14 @@
           try {
             await api("/api/admin/moviepilot/channels/" + b.dataset.create, { method: "POST" });
             toast("已创建", "ok"); load();
+          } catch (e) { toast(e.message, "err"); }
+        });
+        box.querySelectorAll("[data-edit-cb]").forEach(b => b.onclick = async () => {
+          const url = prompt("请输入该用户的 MoviePilot 回调地址（MP 的访问地址，例如 http://192.168.1.100:3000）：", b.dataset.cb || "");
+          if (url === null) return;
+          try {
+            await api("/api/admin/moviepilot/channels/" + b.dataset.editCb, { method: "PUT", body: { callback_url: url } });
+            toast("MP回调地址已保存", "ok"); load();
           } catch (e) { toast(e.message, "err"); }
         });
       } catch (e) {

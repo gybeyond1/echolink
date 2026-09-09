@@ -494,6 +494,7 @@ class TopicFragment : Fragment() {
         binding.tvChatTitle.text = when (topic.kind) {
             "devices" -> "我的设备"
             "messagewall" -> "留言板"
+            "moviepilot" -> "MoviePilot"
             else -> topic.displayName ?: topic.name
         }
         binding.tvChatTitle.gravity = Gravity.CENTER

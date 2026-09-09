@@ -1,3 +1,4 @@
+import json
 from typing import Any, List, Dict, Tuple, Optional
 
 from app.core.event import eventmanager, Event
@@ -230,8 +231,36 @@ class echolink(_PluginBase):
 
     # ===== API 回调 =====
 
+    def _parse_request_body(self, request: Any) -> dict:
+        """从 MP 插件 API 的 request 对象解析请求体"""
+        if request is None:
+            return {}
+        # Flask request 对象
+        if hasattr(request, 'get_json'):
+            try:
+                return request.get_json(silent=True) or {}
+            except Exception:
+                return {}
+        # 字典对象（MP 内部传递）
+        if isinstance(request, dict):
+            if 'json' in request and isinstance(request['json'], dict):
+                return request['json']
+            if 'body' in request:
+                try:
+                    return json.loads(request['body'])
+                except Exception:
+                    return {}
+            return request
+        # 字符串
+        if isinstance(request, str):
+            try:
+                return json.loads(request)
+            except Exception:
+                return {}
+        return {}
+
     def callback(self, apikey: str, request: Any):
-        data = request.get_json() if hasattr(request, 'get_json') else {}
+        data = self._parse_request_body(request)
         username = data.get("username", "")
         callback_data = data.get("callback_data", "")
         message_id = data.get("message_id", "")
@@ -245,7 +274,7 @@ class echolink(_PluginBase):
         }
 
     def message(self, apikey: str, request: Any):
-        data = request.get_json() if hasattr(request, 'get_json') else {}
+        data = self._parse_request_body(request)
         username = data.get("username", "")
         text = data.get("text", "")
 
@@ -253,6 +282,9 @@ class echolink(_PluginBase):
 
         if not text:
             return {"code": 1, "message": "消息内容为空"}
+
+        # TODO: 调用 MP Agent API 处理用户消息
+        # 目前先返回已接收，后续对接 Agent 对话
 
         return {
             "code": 0,
