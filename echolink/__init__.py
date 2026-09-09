@@ -7,7 +7,7 @@ from app.schemas.types import EventType
 from app.utils.http import RequestUtils
 
 
-class Echolink(_PluginBase):
+class echolink(_PluginBase):
     # 插件名称
     plugin_name = "EchoLink"
     # 插件描述
