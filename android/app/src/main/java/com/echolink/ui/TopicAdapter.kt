@@ -45,7 +45,8 @@ class TopicAdapter(
     private val onItemClick: (TopicMessage) -> Unit,
     private val onImageClick: ((TopicMessage) -> Unit)? = null,
     private val onVideoClick: ((TopicMessage) -> Unit)? = null,
-    private val onAvatarClick: ((TopicMessage) -> Unit)? = null
+    private val onAvatarClick: ((TopicMessage) -> Unit)? = null,
+    private val onMpButtonClick: ((String, String) -> Unit)? = null
 ) : RecyclerView.Adapter<TopicAdapter.ViewHolder>() {
 
     private val items = mutableListOf<TopicMessage>()
@@ -905,6 +906,12 @@ class TopicAdapter(
                         setBackgroundResource(R.drawable.bg_role_badge)
                         setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
                         setOnClickListener {
+                            // 点击反馈：按钮变灰，显示"已选择"
+                            isEnabled = false
+                            text = "已选择"
+                            alpha = 0.6f
+                            // 回调给 Fragment：插入用户选择的消息 + 调用 callback API
+                            onMpButtonClick?.invoke(btnText, callbackData)
                             scope.launch(Dispatchers.IO) {
                                 try {
                                     ApiClient.post("/api/moviepilot/callback", mapOf(
@@ -913,6 +920,9 @@ class TopicAdapter(
                                     ))
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {
+                                        isEnabled = true
+                                        text = btnText
+                                        alpha = 1.0f
                                         Toast.makeText(ctx, "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 }

@@ -256,7 +256,30 @@ class TopicFragment : Fragment() {
             },
             onImageClick = { msg -> showImagesViewer(msg) },
             onVideoClick = { msg -> showVideoPlayer(msg) },
-            onAvatarClick = { msg -> handleAvatarClick(msg) }
+            onAvatarClick = { msg -> handleAvatarClick(msg) },
+            onMpButtonClick = { btnText, callbackData ->
+                // MP 卡片按钮点击：在聊天记录插入一条用户选择的消息，跟正常发消息一样显示在右侧
+                val tempId = -System.currentTimeMillis()
+                val tempMsg = TopicMessage(
+                    id = tempId,
+                    topic = topic,
+                    title = "",
+                    text = btnText,
+                    senderName = AuthManager.username ?: "me",
+                    timestamp = System.currentTimeMillis(),
+                    deviceId = AuthManager.deviceId,
+                    deviceName = AuthManager.deviceName,
+                    mediaType = "text",
+                    mediaUrl = null,
+                    mediaName = null,
+                    mediaSize = 0,
+                    duration = 0,
+                    senderUserId = AuthManager.userId,
+                    sending = false
+                )
+                chatAdapter.appendItems(listOf(tempMsg))
+                scrollToBottom()
+            }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = chatAdapter
