@@ -314,7 +314,7 @@ class TopicFragment : Fragment() {
                 // 这样刷新后消息不会消失，同时 callback_data 会转发给 MP 处理
                 val topic = currentTopic
                 if (topic != null) {
-                    publish(topic, "", btnText, "text", null, null, 0)
+                    publish(topic, "", btnText, "text", null, null, 0, skipMpForward = true)
                     // 异步转发 callback 给 MP，Agent 会处理并回复
                     lifecycleScope.launch(Dispatchers.IO) {
                         try {
@@ -909,7 +909,7 @@ class TopicFragment : Fragment() {
         publish(topic, "", text, "text", null, null, 0)
     }
 
-    private fun publish(topic: String, title: String, text: String, mediaType: String, mediaUrl: String?, mediaName: String?, mediaSize: Long, duration: Int = 0) {
+    private fun publish(topic: String, title: String, text: String, mediaType: String, mediaUrl: String?, mediaName: String?, mediaSize: Long, duration: Int = 0, skipMpForward: Boolean = false) {
         // 先插入发送中的临时消息，让用户立即看到
         val tempId = -System.currentTimeMillis()
         val tempMsg = TopicMessage(
@@ -944,7 +944,7 @@ class TopicFragment : Fragment() {
                 if (mediaType == "voice") SoundManager.playVoiceSent()
                 else SoundManager.playMessageSent()
                 // MP 话题：文字消息额外转发给 MoviePilot
-                if (topic.startsWith("moviepilot_") && mediaType == "text" && text.isNotEmpty()) {
+                if (!skipMpForward && topic.startsWith("moviepilot_") && mediaType == "text" && text.isNotEmpty()) {
                     com.echolink.util.DebugLogger.d("TopicFragment", "MP转发消息: topic=$topic, text=$text, msgId=${msg.id}, sender=${msg.senderName}, userId=${msg.senderUserId}")
                     try {
                         val resp = ApiClient.post("/api/moviepilot/send", mapOf("text" to text))
