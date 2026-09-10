@@ -13,7 +13,7 @@ router.post("/callback", async (req, res) => {
   if (!callback_data) {
     return res.status(400).json({ error: "callback_data is required" });
   }
-  const username = req.user.username;
+  const username = req.username;
   try {
     const result = await callbackButton(username, callback_data, message_id);
     if (result.error) {
@@ -31,9 +31,9 @@ router.post("/send", async (req, res) => {
   if (!text || !text.trim()) {
     return res.status(400).json({ error: "text is required" });
   }
-  const username = req.user.username;
+  const username = req.username;
   // 确保 MP 话题存在
-  ensureUserMoviepilotTopic(req.user.id, username);
+  ensureUserMoviepilotTopic(req.userId, username);
   try {
     const result = await sendUserMessageToMP(username, text.trim());
     if (result.error) {

@@ -32,7 +32,8 @@ object DebugLogger {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(KEY_ENABLED, value).apply()
         if (value) {
-            d("DebugLogger", "调试日志已启用")
+            clearLog()
+            d("DebugLogger", "调试日志已启用（已清空旧日志）")
         } else {
             d("DebugLogger", "调试日志已关闭")
         }

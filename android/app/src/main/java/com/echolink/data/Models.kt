@@ -125,29 +125,33 @@ fun parseTopicMessages(jsonArray: JSONArray): List<TopicMessage> {
     val list = mutableListOf<TopicMessage>()
     for (i in 0 until jsonArray.length()) {
         val obj = jsonArray.getJSONObject(i)
-        list.add(
-            TopicMessage(
-                id = obj.getLong("id"),
-                topic = obj.getString("topic"),
-                title = obj.optString("title", ""),
-                text = obj.optString("text", ""),
-                senderName = obj.optString("sender_name", ""),
-                timestamp = obj.getLong("timestamp"),
-                deviceId = obj.optLong("device_id", -1),
-                deviceName = obj.optNullable("device_name"),
-                mediaType = obj.optString("media_type", "text"),
-                mediaUrl = obj.optNullable("media_url"),
-                mediaName = obj.optNullable("media_name"),
-                mediaSize = obj.optLong("media_size", 0),
-                duration = obj.optInt("duration", 0),
-                senderUserId = obj.optLong("user_id", 0),
-                senderAvatar = obj.optNullable("sender_avatar"),
-                senderDisplayName = obj.optNullable("sender_display_name"),
-                peerAvatar = obj.optNullable("peer_avatar"),
-                read = obj.optInt("read", 0) == 1,
-                cardData = obj.optNullable("card_data")
-            )
+        val msg = TopicMessage(
+            id = obj.getLong("id"),
+            topic = obj.getString("topic"),
+            title = obj.optString("title", ""),
+            text = obj.optString("text", ""),
+            senderName = obj.optString("sender_name", ""),
+            timestamp = obj.getLong("timestamp"),
+            deviceId = obj.optLong("device_id", -1),
+            deviceName = obj.optNullable("device_name"),
+            mediaType = obj.optString("media_type", "text"),
+            mediaUrl = obj.optNullable("media_url"),
+            mediaName = obj.optNullable("media_name"),
+            mediaSize = obj.optLong("media_size", 0),
+            duration = obj.optInt("duration", 0),
+            senderUserId = obj.optLong("user_id", 0),
+            senderAvatar = obj.optNullable("sender_avatar"),
+            senderDisplayName = obj.optNullable("sender_display_name"),
+            peerAvatar = obj.optNullable("peer_avatar"),
+            read = obj.optInt("read", 0) == 1,
+            cardData = obj.optNullable("card_data")
         )
+        // DEBUG: 记录每条消息的原始JSON和解析结果
+        if (msg.topic.startsWith("moviepilot_")) {
+            com.echolink.util.DebugLogger.d("parseTopicMessages",
+                "id=${msg.id} userId_raw=${obj.opt("user_id")} userId_parsed=${msg.senderUserId} sender=${msg.senderName} text=${msg.text.take(30)}")
+        }
+        list.add(msg)
     }
     return list
 }
