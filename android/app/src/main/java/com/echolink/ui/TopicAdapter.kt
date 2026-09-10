@@ -864,6 +864,11 @@ class TopicAdapter(
         holder.llVoice.visibility = View.GONE
         holder.llFile.visibility = View.GONE
         holder.cardContainer.visibility = View.VISIBLE
+        // 卡片消息也用气泡背景（带尾角箭头），自己的右下/对面的左下
+        val isMine = isSelfMessage(item)
+        holder.cardContainer.setBackgroundResource(if (isMine) R.drawable.bg_msg_own else R.drawable.bg_msg_other)
+        val dp = ctx.resources.displayMetrics.density
+        holder.cardContainer.setPadding((10*dp).toInt(), (8*dp).toInt(), (10*dp).toInt(), (8*dp).toInt())
 
         holder.llCardDetails.removeAllViews()
         holder.llCardButtons.removeAllViews()
