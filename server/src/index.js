@@ -1,152 +1,109 @@
-require("dotenv").config();
+/**
+ * EchoLink 服务器入口
+ * 跨设备消息互联 · 通知同步 · 好友
+ */
 
 const express = require("express");
 const cors = require("cors");
-const http = require("http");
 const path = require("path");
 const fs = require("fs");
-const crypto = require("crypto");
-const { initDB, seedAdmin, getSettings } = require("./db");
-const { setupWebSocket } = require("./websocket");
+
+const { getDB, initTables } = require("./db");
+const telegramBridge = require("./telegram_bridge");
 
 const app = express();
-const server = http.createServer(app);
+const PORT = process.env.PORT || 3000;
 
 // 中间件
 app.use(cors());
-// 留言板 Webhook 可能携带 base64 图片，单独放宽 body 上限（全局 1mb 不够用）
-app.use("/api/webhook", express.json({ limit: "15mb" }));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "100mb" }));
+app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
-// 反代友好：当部署在 nginx/caddy 等反向代理之后时，正确识别客户端 IP 与协议
-app.set("trust proxy", true);
-
-// 请求日志
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
-
-// ---- JWT_SECRET 自动生成并持久化（无需在终端设置）----
-function getDataDir() {
-  const dbPath = process.env.DB_PATH || "./data/echolink.db";
-  return path.dirname(dbPath);
+// 静态文件服务
+const publicDir = path.join(__dirname, "public");
+if (fs.existsSync(publicDir)) {
+  app.use(express.static(publicDir));
 }
-function loadJwtSecret() {
-  const PLACEHOLDER = "change-this-to-a-random-secret-key";
-  const envSecret = process.env.JWT_SECRET;
-  const envOk = envSecret && envSecret.length >= 16 && envSecret !== PLACEHOLDER;
-  if (envOk) return envSecret; // 显式提供的强密钥优先
 
-  const dir = getDataDir();
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const secretFile = path.join(dir, ".jwt_secret");
-  if (fs.existsSync(secretFile)) {
-    try {
-      const loaded = fs.readFileSync(secretFile, "utf8").trim();
-      if (loaded) return loaded;
-    } catch (e) { /* ignore */ }
-  }
-  // 首次运行：生成并持久化，重启后保持稳定
-  const generated = crypto.randomBytes(48).toString("hex");
-  try { fs.writeFileSync(secretFile, generated, { mode: 0o600 }); } catch (e) { /* ignore */ }
-  console.log("[JWT] auto-generated secret persisted to", secretFile);
-  return generated;
+// 上传目录
+const uploadDir = path.join(__dirname, "..", "data", "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
 }
-process.env.JWT_SECRET = loadJwtSecret();
+app.use("/uploads", express.static(uploadDir));
 
-// 健康检查
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", timestamp: Date.now() });
-});
-
-// 公开信息（WebUI 概览用）
-app.get("/api/info", (req, res) => {
-  let version = "1.0.0";
-  try { version = require("../package.json").version; } catch (e) { /* ignore */ }
-  res.json({
-    name: "EchoLink",
-    version,
-    uptime: Math.floor(process.uptime()),
-    dataDir: getDataDir(),
-  });
-});
+// 初始化数据库
+const db = getDB();
+initTables();
 
 // API 路由
 app.use("/api/auth", require("./routes/auth"));
+app.use("/api/users", require("./routes/users"));
 app.use("/api/devices", require("./routes/devices"));
-app.use("/api/notifications", require("./routes/notifications"));
-app.use("/api/filters", require("./routes/filters"));
 app.use("/api/topics", require("./routes/topics"));
-app.use("/api", require("./routes/friends"));
-app.use("/api/user", require("./routes/user"));
+app.use("/api/messages", require("./routes/messages"));
+app.use("/api/notifications", require("./routes/notifications"));
+app.use("/api/friends", require("./routes/friends"));
+app.use("/api/filters", require("./routes/filters"));
 app.use("/api/admin", require("./routes/admin"));
 app.use("/api/webhook", require("./routes/webhook"));
 app.use("/api/moviepilot", require("./routes/moviepilot"));
 
-// 静态管理界面（WebUI）
-const publicDir = path.join(__dirname, "..", "public");
-if (fs.existsSync(publicDir)) {
-  app.use(express.static(publicDir));
-  // 上传的媒体文件（图片/语音/附件）静态可访问
-  const uploadsDir = path.join(getDataDir(), "uploads");
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-  app.use("/uploads", express.static(uploadsDir, {
-    maxAge: "1y",
-    immutable: true,
-    setHeaders: (res) => {
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-    },
-  }));
-  // 未匹配的非 API 路径都回退到 index.html（单页应用）
-  app.get(/^(?!\/api\/).*/, (req, res) => {
-    res.sendFile(path.join(publicDir, "index.html"));
+// 根路径重定向到前端
+app.get("/", (req, res) => {
+  res.sendFile(path.join(publicDir, "index.html"));
+});
+
+// 健康检查
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true, status: "running", timestamp: new Date().toISOString() });
+});
+
+// 服务器信息
+app.get("/api/info", (req, res) => {
+  const uptime = process.uptime();
+  res.json({
+    name: "EchoLink",
+    version: "1.0.0",
+    uptime: uptime,
+    dataDir: path.join(__dirname, "..", "data"),
   });
-}
-
-// 错误处理
-app.use((err, req, res, next) => {
-  console.error("[ERROR]", err);
-  res.status(500).json({ error: "Internal server error" });
 });
 
-// 404
-app.use((req, res) => {
-  res.status(404).json({ error: "Not found" });
-});
-
-// 初始化数据库
-initDB();
-// 加载服务器设置缓存（大小上限等）
-try {
-  getSettings();
-  console.log("[Settings] loaded");
-} catch (e) {
-  console.error("[Settings] load error:", e);
-}
-// 根据环境变量初始化/维护管理员账号
-try {
-  seedAdmin();
-} catch (e) {
-  console.error("[DB] seedAdmin error:", e);
-}
-
-// 启动 WebSocket
-setupWebSocket(server);
-
-// 启动 HTTP 服务
-const PORT = process.env.PORT || 3000;
-const HOST = "0.0.0.0";
-
-
-  // 迁移旧的 messagewall 话题
-  try { require("./messagewall").migrateLegacyMessagewallTopic(); } catch (e) { console.error("messagewall migrate failed:", e.message); }
-
-server.listen(PORT, HOST, () => {
+// 启动服务器
+const server = app.listen(PORT, () => {
   console.log(`\n========================================`);
-  console.log(`  EchoLink Server`);
-  console.log(`  HTTP:  http://${HOST}:${PORT}`);
-  console.log(`  WS:    ws://${HOST}:${PORT}/ws`);
-  console.log(`  WebUI: http://${HOST}:${PORT}/`);
+  console.log(`  EchoLink 服务器已启动`);
+  console.log(`  端口: ${PORT}`);
+  console.log(`  访问: http://localhost:${PORT}`);
   console.log(`========================================\n`);
+
+  // 启动所有 Telegram 模式用户的长轮询监控
+  // 异步启动，不阻塞服务器启动
+  setTimeout(() => {
+    try {
+      telegramBridge.startAllPolling();
+    } catch (e) {
+      console.error("启动 Telegram 监控失败:", e.message);
+    }
+  }, 1000);
 });
+
+// 优雅关闭
+process.on("SIGTERM", () => {
+  console.log("收到 SIGTERM，正在关闭服务器...");
+  server.close(() => {
+    console.log("服务器已关闭");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", () => {
+  console.log("\n收到 SIGINT，正在关闭服务器...");
+  server.close(() => {
+    console.log("服务器已关闭");
+    process.exit(0);
+  });
+});
+
+module.exports = { app, server };
