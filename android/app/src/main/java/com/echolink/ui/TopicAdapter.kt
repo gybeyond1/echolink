@@ -428,6 +428,10 @@ class TopicAdapter(
         holder.ivPlayOverlay.visibility = View.GONE
         holder.llVoice.visibility = View.GONE
         holder.llFile.visibility = View.GONE
+        // 关键修复：普通文本/图片/语音/文件消息必须隐藏 cardContainer，否则复用旧卡片ViewHolder时旧卡片内容会盖在上面
+        holder.cardContainer.visibility = View.GONE
+        // 同时恢复 bubbleInner 可见（bindCard 里会把它设为 GONE，复用回来时要恢复）
+        holder.bubbleInner.visibility = View.VISIBLE
         // 统一恢复气泡背景（语音/文字用气泡，图片/视频去掉气泡）
         val dpRestore = holder.itemView.context.resources.displayMetrics.density
         holder.bubbleInner.setBackgroundResource(if (isMine) R.drawable.bg_msg_own else R.drawable.bg_msg_other)
@@ -556,30 +560,29 @@ class TopicAdapter(
         val ctx = holder.itemView.context
         val dp = ctx.resources.displayMetrics.density
 
-        // 气泡宽度自适应内容，上限屏宽 66%（约2/3），长文本自动换行
-        val maxW = (ctx.resources.displayMetrics.widthPixels * 0.66f).toInt()
+        // 气泡宽度自适应内容，上限屏宽 60%，长文本自动换行
+        val maxW = (ctx.resources.displayMetrics.widthPixels * 0.60f).toInt()
         holder.tvTitle.maxWidth = maxW
         holder.tvText.maxWidth = maxW
         val lp = holder.bubbleInner.layoutParams as android.widget.LinearLayout.LayoutParams
         lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
         lp.weight = 0f
         holder.bubbleInner.layoutParams = lp
-        // llContent 也用 wrap_content，让已读标志紧挨气泡、气泡与头像保持正常间距
+
+        // llContent 填充剩余空间（0dp + weight=1），通过 gravity 控制气泡左右对齐
+        // 这是关键：之前用 WRAP_CONTENT 导致气泡永远靠左
         val lpContent = holder.llContent.layoutParams as android.widget.LinearLayout.LayoutParams
-        lpContent.width = ViewGroup.LayoutParams.WRAP_CONTENT
-        lpContent.weight = 0f
-        // 气泡与头像之间留 8dp 间距；顶部 2dp 让头像与发送人名字顶部齐平
-        // 一对一对话：Telegram 风格，无头像，气泡紧贴边缘
+        lpContent.width = 0
+        lpContent.weight = 1f
         lpContent.topMargin = if (hideAvatar) 0 else (2 * dp).toInt()
         lpContent.bottomMargin = 0
-        if (isMine) {
-            lpContent.marginStart = 0
-            lpContent.marginEnd = if (hideAvatar) 0 else (8 * dp).toInt()
-        } else {
-            lpContent.marginStart = if (hideAvatar) 0 else (8 * dp).toInt()
-            lpContent.marginEnd = 0
-        }
+        lpContent.marginStart = if (hideAvatar) 0 else (8 * dp).toInt()
+        lpContent.marginEnd = if (hideAvatar) 0 else (8 * dp).toInt()
         holder.llContent.layoutParams = lpContent
+
+        // 核心修复：通过 gravity 控制气泡在 llContent 中的对齐方向
+        // 自己的消息靠右（END），对方的消息靠左（START）
+        holder.llContent.gravity = if (isMine) android.view.Gravity.END else android.view.Gravity.START
 
         val padH = (8 * dp).toInt()
         val padV = (4 * dp).toInt()
