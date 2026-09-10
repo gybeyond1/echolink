@@ -142,16 +142,16 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                 val filtered = friends.filter { !it.isMoviepilot }
                 friendAdapter.setItems(filtered)
                 binding.tvEmptyFriends.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
-                // 检查是否有 MoviePilot 话题，有则显示 MP 入口
-                try {
-                    val topics = ApiClient.getMyTopics()
-                    val mpTopic = topics.firstOrNull { it.name.startsWith("moviepilot_") }
-                    binding.rowMoviePilot.visibility = if (mpTopic != null) View.VISIBLE else View.GONE
-                    if (mpTopic != null) {
-                        binding.rowMoviePilot.setOnClickListener {
+                // MP 入口始终显示（删除会话后也能从好友页重新进入）
+                binding.rowMoviePilot.visibility = View.VISIBLE
+                binding.rowMoviePilot.setOnClickListener {
+                    lifecycleScope.launch {
+                        try {
+                            val resp = ApiClient.ensureMoviepilotTopic()
+                            val topicName = resp.getJSONObject("topic").getString("name")
                             if (isWide) {
                                 // 平板：右侧打开 MP 话题
-                                val frag = TopicFragment.chatOnly(mpTopic.name, "MoviePilot")
+                                val frag = TopicFragment.chatOnly(topicName, "MoviePilot")
                                 childFragmentManager.beginTransaction()
                                     .replace(binding.chatContainer.id, frag)
                                     .commit()
@@ -159,11 +159,13 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                                 binding.tvChatPlaceholder.visibility = View.GONE
                             } else {
                                 // 手机：打开 MP 话题
-                                (activity as? MainActivity)?.openTopic(mpTopic.name, "MoviePilot")
+                                (activity as? MainActivity)?.openTopic(topicName, "MoviePilot", fromFriends = true)
                             }
+                        } catch (e: Exception) {
+                            Toast.makeText(requireContext(), "打开 MP 会话失败: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
-                } catch (_: Exception) {}
+                }
                 // 平板双栏：首次加载后自动选中第一个好友，让右侧立即显示聊天（镜像消息页体验）
                 if (isWide && !initialAutoSelectDone && filtered.isNotEmpty()) {
                     initialAutoSelectDone = true
@@ -213,7 +215,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                 lp.weight = 0f
                 binding.leftPane.layoutParams = lp
             } else {
-                (activity as? MainActivity)?.openTopic(mpTopic, "MoviePilot")
+                (activity as? MainActivity)?.openTopic(mpTopic, "MoviePilot", fromFriends = true)
             }
             return
         }
@@ -226,7 +228,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                 try {
                     val (topic, title) = ApiClient.openFriendChat(friend.username)
                     val displayTitle = friend.displayName ?: title
-                    (activity as? MainActivity)?.openTopic(topic, displayTitle)
+                    (activity as? MainActivity)?.openTopic(topic, displayTitle, fromFriends = true)
                 } catch (e: Exception) {
                     Toast.makeText(requireContext(), "打开私聊失败: ${e.message}", Toast.LENGTH_SHORT).show()
                 }

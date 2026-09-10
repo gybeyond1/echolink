@@ -127,6 +127,8 @@ class TopicFragment : Fragment() {
     private var unreadChatCount = 0
     // 仅聊天模式：由好友页在平板右侧以子 Fragment 方式承载，只显示聊天、不含左侧列表
     private var chatOnly = false
+    // 从好友页进入的聊天：返回时回到好友页而不是消息列表
+    private var fromFriends = false
     private var unifiedRequests = UnifiedRequests(emptyList(), emptyList())
 
     private var mediaRecorder: MediaRecorder? = null
@@ -285,6 +287,8 @@ class TopicFragment : Fragment() {
 
         // 仅聊天模式（平板好友页右侧）：不加载左侧列表，直接进入聊天
         chatOnly = arguments?.getBoolean(EXTRA_CHAT_ONLY) ?: false
+        // 从好友页进入的聊天：返回时回到好友页
+        fromFriends = arguments?.getBoolean("fromFriends") ?: false
 
         listAdapter = TopicListAdapter(
             onItemClick = { showChatMode(it) },
@@ -356,7 +360,13 @@ class TopicFragment : Fragment() {
                     chatAdapter.selectionMode -> { chatAdapter.clearSelection(); updateSelectionUI() }
                     chatOnly -> (parentFragment as? ChatPaneHost)?.onChatPaneClosed()
                         ?: (activity as? MainActivity)?.backToTopics()
-                    binding.chatLayout.visibility == View.VISIBLE -> showListMode()
+                    binding.chatLayout.visibility == View.VISIBLE -> {
+                        if (fromFriends) {
+                            (activity as? MainActivity)?.backToFriends()
+                        } else {
+                            showListMode()
+                        }
+                    }
                 }
             }
         }

@@ -305,15 +305,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun openTopic(topic: String, title: String? = null) {
+    fun openTopic(topic: String, title: String? = null, fromFriends: Boolean = false) {
         val frag = TopicFragment()
         frag.arguments = Bundle().apply {
             putString("topic", topic)
             if (title != null) putString("title", title)
+            putBoolean("fromFriends", fromFriends)
         }
         switchFragment(frag)
         if (!isTablet) {
             binding.bottomNav!!.menu.findItem(R.id.nav_topic)?.isChecked = true
+        }
+    }
+
+    fun backToFriends() {
+        switchFragment(FriendsFragment())
+        if (!isTablet) {
+            binding.bottomNav!!.menu.findItem(R.id.nav_friends)?.isChecked = true
         }
     }
 
