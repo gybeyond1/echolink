@@ -145,25 +145,23 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                 // MP 入口始终显示（删除会话后也能从好友页重新进入）
                 binding.rowMoviePilot.visibility = View.VISIBLE
                 binding.rowMoviePilot.setOnClickListener {
+                    // 直接用固定格式构造话题名，无需调 API 等待（moviepilot_<username>）
+                    val topicName = "moviepilot_" + com.echolink.data.AuthManager.username
+                    if (isWide) {
+                        // 平板：右侧打开 MP 话题
+                        val frag = TopicFragment.chatOnly(topicName, "MoviePilot")
+                        childFragmentManager.beginTransaction()
+                            .replace(binding.chatContainer.id, frag)
+                            .commit()
+                        binding.chatContainer.visibility = View.VISIBLE
+                        binding.tvChatPlaceholder.visibility = View.GONE
+                    } else {
+                        // 手机：打开 MP 话题
+                        (activity as? MainActivity)?.openTopic(topicName, "MoviePilot", fromFriends = true)
+                    }
+                    // 后台异步确保话题存在（不阻塞 UI）
                     lifecycleScope.launch {
-                        try {
-                            val resp = ApiClient.ensureMoviepilotTopic()
-                            val topicName = resp.getJSONObject("topic").getString("name")
-                            if (isWide) {
-                                // 平板：右侧打开 MP 话题
-                                val frag = TopicFragment.chatOnly(topicName, "MoviePilot")
-                                childFragmentManager.beginTransaction()
-                                    .replace(binding.chatContainer.id, frag)
-                                    .commit()
-                                binding.chatContainer.visibility = View.VISIBLE
-                                binding.tvChatPlaceholder.visibility = View.GONE
-                            } else {
-                                // 手机：打开 MP 话题
-                                (activity as? MainActivity)?.openTopic(topicName, "MoviePilot", fromFriends = true)
-                            }
-                        } catch (e: Exception) {
-                            Toast.makeText(requireContext(), "打开 MP 会话失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
+                        try { ApiClient.ensureMoviepilotTopic() } catch (_: Exception) {}
                     }
                 }
                 // 平板双栏：首次加载后自动选中第一个好友，让右侧立即显示聊天（镜像消息页体验）
