@@ -381,6 +381,11 @@ class TopicAdapter(
             holder.avatarContainer.visibility = View.VISIBLE
             holder.llSenderInfo.visibility = View.VISIBLE
         }
+        // MP 会话：Telegram 风格，完全去掉头像和发送人名字，气泡紧贴边缘
+        if (isMoviePilot) {
+            holder.avatarContainer.visibility = View.GONE
+            holder.llSenderInfo.visibility = View.GONE
+        }
 
         // Sender display name: prefer display_name, fallback to sender_name (username)
         val displayName = item.senderDisplayName?.takeIf { it.isNotBlank() }
@@ -560,13 +565,14 @@ class TopicAdapter(
         lpContent.width = ViewGroup.LayoutParams.WRAP_CONTENT
         lpContent.weight = 0f
         // 气泡与头像之间留 8dp 间距；顶部 2dp 让头像与发送人名字顶部齐平
-        lpContent.topMargin = (2 * dp).toInt()
+        // MP 会话：Telegram 风格，无头像，气泡紧贴边缘
+        lpContent.topMargin = if (isMoviePilot) 0 else (2 * dp).toInt()
         lpContent.bottomMargin = 0
         if (isMine) {
             lpContent.marginStart = 0
-            lpContent.marginEnd = (8 * dp).toInt()
+            lpContent.marginEnd = if (isMoviePilot) 0 else (8 * dp).toInt()
         } else {
-            lpContent.marginStart = (8 * dp).toInt()
+            lpContent.marginStart = if (isMoviePilot) 0 else (8 * dp).toInt()
             lpContent.marginEnd = 0
         }
         holder.llContent.layoutParams = lpContent
