@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 对面的消息气泡：左下角小尾角指向对方，就是自己气泡的水平镜像（Telegram风格） -->
+<!-- 对面的消息气泡：左下角小尾角指向对方，颜色和自己气泡完全一样，只是水平镜像（Telegram风格） -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/bubble_other" />
+            <solid android:color="@color/bubble_own" />
             <corners
                 android:topLeftRadius="16dp"
                 android:topRightRadius="16dp"
@@ -21,7 +21,7 @@
             android:viewportWidth="10"
             android:viewportHeight="14">
             <path
-                android:fillColor="@color/bubble_other"
+                android:fillColor="@color/bubble_own"
                 android:pathData="M0,7 L10,0 L10,14 Z" />
         </vector>
     </item>

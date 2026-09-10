@@ -580,6 +580,11 @@ class TopicFragment : Fragment() {
         binding.inputBar.visibility = if (isMw) View.GONE else View.VISIBLE
         binding.panelContainer.visibility = View.GONE
         binding.tvEmptyChat.text = if (isMw) "暂无留言" else "暂无消息\n发送一条消息开始聊天"
+        // MP 会话：只支持文字消息，隐藏语音/表情/附件按钮，只留输入框和发送
+        val isMp = topic.kind == "moviepilot"
+        binding.btnVoiceToggle.visibility = if (isMp) View.GONE else View.VISIBLE
+        binding.btnEmoji.visibility = if (isMp) View.GONE else View.VISIBLE
+        binding.btnPlus.visibility = if (isMp) View.GONE else View.VISIBLE
         // 平板且非仅聊天模式 → 左列表 + 右聊天并排；其余（手机 / 仅聊天模式）→ 聊天占满
         val dual = isWide && !chatOnly
         if (dual) {

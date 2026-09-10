@@ -109,16 +109,20 @@ class TopicAdapter(
     /** 是否为「我」发出的消息：优先用 user_id 严格判定；当 AuthManager.userId 未初始化(<=0)
      *  或消息 user_id 无效时，回退用 senderName 与当前用户名比对，避免刷新后身份错乱。 */
     private fun isSelfMessage(item: TopicMessage): Boolean {
+        // 我的设备会话：用 device_id 区分当前设备和其他设备
+        if (isMyDevice) {
+            if (item.deviceId > 0 && AuthManager.deviceId > 0) {
+                return item.deviceId == AuthManager.deviceId
+            }
+            // device_id 无效时默认是自己的（同一账号）
+            return true
+        }
+        // 其他会话：优先 user_id，回退 senderName
         val result = if (item.senderUserId > 0 && AuthManager.userId > 0) {
             item.senderUserId == AuthManager.userId
         } else {
             val me = AuthManager.username
             !me.isNullOrBlank() && item.senderName == me
-        }
-        // DEBUG: MP 会话记录身份判断详情，排查刷新后消息错乱
-        if (item.topic.startsWith("moviepilot_")) {
-            com.echolink.util.DebugLogger.d("isSelfMessage",
-                "id=${item.id} result=$result senderUserId=${item.senderUserId} authUserId=${AuthManager.userId} senderName='${item.senderName}' authUsername='${AuthManager.username}' text='${item.text.take(20)}'")
         }
         return result
     }
@@ -546,11 +550,12 @@ class TopicAdapter(
         // 已读回执仅在 dm 私聊自己消息时显示，要放在消息气泡左侧，不要卡在头像和气泡之间。
         row.removeAllViews()
         if (isMine) {
-            // 自己的消息：[气泡, 已读标志, 头像] —— 已读标志紧挨气泡右边，不能放到最左边
-            row.addView(holder.llContent)
+            // 自己的消息：[已读标志, 气泡, 头像] —— 已读标志紧挨气泡左边
             row.addView(holder.statusContainer)
+            row.addView(holder.llContent)
             row.addView(holder.avatarContainer)
         } else {
+            // 对面的消息：[头像, 气泡, 已读标志] —— 已读标志紧挨气泡右边
             row.addView(holder.avatarContainer)
             row.addView(holder.llContent)
             row.addView(holder.statusContainer)
@@ -558,8 +563,8 @@ class TopicAdapter(
         val g = if (isMine) Gravity.END else Gravity.START
         row.gravity = g or Gravity.CENTER_VERTICAL
         holder.llSenderInfo.gravity = g
-        holder.tvTitle.gravity = g
-        holder.tvText.gravity = g
+        holder.tvTitle.gravity = android.view.Gravity.START
+        holder.tvText.gravity = android.view.Gravity.START
         (holder.mediaContainer.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
         (holder.llVoice.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
         (holder.llFile.layoutParams as android.widget.LinearLayout.LayoutParams).gravity = g
