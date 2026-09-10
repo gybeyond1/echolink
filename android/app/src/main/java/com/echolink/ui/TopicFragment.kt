@@ -57,6 +57,7 @@ import com.echolink.data.TopicMessage
 import com.echolink.data.UnifiedRequests
 import com.echolink.data.UnifiedTopicRequest
 import com.echolink.data.WebSocketClient
+import com.echolink.data.optNullable
 import com.echolink.data.parseTopicMessage
 import com.echolink.databinding.FragmentTopicBinding
 import kotlinx.coroutines.Dispatchers
