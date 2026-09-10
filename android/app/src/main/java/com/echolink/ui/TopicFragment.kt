@@ -257,28 +257,20 @@ class TopicFragment : Fragment() {
             onImageClick = { msg -> showImagesViewer(msg) },
             onVideoClick = { msg -> showVideoPlayer(msg) },
             onAvatarClick = { msg -> handleAvatarClick(msg) },
-            onMpButtonClick = { btnText, callbackData ->
-                // MP 卡片按钮点击：在聊天记录插入一条用户选择的消息，跟正常发消息一样显示在右侧
-                val tempId = -System.currentTimeMillis()
-                val tempMsg = TopicMessage(
-                    id = tempId,
-                    topic = currentTopic ?: "",
-                    title = "",
-                    text = btnText,
-                    senderName = AuthManager.username ?: "me",
-                    timestamp = System.currentTimeMillis(),
-                    deviceId = AuthManager.deviceId,
-                    deviceName = AuthManager.deviceName,
-                    mediaType = "text",
-                    mediaUrl = null,
-                    mediaName = null,
-                    mediaSize = 0,
-                    duration = 0,
-                    senderUserId = AuthManager.userId,
-                    sending = false
-                )
-                chatAdapter.appendItems(listOf(tempMsg))
-                scrollToBottom()
+                        onMpButtonClick = { btnText, callbackData ->
+                // MP 卡片按钮点击：走正常发消息流程，把按钮文字作为消息发送到服务器
+                // 这样刷新后消息不会消失，同时 callback_data 会转发给 MP 处理
+                val topic = currentTopic ?: return@onMpButtonClick
+                publish(topic, "", btnText, "text", null, null, 0)
+                // 异步转发 callback 给 MP，Agent 会处理并回复
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        ApiClient.post("/api/moviepilot/callback", mapOf(
+                            "callback_data" to callbackData,
+                            "message_id" to ""
+                        ))
+                    } catch (_: Exception) {}
+                }
             }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())

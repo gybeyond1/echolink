@@ -966,22 +966,8 @@ class TopicAdapter(
                             isEnabled = false
                             alpha = 0.4f
                             com.echolink.util.DebugLogger.d("MPButtons", "clicked text='$btnText' callback='$callbackData'")
-                            // 回调给 Fragment：插入用户选择的消息 + 调用 callback API
+                            // 回调给 Fragment：走正常发消息流程 + 转发 callback 给 MP
                             onMpButtonClick?.invoke(btnText, callbackData)
-                            scope.launch(Dispatchers.IO) {
-                                try {
-                                    ApiClient.post("/api/moviepilot/callback", mapOf(
-                                        "callback_data" to callbackData,
-                                        "message_id" to item.id
-                                    ))
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        isEnabled = true
-                                        alpha = 1.0f
-                                        Toast.makeText(ctx, "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
                         }
                     }
                     val btnLp = android.widget.LinearLayout.LayoutParams(
