@@ -110,12 +110,16 @@ class TopicAdapter(
      *  或消息 user_id 无效时，回退用 senderName 与当前用户名比对，避免刷新后身份错乱。 */
     private fun isSelfMessage(item: TopicMessage): Boolean {
         // 我的设备会话：用 device_id 区分当前设备和其他设备
-        if (isMyDevice) {
-            if (item.deviceId > 0 && AuthManager.deviceId > 0) {
-                return item.deviceId == AuthManager.deviceId
+        val isDeviceTopic = isMyDevice || item.topic.endsWith("-devices")
+        if (isDeviceTopic) {
+            val result = if (item.deviceId > 0 && AuthManager.deviceId > 0) {
+                item.deviceId == AuthManager.deviceId
+            } else {
+                true // device_id 无效时默认是自己的（同一账号）
             }
-            // device_id 无效时默认是自己的（同一账号）
-            return true
+            com.echolink.util.DebugLogger.d("isSelfMessage",
+                "DEVICE topic=${item.topic} isMyDevice=$isMyDevice result=$result itemDevId=${item.deviceId} authDevId=${AuthManager.deviceId} sender=${item.senderName}")
+            return result
         }
         // 其他会话：优先 user_id，回退 senderName
         val result = if (item.senderUserId > 0 && AuthManager.userId > 0) {
@@ -546,19 +550,24 @@ class TopicAdapter(
     private fun applyOwnStyle(holder: ViewHolder, isMine: Boolean) {
         // 去掉 lastMine 缓存：RecyclerView 复用时缓存会导致样式错乱，每次都重新设置
         val row = holder.llMessageRow
-        // 重排子视图：自己的消息 [已读回执, 气泡, 头像]，他人的消息 [头像, 气泡, 已读回执]
-        // 已读回执仅在 dm 私聊自己消息时显示，要放在消息气泡左侧，不要卡在头像和气泡之间。
+        // 重排子视图：自己的消息 [占位, 已读回执, 气泡, 头像]，他人的消息 [头像, 气泡, 已读回执, 占位]
+        // 用占位view占满剩余空间，让已读标志紧贴气泡
         row.removeAllViews()
+        val spacer = android.view.View(holder.itemView.context)
+        val spacerLp = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+        spacer.layoutParams = spacerLp
         if (isMine) {
-            // 自己的消息：[已读标志, 气泡, 头像] —— 已读标志紧挨气泡左边
+            // 自己的消息：[占位, 已读标志, 气泡, 头像] —— 已读标志紧挨气泡左边
+            row.addView(spacer)
             row.addView(holder.statusContainer)
             row.addView(holder.llContent)
             row.addView(holder.avatarContainer)
         } else {
-            // 对面的消息：[头像, 气泡, 已读标志] —— 已读标志紧挨气泡右边
+            // 对面的消息：[头像, 气泡, 已读标志, 占位] —— 已读标志紧挨气泡右边
             row.addView(holder.avatarContainer)
             row.addView(holder.llContent)
             row.addView(holder.statusContainer)
+            row.addView(spacer)
         }
         val g = if (isMine) Gravity.END else Gravity.START
         row.gravity = g or Gravity.CENTER_VERTICAL

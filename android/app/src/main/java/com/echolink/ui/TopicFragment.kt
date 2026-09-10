@@ -109,7 +109,8 @@ class TopicFragment : Fragment() {
                         mediaSize = json.optLong("media_size", 0),
                         senderUserId = json.optLong("user_id", 0),
                         senderAvatar = if (!json.isNull("sender_avatar")) json.optNullable("sender_avatar") else null,
-                        senderDisplayName = if (!json.isNull("sender_display_name")) json.optNullable("sender_display_name") else null
+                        senderDisplayName = if (!json.isNull("sender_display_name")) json.optNullable("sender_display_name") else null,
+                        cardData = if (!json.isNull("card_data")) json.optString("card_data", null) else null
                     )
                     val wasAtBottom = isAtBottom()
                     chatAdapter.appendItems(listOf(msg))
@@ -423,8 +424,15 @@ class TopicFragment : Fragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 val has = !s.isNullOrEmpty()
-                binding.btnSend.visibility = if (has) View.VISIBLE else View.GONE
-                binding.btnPlus.visibility = if (has) View.GONE else View.VISIBLE
+                val isMpChat = chatTopic?.kind == "moviepilot"
+                if (isMpChat) {
+                    // MP会话：只发文字，发送按钮一直显示，附件按钮一直隐藏
+                    binding.btnSend.visibility = View.VISIBLE
+                    binding.btnPlus.visibility = View.GONE
+                } else {
+                    binding.btnSend.visibility = if (has) View.VISIBLE else View.GONE
+                    binding.btnPlus.visibility = if (has) View.GONE else View.VISIBLE
+                }
                 if (has) hidePanels()
             }
         })

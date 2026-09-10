@@ -7,22 +7,22 @@
             <corners
                 android:topLeftRadius="16dp"
                 android:topRightRadius="16dp"
-                android:bottomRightRadius="3dp"
+                android:bottomRightRadius="4dp"
                 android:bottomLeftRadius="16dp" />
         </shape>
     </item>
     <item
-        android:width="10dp"
-        android:height="14dp"
+        android:width="12dp"
+        android:height="16dp"
         android:gravity="bottom|right">
         <vector
-            android:width="10dp"
-            android:height="14dp"
-            android:viewportWidth="10"
-            android:viewportHeight="14">
+            android:width="12dp"
+            android:height="16dp"
+            android:viewportWidth="12"
+            android:viewportHeight="16">
             <path
                 android:fillColor="@color/bubble_own"
-                android:pathData="M10,7 L0,0 L0,14 Z" />
+                android:pathData="M12,8 L0,0 L0,16 Z" />
         </vector>
     </item>
 </layer-list>

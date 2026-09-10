@@ -8,21 +8,21 @@
                 android:topLeftRadius="16dp"
                 android:topRightRadius="16dp"
                 android:bottomRightRadius="16dp"
-                android:bottomLeftRadius="3dp" />
+                android:bottomLeftRadius="4dp" />
         </shape>
     </item>
     <item
-        android:width="10dp"
-        android:height="14dp"
+        android:width="12dp"
+        android:height="16dp"
         android:gravity="bottom|left">
         <vector
-            android:width="10dp"
-            android:height="14dp"
-            android:viewportWidth="10"
-            android:viewportHeight="14">
+            android:width="12dp"
+            android:height="16dp"
+            android:viewportWidth="12"
+            android:viewportHeight="16">
             <path
                 android:fillColor="@color/bubble_own"
-                android:pathData="M0,7 L10,0 L10,14 Z" />
+                android:pathData="M0,8 L12,0 L12,16 Z" />
         </vector>
     </item>
 </layer-list>
