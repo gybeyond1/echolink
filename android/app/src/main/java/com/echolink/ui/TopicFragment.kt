@@ -134,7 +134,7 @@ class TopicFragment : Fragment() {
                     if (topic == currentTopic) {
                         val msg = TopicMessage(
                             id = intent.getLongExtra("id", 0),
-                            topic = topic,
+                            topic = currentTopic ?: "",
                             title = intent.getStringExtra("title") ?: "",
                             text = intent.getStringExtra("text") ?: "",
                             senderName = intent.getStringExtra("sender_name") ?: "",
@@ -262,7 +262,7 @@ class TopicFragment : Fragment() {
                 val tempId = -System.currentTimeMillis()
                 val tempMsg = TopicMessage(
                     id = tempId,
-                    topic = topic,
+                    topic = currentTopic ?: "",
                     title = "",
                     text = btnText,
                     senderName = AuthManager.username ?: "me",
@@ -844,7 +844,7 @@ class TopicFragment : Fragment() {
         val tempId = -System.currentTimeMillis()
         val tempMsg = TopicMessage(
             id = tempId,
-            topic = topic,
+            topic = currentTopic ?: "",
             title = title,
             text = text,
             senderName = AuthManager.username ?: "me",
