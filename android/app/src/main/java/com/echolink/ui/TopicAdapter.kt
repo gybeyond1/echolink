@@ -935,12 +935,11 @@ class TopicAdapter(
                             }
                         }
                     }
-                    val lp = android.widget.GridLayout.LayoutParams(
-                        android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f),
-                        android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
-                    ).apply {
+                    val lp = android.widget.GridLayout.LayoutParams().apply {
                         width = 0
                         height = android.widget.GridLayout.LayoutParams.WRAP_CONTENT
+                        columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
+                        rowSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED)
                         setMargins((4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt())
                     }
                     holder.glCardButtons.addView(btn, lp)
