@@ -90,24 +90,26 @@ class TopicFragment : Fragment() {
             // 过滤本机自己发的消息
             val fromDeviceId = data.optLong("device_id", -1)
             if (fromDeviceId == com.echolink.data.AuthManager.deviceId) return
+            // 提前赋值给非空局部变量，避免 lambda 内智能类型转换失效
+            val json = data
             activity?.runOnUiThread {
                 try {
                     val msg = TopicMessage(
-                        id = data.optLong("id", 0),
+                        id = json.optLong("id", 0),
                         topic = t,
-                        title = data.optString("title", ""),
-                        text = data.optString("text", ""),
-                        senderName = data.optString("sender_name", ""),
-                        timestamp = data.optLong("timestamp", System.currentTimeMillis()),
-                        deviceId = data.optLong("device_id", -1),
-                        deviceName = if (!data.isNull("device_name")) data.optNullable("device_name") else null,
-                        mediaType = data.optString("media_type", "text"),
-                        mediaUrl = if (!data.isNull("media_url")) data.optNullable("media_url") else null,
-                        mediaName = if (!data.isNull("media_name")) data.optNullable("media_name") else null,
-                        mediaSize = data.optLong("media_size", 0),
-                        senderUserId = data.optLong("user_id", 0),
-                        senderAvatar = if (!data.isNull("sender_avatar")) data.optNullable("sender_avatar") else null,
-                        senderDisplayName = if (!data.isNull("sender_display_name")) data.optNullable("sender_display_name") else null
+                        title = json.optString("title", ""),
+                        text = json.optString("text", ""),
+                        senderName = json.optString("sender_name", ""),
+                        timestamp = json.optLong("timestamp", System.currentTimeMillis()),
+                        deviceId = json.optLong("device_id", -1),
+                        deviceName = if (!json.isNull("device_name")) json.optNullable("device_name") else null,
+                        mediaType = json.optString("media_type", "text"),
+                        mediaUrl = if (!json.isNull("media_url")) json.optNullable("media_url") else null,
+                        mediaName = if (!json.isNull("media_name")) json.optNullable("media_name") else null,
+                        mediaSize = json.optLong("media_size", 0),
+                        senderUserId = json.optLong("user_id", 0),
+                        senderAvatar = if (!json.isNull("sender_avatar")) json.optNullable("sender_avatar") else null,
+                        senderDisplayName = if (!json.isNull("sender_display_name")) json.optNullable("sender_display_name") else null
                     )
                     val wasAtBottom = isAtBottom()
                     chatAdapter.appendItems(listOf(msg))
