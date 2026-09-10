@@ -915,25 +915,51 @@ class TopicAdapter(
                 // DEBUG: 打印 buttons 原始结构
                 com.echolink.util.DebugLogger.d("MPButtons", "raw buttons: ${buttons.toString().take(200)}")
 
-                // 检测 buttons 是一维数组还是二维数组
+                // Telegram 风格：整体圆角边框容器
+                val containerBg = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                    cornerRadius = 12 * dp
+                    setColor(ctx.getColor(R.color.bubble_other))
+                    setStroke((1 * dp).toInt(), ctx.getColor(R.color.outline))
+                }
+                holder.llCardButtons.background = containerBg
+                holder.llCardButtons.setPadding(0, 0, 0, 0)
+                holder.llCardButtons.orientation = android.widget.LinearLayout.VERTICAL
+
+                // 收集所有按钮（一维/二维数组都展平成一维，Telegram 风格一排一个）
+                val allButtons = mutableListOf<org.json.JSONObject>()
                 val is2D = buttons.length() > 0 && buttons.opt(0) is org.json.JSONArray
                 com.echolink.util.DebugLogger.d("MPButtons", "is2D=$is2D, length=${buttons.length()}")
+                if (is2D) {
+                    for (rowIdx in 0 until buttons.length()) {
+                        val rowArr = buttons.getJSONArray(rowIdx)
+                        for (btnIdx in 0 until rowArr.length()) {
+                            allButtons.add(rowArr.getJSONObject(btnIdx))
+                        }
+                    }
+                } else {
+                    for (i in 0 until buttons.length()) {
+                        allButtons.add(buttons.getJSONObject(i))
+                    }
+                }
 
-                fun createButton(b: org.json.JSONObject, rowLayout: android.widget.LinearLayout) {
+                // 一排一个按钮，按钮之间加细分隔线
+                for (i in 0 until allButtons.size) {
+                    val b = allButtons[i]
                     val btnText = b.optString("text", "按钮")
                     val callbackData = b.optString("callback_data", "")
-                    com.echolink.util.DebugLogger.d("MPButtons", "  btn text='$btnText' callback='$callbackData'")
+                    com.echolink.util.DebugLogger.d("MPButtons", "  btn[$i] text='$btnText' callback='$callbackData'")
+
                     val btn = android.widget.Button(ctx).apply {
                         text = btnText
-                        textSize = 13f
-                        setTextColor(ctx.getColor(R.color.white))
-                        setBackgroundResource(R.drawable.bg_role_badge)
-                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
+                        textSize = 14f
+                        setTextColor(ctx.getColor(R.color.brand_primary))
+                        setBackgroundResource(android.R.color.transparent)
+                        setPadding((16 * dp).toInt(), (14 * dp).toInt(), (16 * dp).toInt(), (14 * dp).toInt())
                         setOnClickListener {
-                            // 点击反馈：按钮变灰，显示"已选择"
+                            // 点击反馈：按钮变灰
                             isEnabled = false
-                            text = "已选择"
-                            alpha = 0.6f
+                            alpha = 0.4f
                             com.echolink.util.DebugLogger.d("MPButtons", "clicked text='$btnText' callback='$callbackData'")
                             // 回调给 Fragment：插入用户选择的消息 + 调用 callback API
                             onMpButtonClick?.invoke(btnText, callbackData)
@@ -946,7 +972,6 @@ class TopicAdapter(
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {
                                         isEnabled = true
-                                        text = btnText
                                         alpha = 1.0f
                                         Toast.makeText(ctx, "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
@@ -955,46 +980,21 @@ class TopicAdapter(
                         }
                     }
                     val btnLp = android.widget.LinearLayout.LayoutParams(
-                        0,
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                        1f
-                    ).apply {
-                        setMargins((4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt())
-                    }
-                    rowLayout.addView(btn, btnLp)
-                }
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                    holder.llCardButtons.addView(btn, btnLp)
 
-                if (is2D) {
-                    // 二维数组：外层是行，内层是按钮
-                    for (rowIdx in 0 until buttons.length()) {
-                        val rowArr = buttons.getJSONArray(rowIdx)
-                        val rowLayout = android.widget.LinearLayout(ctx).apply {
-                            orientation = android.widget.LinearLayout.HORIZONTAL
+                    // 按钮之间加细分隔线（最后一个不加）
+                    if (i < allButtons.size - 1) {
+                        val divider = View(ctx).apply {
+                            setBackgroundColor(ctx.getColor(R.color.outline))
                             layoutParams = android.widget.LinearLayout.LayoutParams(
                                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                                (1 * dp).toInt()
                             )
                         }
-                        holder.llCardButtons.addView(rowLayout)
-                        for (btnIdx in 0 until rowArr.length()) {
-                            createButton(rowArr.getJSONObject(btnIdx), rowLayout)
-                        }
-                    }
-                } else {
-                    // 一维数组：每两个按钮一行
-                    var rowLayout: android.widget.LinearLayout? = null
-                    for (i in 0 until buttons.length()) {
-                        if (i % 2 == 0) {
-                            rowLayout = android.widget.LinearLayout(ctx).apply {
-                                orientation = android.widget.LinearLayout.HORIZONTAL
-                                layoutParams = android.widget.LinearLayout.LayoutParams(
-                                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-                                )
-                            }
-                            holder.llCardButtons.addView(rowLayout)
-                        }
-                        createButton(buttons.getJSONObject(i), rowLayout!!)
+                        holder.llCardButtons.addView(divider)
                     }
                 }
             } else {
