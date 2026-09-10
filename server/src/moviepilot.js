@@ -145,9 +145,9 @@ function appendMoviepilotMessage(username, cardData, text) {
     peer_avatar: null,
   };
 
-  const { broadcastToUser, publishToTopic } = require("./websocket");
+  const { broadcastToUser } = require("./websocket");
+  // 只推一次：broadcastToUser 覆盖用户所有设备（含未订阅话题的设备），避免与 publishToTopic 重复推送导致多条通知
   try { broadcastToUser(userId, { type: "topic_message", topic: topicName, data: message }); } catch (_) {}
-  try { publishToTopic(topicName, message, {}); } catch (_) {}
 
   // 清理旧消息
   const maxHistory = parseInt(process.env.MAX_TOPIC_HISTORY || "200");
