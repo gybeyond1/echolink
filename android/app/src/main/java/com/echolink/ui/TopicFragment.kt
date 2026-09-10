@@ -260,16 +260,18 @@ class TopicFragment : Fragment() {
                         onMpButtonClick = { btnText, callbackData ->
                 // MP 卡片按钮点击：走正常发消息流程，把按钮文字作为消息发送到服务器
                 // 这样刷新后消息不会消失，同时 callback_data 会转发给 MP 处理
-                val topic = currentTopic ?: return@onMpButtonClick
-                publish(topic, "", btnText, "text", null, null, 0)
-                // 异步转发 callback 给 MP，Agent 会处理并回复
-                lifecycleScope.launch(Dispatchers.IO) {
-                    try {
-                        ApiClient.post("/api/moviepilot/callback", mapOf(
-                            "callback_data" to callbackData,
-                            "message_id" to ""
-                        ))
-                    } catch (_: Exception) {}
+                val topic = currentTopic
+                if (topic != null) {
+                    publish(topic, "", btnText, "text", null, null, 0)
+                    // 异步转发 callback 给 MP，Agent 会处理并回复
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            ApiClient.post("/api/moviepilot/callback", mapOf(
+                                "callback_data" to callbackData,
+                                "message_id" to ""
+                            ))
+                        } catch (_: Exception) {}
+                    }
                 }
             }
         )
