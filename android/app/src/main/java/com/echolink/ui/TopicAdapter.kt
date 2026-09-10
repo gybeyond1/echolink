@@ -132,9 +132,13 @@ class TopicAdapter(
     }
 
     fun appendItems(list: List<TopicMessage>) {
+        // 去重：按消息 id 判断，已存在的不重复添加（避免 WebSocket 推送和服务器拉取重复）
+        val existingIds = items.map { it.id }.toSet()
+        val newItems = list.filter { it.id !in existingIds }
+        if (newItems.isEmpty()) return
         val start = items.size
-        items.addAll(list)
-        notifyItemRangeInserted(start, list.size)
+        items.addAll(newItems)
+        notifyItemRangeInserted(start, newItems.size)
     }
 
     /** 用真实消息替换发送中的临时消息（按临时 id 匹配） */
