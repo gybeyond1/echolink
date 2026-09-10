@@ -262,6 +262,17 @@ object ApiClient {
         return parseTopicMessages(json.getJSONArray("messages"))
     }
 
+    // 获取话题消息原始JSON（用于本地缓存）
+    suspend fun getTopicMessagesRaw(topic: String, limit: Int = 50): String {
+        val json = execute(
+            buildRequest(
+                "/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/messages?limit=$limit",
+                "GET"
+            )
+        )
+        return json.getJSONArray("messages").toString()
+    }
+
     // 删除单条话题消息
     suspend fun deleteTopicMessage(topic: String, id: Long) {
         execute(buildRequest("/api/topics/${java.net.URLEncoder.encode(topic, "UTF-8")}/messages/$id", "DELETE"))

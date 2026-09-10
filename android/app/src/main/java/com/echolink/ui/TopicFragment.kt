@@ -871,10 +871,24 @@ class TopicFragment : Fragment() {
         val topic = currentTopic ?: return
         com.echolink.util.DebugLogger.d("TopicFragment", "loadMessages: topic=$topic")
         resetUnreadPill()
+
+        // 先从本地缓存加载，立即显示
+        val cached = loadCachedMessages(topic)
+        if (cached.isNotEmpty()) {
+            com.echolink.util.DebugLogger.d("TopicFragment", "loadMessages from cache: ${cached.size} messages")
+            chatAdapter.setItems(cached)
+            binding.tvEmptyChat.visibility = View.GONE
+            binding.recyclerView.visibility = View.VISIBLE
+            scrollToBottom()
+        }
+
+        // 再从服务器拉取最新消息
         binding.progressBar.visibility = View.VISIBLE
         lifecycleScope.launch {
             try {
-                val messages = ApiClient.getTopicMessages(topic, 50)
+                val rawJson = ApiClient.getTopicMessagesRaw(topic, 50)
+                saveCachedMessages(topic, rawJson)
+                val messages = parseTopicMessages(org.json.JSONArray(rawJson))
                 com.echolink.util.DebugLogger.d("TopicFragment", "loadMessages got ${messages.size} messages")
                 messages.forEachIndexed { idx, m ->
                     com.echolink.util.DebugLogger.d("TopicFragment", "  msg[$idx]: id=${m.id}, sender=${m.senderName}, userId=${m.senderUserId}, text=${m.text.take(30)}, isSelf=${m.senderUserId > 0 && m.senderUserId == com.echolink.data.AuthManager.userId}")
@@ -892,12 +906,33 @@ class TopicFragment : Fragment() {
                 binding.recyclerView.visibility = if (messages.isEmpty()) View.GONE else View.VISIBLE
                 scrollToBottom()
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                if (cached.isEmpty()) {
+                    Toast.makeText(requireContext(), "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             } finally {
                 binding.progressBar.visibility = View.GONE
                 binding.swipeRefresh.isRefreshing = false
             }
         }
+    }
+
+    // 从本地缓存加载消息
+    private fun loadCachedMessages(topic: String): List<TopicMessage> {
+        return try {
+            val sp = requireContext().getSharedPreferences("msg_cache", android.content.Context.MODE_PRIVATE)
+            val raw = sp.getString("topic_$topic", null) ?: return emptyList()
+            parseTopicMessages(org.json.JSONArray(raw))
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    // 保存消息到本地缓存
+    private fun saveCachedMessages(topic: String, rawJson: String) {
+        try {
+            val sp = requireContext().getSharedPreferences("msg_cache", android.content.Context.MODE_PRIVATE)
+            sp.edit().putString("topic_$topic", rawJson).apply()
+        } catch (_: Exception) {}
     }
 
     private fun sendText() {
