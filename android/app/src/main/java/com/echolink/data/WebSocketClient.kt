@@ -27,6 +27,8 @@ object WebSocketClient {
     private var webSocket: WebSocket? = null
     @Volatile
     private var listener: WsEventListener? = null
+    // 额外监听器列表：UI 层可直接监听 WS 消息，不依赖广播（避免广播接收器生命周期问题）
+    private val extraListeners = mutableListOf<WsEventListener>()
     @Volatile
     private var isConnecting = false
     @Volatile
@@ -49,6 +51,14 @@ object WebSocketClient {
 
     fun setListener(l: WsEventListener) {
         listener = l
+    }
+
+    fun addListener(l: WsEventListener) {
+        if (!extraListeners.contains(l)) extraListeners.add(l)
+    }
+
+    fun removeListener(l: WsEventListener) {
+        extraListeners.remove(l)
     }
 
     val isConnected: Boolean
@@ -84,6 +94,7 @@ object WebSocketClient {
                 isConnecting = false
                 lastPongTime = System.currentTimeMillis()
                 listener?.onConnected()
+                extraListeners.forEach { it.onConnected() }
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -106,6 +117,7 @@ object WebSocketClient {
                     }
                     val topic = if (json.has("topic")) json.optNullable("topic") else null
                     listener?.onMessage(type, data, topic)
+                    extraListeners.forEach { it.onMessage(type, data, topic) }
                 } catch (e: Exception) {
                     Log.e(TAG, "Parse message error", e)
                 }
@@ -124,6 +136,7 @@ object WebSocketClient {
                 Log.i(TAG, "WebSocket closed: $code $reason")
                 cleanup()
                 listener?.onDisconnected(reason)
+                extraListeners.forEach { it.onDisconnected(reason) }
                 scheduleReconnect()
             }
 
@@ -131,6 +144,7 @@ object WebSocketClient {
                 Log.e(TAG, "WebSocket failure", t)
                 cleanup()
                 listener?.onError(t.message ?: "Connection failed")
+                extraListeners.forEach { it.onError(t.message ?: "Connection failed") }
                 scheduleReconnect()
             }
         })

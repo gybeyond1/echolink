@@ -77,6 +77,48 @@ class TopicFragment : Fragment() {
     private val myTopics = mutableListOf<MyTopic>()
     private var currentTopic: String? = null
     private var chatTopic: MyTopic? = null
+    // 直接监听 WebSocket topic_message，不依赖广播（避免广播接收器生命周期问题导致新消息不刷新）
+    private val wsListener = object : WebSocketClient.WsEventListener {
+        override fun onConnected() {}
+        override fun onDisconnected(reason: String) {}
+        override fun onError(error: String) {}
+        override fun onMessage(type: String, data: org.json.JSONObject?, topic: String?) {
+            if (type != "topic_message" || data == null) return
+            val t = topic ?: data.optString("topic", "")
+            if (t != currentTopic) return
+            // 过滤本机自己发的消息
+            val fromDeviceId = data.optLong("device_id", -1)
+            if (fromDeviceId == com.echolink.data.AuthManager.deviceId) return
+            activity?.runOnUiThread {
+                try {
+                    val msg = TopicMessage(
+                        id = data.optLong("id", 0),
+                        topic = t,
+                        title = data.optString("title", ""),
+                        text = data.optString("text", ""),
+                        senderName = data.optString("sender_name", ""),
+                        timestamp = data.optLong("timestamp", System.currentTimeMillis()),
+                        deviceId = data.optLong("device_id", -1),
+                        deviceName = if (!data.isNull("device_name")) data.optNullable("device_name") else null,
+                        mediaType = data.optString("media_type", "text"),
+                        mediaUrl = if (!data.isNull("media_url")) data.optNullable("media_url") else null,
+                        mediaName = if (!data.isNull("media_name")) data.optNullable("media_name") else null,
+                        mediaSize = data.optLong("media_size", 0),
+                        senderUserId = data.optLong("user_id", 0),
+                        senderAvatar = if (!data.isNull("sender_avatar")) data.optNullable("sender_avatar") else null,
+                        senderDisplayName = if (!data.isNull("sender_display_name")) data.optNullable("sender_display_name") else null
+                    )
+                    val wasAtBottom = isAtBottom()
+                    chatAdapter.appendItems(listOf(msg))
+                    com.echolink.util.DebugLogger.d("wsListener", "WS直接收到消息 id=${msg.id} text=${msg.text.take(20)} items=${chatAdapter.itemCount}")
+                    if (wasAtBottom) scrollToBottom()
+                    else { unreadChatCount++; showUnreadPill() }
+                } catch (e: Exception) {
+                    com.echolink.util.DebugLogger.d("wsListener", "解析消息异常: ${e.message}")
+                }
+            }
+        }
+    }
     /** 聊天界面未读消息计数：用户向上翻看历史时，新消息不自动滚动，改用气泡提示 */
     private var unreadChatCount = 0
     // 仅聊天模式：由好友页在平板右侧以子 Fragment 方式承载，只显示聊天、不含左侧列表
@@ -451,12 +493,16 @@ class TopicFragment : Fragment() {
             Context.RECEIVER_NOT_EXPORTED
         )
         currentTopic?.let { WebSocketClient.sendSubscribe(it) }
+        WebSocketClient.addListener(wsListener)
+        com.echolink.util.DebugLogger.d("wsListener", "onResume 添加WS监听器 currentTopic=$currentTopic")
     }
 
     override fun onPause() {
         super.onPause()
         com.echolink.util.DebugLogger.d("topicReceiver", "onPause 注销广播接收器 currentTopic=$currentTopic")
         try { requireActivity().unregisterReceiver(topicReceiver) } catch (e: Exception) {}
+        WebSocketClient.removeListener(wsListener)
+        com.echolink.util.DebugLogger.d("wsListener", "onPause 移除WS监听器")
     }
 
     override fun onDestroyView() {
