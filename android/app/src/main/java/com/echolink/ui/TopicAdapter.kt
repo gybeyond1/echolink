@@ -105,12 +105,18 @@ class TopicAdapter(
     /** 是否为「我」发出的消息：优先用 user_id 严格判定；当 AuthManager.userId 未初始化(<=0)
      *  或消息 user_id 无效时，回退用 senderName 与当前用户名比对，避免刷新后身份错乱。 */
     private fun isSelfMessage(item: TopicMessage): Boolean {
-        if (item.senderUserId > 0 && AuthManager.userId > 0) {
-            return item.senderUserId == AuthManager.userId
+        val result = if (item.senderUserId > 0 && AuthManager.userId > 0) {
+            item.senderUserId == AuthManager.userId
+        } else {
+            val me = AuthManager.username
+            !me.isNullOrBlank() && item.senderName == me
         }
-        // user_id 无效或未初始化：用用户名兜底
-        val me = AuthManager.username
-        return !me.isNullOrBlank() && item.senderName == me
+        // DEBUG: MP 会话记录身份判断详情，排查刷新后消息错乱
+        if (item.topic.startsWith("moviepilot_")) {
+            com.echolink.util.DebugLogger.d("isSelfMessage",
+                "id=${item.id} result=$result senderUserId=${item.senderUserId} authUserId=${AuthManager.userId} senderName='${item.senderName}' authUsername='${AuthManager.username}' text='${item.text.take(20)}'")
+        }
+        return result
     }
 
     fun appendItems(list: List<TopicMessage>) {
@@ -207,7 +213,7 @@ class TopicAdapter(
         val tvCardTitle: TextView = view.findViewById(R.id.tvCardTitle)
         val llCardDetails: android.widget.LinearLayout = view.findViewById(R.id.llCardDetails)
         val tvCardText: TextView = view.findViewById(R.id.tvCardText)
-        val llCardButtons: android.widget.LinearLayout = view.findViewById(R.id.llCardButtons)
+        val glCardButtons: android.widget.GridLayout = view.findViewById(R.id.glCardButtons)
         var item: TopicMessage? = null
         private var selectionTapHandled = false
         var lastMine: Boolean? = null
@@ -828,7 +834,7 @@ class TopicAdapter(
         holder.cardContainer.visibility = View.VISIBLE
 
         holder.llCardDetails.removeAllViews()
-        holder.llCardButtons.removeAllViews()
+        holder.glCardButtons.removeAllViews()
 
         val cardJson = item.cardData ?: run {
             holder.tvCardTitle.text = item.title
@@ -893,7 +899,7 @@ class TopicAdapter(
 
             val buttons = card.optJSONArray("buttons")
             if (buttons != null && buttons.length() > 0) {
-                holder.llCardButtons.visibility = View.VISIBLE
+                holder.glCardButtons.visibility = View.VISIBLE
                 val dp = ctx.resources.displayMetrics.density
                 for (i in 0 until buttons.length()) {
                     val b = buttons.getJSONObject(i)
@@ -929,23 +935,25 @@ class TopicAdapter(
                             }
                         }
                     }
-                    val lp = android.widget.LinearLayout.LayoutParams(
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                    val lp = android.widget.GridLayout.LayoutParams(
+                        android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f),
+                        android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
                     ).apply {
-                        marginEnd = (8 * dp).toInt()
+                        width = 0
+                        height = android.widget.GridLayout.LayoutParams.WRAP_CONTENT
+                        setMargins((4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt())
                     }
-                    holder.llCardButtons.addView(btn, lp)
+                    holder.glCardButtons.addView(btn, lp)
                 }
             } else {
-                holder.llCardButtons.visibility = View.GONE
+                holder.glCardButtons.visibility = View.GONE
             }
         } catch (e: Exception) {
             holder.tvCardTitle.text = "卡片解析失败"
             holder.ivCardPoster.visibility = View.GONE
             holder.llCardDetails.visibility = View.GONE
             holder.tvCardText.visibility = View.GONE
-            holder.llCardButtons.visibility = View.GONE
+            holder.glCardButtons.visibility = View.GONE
         }
     }
 
