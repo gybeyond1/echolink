@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 对方消息气泡：左下角小箭头指向发送方，箭头与气泡融为一体（Telegram风格） -->
+<!-- 对面的消息气泡：左下角小尾角指向对方，就是自己气泡的水平镜像（Telegram风格） -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
@@ -8,21 +8,21 @@
                 android:topLeftRadius="16dp"
                 android:topRightRadius="16dp"
                 android:bottomRightRadius="16dp"
-                android:bottomLeftRadius="2dp" />
+                android:bottomLeftRadius="3dp" />
         </shape>
     </item>
     <item
-        android:width="8dp"
-        android:height="12dp"
+        android:width="10dp"
+        android:height="14dp"
         android:gravity="bottom|left">
         <vector
-            android:width="8dp"
-            android:height="12dp"
-            android:viewportWidth="8"
-            android:viewportHeight="12">
+            android:width="10dp"
+            android:height="14dp"
+            android:viewportWidth="10"
+            android:viewportHeight="14">
             <path
                 android:fillColor="@color/bubble_other"
-                android:pathData="M0,6 L8,0 L8,12 Z" />
+                android:pathData="M0,7 L10,0 L10,14 Z" />
         </vector>
     </item>
 </layer-list>
