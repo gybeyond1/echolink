@@ -255,6 +255,8 @@ class MainActivity : AppCompatActivity() {
     // ===== 手机底部导航 =====
 
     private fun setupBottomNav() {
+        // 新拟态矢量图标带渐变，清除默认 tint 否则渐变被染成单色
+        binding.bottomNav!!.itemIconTintList = null
         binding.bottomNav!!.setOnItemSelectedListener { item ->
             val fragment: Fragment = when (item.itemId) {
                 R.id.nav_friends -> FriendsFragment()

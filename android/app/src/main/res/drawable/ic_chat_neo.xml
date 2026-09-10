@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 新拟态风格消息图标：聊天气泡，带渐变+高光+阴影模拟凸起感 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 阴影层（右下偏移） -->
+    <path
+        android:fillColor="#C0C0C0"
+        android:pathData="M5,3h14c1.1,0 2,0.9 2,2v10c0,1.1 -0.9,2 -2,2H9l-4,4V5c0,-1.1 0.9,-2 2,-2z"
+        android:translateX="0.5"
+        android:translateY="0.5" />
+    <!-- 主体渐变 -->
+    <path
+        android:pathData="M5,3h14c1.1,0 2,0.9 2,2v10c0,1.1 -0.9,2 -2,2H9l-4,4V5c0,-1.1 0.9,-2 2,-2z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startColor="#F5F5F5"
+                android:centerColor="#E8E8E8"
+                android:endColor="#D8D8D8"
+                android:type="linear"
+                android:angle="135" />
+        </aapt:attr>
+    </path>
+    <!-- 高光层（左上偏移） -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.5"
+        android:pathData="M5,3h14c1.1,0 2,0.9 2,2v2c0,-1.1 -0.9,-2 -2,-2H5c-1.1,0 -2,0.9 -2,2V5c0,-1.1 0.9,-2 2,-2z" />
+    <!-- 气泡内的三个点 -->
+    <path
+        android:fillColor="#999999"
+        android:pathData="M8,10m-1.2,0a1.2,1.2 0,1 1,2.4 0a1.2,1.2 0,1 1,-2.4 0" />
+    <path
+        android:fillColor="#999999"
+        android:pathData="M12,10m-1.2,0a1.2,1.2 0,1 1,2.4 0a1.2,1.2 0,1 1,-2.4 0" />
+    <path
+        android:fillColor="#999999"
+        android:pathData="M16,10m-1.2,0a1.2,1.2 0,1 1,2.4 0a1.2,1.2 0,1 1,-2.4 0" />
+</vector>

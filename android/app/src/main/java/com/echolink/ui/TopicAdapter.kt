@@ -592,10 +592,10 @@ class TopicAdapter(
         lp.gravity = g
         holder.bubbleInner.layoutParams = lp
 
-        // llContent 填充剩余空间（0dp + weight=1），通过 gravity 控制气泡左右对齐
+        // llContent 用 wrap_content，让已读标志紧贴气泡（spacer 负责占满剩余空间）
         val lpContent = holder.llContent.layoutParams as android.widget.LinearLayout.LayoutParams
-        lpContent.width = 0
-        lpContent.weight = 1f
+        lpContent.width = ViewGroup.LayoutParams.WRAP_CONTENT
+        lpContent.weight = 0f
         lpContent.topMargin = 0
         lpContent.bottomMargin = 0
         lpContent.marginStart = 0
