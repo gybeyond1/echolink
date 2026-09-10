@@ -883,8 +883,10 @@ class TopicFragment : Fragment() {
             scrollToBottom()
         }
 
-        // 再从服务器拉取最新消息
-        binding.progressBar.visibility = View.VISIBLE
+        // 再从服务器拉取最新消息（有缓存时不显示加载动画，后台静默更新）
+        if (cached.isEmpty()) {
+            binding.progressBar.visibility = View.VISIBLE
+        }
         lifecycleScope.launch {
             try {
                 val rawJson = ApiClient.getTopicMessagesRaw(topic, 50)
