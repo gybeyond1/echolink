@@ -131,6 +131,7 @@ class TopicFragment : Fragment() {
                 }
                 else -> {
                     val topic = intent?.getStringExtra("topic") ?: return
+                    com.echolink.util.DebugLogger.d("topicReceiver", "收到广播 action=${intent?.action} topic=$topic currentTopic=$currentTopic chatLayoutVisible=${binding.chatLayout.visibility}")
                     if (topic == currentTopic) {
                         val msg = TopicMessage(
                             id = intent.getLongExtra("id", 0),
@@ -152,6 +153,7 @@ class TopicFragment : Fragment() {
                         // 用户是否已经在底部：在追加前判断，避免新插入项导致判断失真
                         val wasAtBottom = isAtBottom()
                         chatAdapter.appendItems(listOf(msg))
+                        com.echolink.util.DebugLogger.d("topicReceiver", "已追加消息 id=${msg.id} text=${msg.text.take(20)} itemsCount=${chatAdapter.itemCount}")
                         if (wasAtBottom) {
                             scrollToBottom()
                         } else {
@@ -434,6 +436,7 @@ class TopicFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        com.echolink.util.DebugLogger.d("topicReceiver", "onResume 注册广播接收器 currentTopic=$currentTopic")
         // 聊天态隐藏 FAB，列表态显示
         val inChat = chatTopic != null || binding.chatLayout.visibility == View.VISIBLE
         binding.fabAddTopic.visibility = if (inChat) View.GONE else View.VISIBLE
@@ -452,6 +455,7 @@ class TopicFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
+        com.echolink.util.DebugLogger.d("topicReceiver", "onPause 注销广播接收器 currentTopic=$currentTopic")
         try { requireActivity().unregisterReceiver(topicReceiver) } catch (e: Exception) {}
     }
 
