@@ -101,11 +101,13 @@ class TopicAdapter(
         notifyDataSetChanged()
     }
 
-    /** 是否为「我」发出的消息：优先用 user_id 严格判定；为兼容历史消息（user_id 可能为 0），
-     *  当 user_id 无效时回退用 senderName 与当前用户名比对。 */
+    /** 是否为「我」发出的消息：优先用 user_id 严格判定；当 AuthManager.userId 未初始化(<=0)
+     *  或消息 user_id 无效时，回退用 senderName 与当前用户名比对，避免刷新后身份错乱。 */
     private fun isSelfMessage(item: TopicMessage): Boolean {
-        if (item.senderUserId > 0) return item.senderUserId == AuthManager.userId
-        // user_id 缺失的旧消息：用用户名兜底（仅当已登录且有用户名时可信）
+        if (item.senderUserId > 0 && AuthManager.userId > 0) {
+            return item.senderUserId == AuthManager.userId
+        }
+        // user_id 无效或未初始化：用用户名兜底
         val me = AuthManager.username
         return !me.isNullOrBlank() && item.senderName == me
     }
@@ -736,7 +738,7 @@ class TopicAdapter(
                 holder.ivAvatar.setImageResource(iconRes)
                 holder.ivAvatar.setBackgroundResource(R.drawable.bg_circle_avatar)
                 holder.ivAvatar.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                holder.ivAvatar.setPadding(8, 8, 8, 8)
+                holder.ivAvatar.setPadding(0, 0, 0, 0)
                 return
             }
         }
@@ -918,9 +920,10 @@ class TopicAdapter(
                         }
                     }
                     val lp = android.widget.LinearLayout.LayoutParams(
-                        0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply {
-                        marginEnd = (6 * dp).toInt()
+                        marginEnd = (8 * dp).toInt()
                     }
                     holder.llCardButtons.addView(btn, lp)
                 }

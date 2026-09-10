@@ -224,13 +224,18 @@
                 android:layout_marginTop="4dp"
                 android:visibility="gone" />
 
-            <!-- 交互按钮（动态添加） -->
-            <LinearLayout
-                android:id="@+id/llCardButtons"
+            <!-- 交互按钮（动态添加，横向可滑动） -->
+            <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp" />
+                android:layout_marginTop="8dp"
+                android:scrollbars="none">
+                <LinearLayout
+                    android:id="@+id/llCardButtons"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
         </LinearLayout>
     </LinearLayout>
 
