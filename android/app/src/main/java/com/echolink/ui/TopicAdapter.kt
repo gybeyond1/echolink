@@ -213,7 +213,7 @@ class TopicAdapter(
         val tvCardTitle: TextView = view.findViewById(R.id.tvCardTitle)
         val llCardDetails: android.widget.LinearLayout = view.findViewById(R.id.llCardDetails)
         val tvCardText: TextView = view.findViewById(R.id.tvCardText)
-        val glCardButtons: android.widget.GridLayout = view.findViewById(R.id.glCardButtons)
+        val llCardButtons: android.widget.LinearLayout = view.findViewById(R.id.llCardButtons)
         var item: TopicMessage? = null
         private var selectionTapHandled = false
         var lastMine: Boolean? = null
@@ -834,7 +834,7 @@ class TopicAdapter(
         holder.cardContainer.visibility = View.VISIBLE
 
         holder.llCardDetails.removeAllViews()
-        holder.glCardButtons.removeAllViews()
+        holder.llCardButtons.removeAllViews()
 
         val cardJson = item.cardData ?: run {
             holder.tvCardTitle.text = item.title
@@ -899,9 +899,22 @@ class TopicAdapter(
 
             val buttons = card.optJSONArray("buttons")
             if (buttons != null && buttons.length() > 0) {
-                holder.glCardButtons.visibility = View.VISIBLE
+                holder.llCardButtons.visibility = View.VISIBLE
+                holder.llCardButtons.removeAllViews()
                 val dp = ctx.resources.displayMetrics.density
+                // 每两个按钮一行，用水平 LinearLayout 包裹，按钮 weight=1 平均分配宽度
+                var rowLayout: android.widget.LinearLayout? = null
                 for (i in 0 until buttons.length()) {
+                    if (i % 2 == 0) {
+                        rowLayout = android.widget.LinearLayout(ctx).apply {
+                            orientation = android.widget.LinearLayout.HORIZONTAL
+                            layoutParams = android.widget.LinearLayout.LayoutParams(
+                                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                            )
+                        }
+                        holder.llCardButtons.addView(rowLayout)
+                    }
                     val b = buttons.getJSONObject(i)
                     val btnText = b.optString("text", "按钮")
                     val callbackData = b.optString("callback_data", "")
@@ -935,24 +948,24 @@ class TopicAdapter(
                             }
                         }
                     }
-                    val lp = android.widget.GridLayout.LayoutParams().apply {
-                        width = 0
-                        height = android.widget.GridLayout.LayoutParams.WRAP_CONTENT
-                        columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
-                        rowSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED)
+                    val btnLp = android.widget.LinearLayout.LayoutParams(
+                        0,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1f
+                    ).apply {
                         setMargins((4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt())
                     }
-                    holder.glCardButtons.addView(btn, lp)
+                    rowLayout?.addView(btn, btnLp)
                 }
             } else {
-                holder.glCardButtons.visibility = View.GONE
+                holder.llCardButtons.visibility = View.GONE
             }
         } catch (e: Exception) {
             holder.tvCardTitle.text = "卡片解析失败"
             holder.ivCardPoster.visibility = View.GONE
             holder.llCardDetails.visibility = View.GONE
             holder.tvCardText.visibility = View.GONE
-            holder.glCardButtons.visibility = View.GONE
+            holder.llCardButtons.visibility = View.GONE
         }
     }
 

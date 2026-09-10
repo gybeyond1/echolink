@@ -225,12 +225,12 @@
                 android:visibility="gone" />
 
             <!-- 交互按钮（动态添加，Telegram式自动换行，每行两个） -->
-            <android.widget.GridLayout
-                android:id="@+id/glCardButtons"
+            <LinearLayout
+                android:id="@+id/llCardButtons"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:columnCount="2" />
+                android:orientation="vertical" />
         </LinearLayout>
     </LinearLayout>
 
