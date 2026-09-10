@@ -186,6 +186,7 @@ class TopicAdapter(
     }
 
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val llMessageRow: android.widget.LinearLayout = view.findViewById(R.id.llMessageRow)
         val avatarContainer: View = view.findViewById(R.id.avatarContainer)
         val tvAvatar: TextView = view.findViewById(R.id.tvAvatar)
         val ivAvatar: ImageView = view.findViewById(R.id.ivAvatar)
@@ -519,23 +520,22 @@ class TopicAdapter(
      * 气泡宽度自适应内容（上限屏宽 72%），只在归属变化时重排，避免复用抖动。
      */
     private fun applyOwnStyle(holder: ViewHolder, isMine: Boolean) {
-        if (holder.lastMine == isMine) return
-        holder.lastMine = isMine
-        val root = holder.itemView as android.widget.LinearLayout
+        // 去掉 lastMine 缓存：RecyclerView 复用时缓存会导致样式错乱，每次都重新设置
+        val row = holder.llMessageRow
         // 重排子视图：自己的消息 [已读回执, 气泡, 头像]，他人的消息 [头像, 气泡, 已读回执]
         // 已读回执仅在 dm 私聊自己消息时显示，要放在消息气泡左侧，不要卡在头像和气泡之间。
-        root.removeAllViews()
+        row.removeAllViews()
         if (isMine) {
-            root.addView(holder.statusContainer)
-            root.addView(holder.llContent)
-            root.addView(holder.avatarContainer)
+            row.addView(holder.statusContainer)
+            row.addView(holder.llContent)
+            row.addView(holder.avatarContainer)
         } else {
-            root.addView(holder.avatarContainer)
-            root.addView(holder.llContent)
-            root.addView(holder.statusContainer)
+            row.addView(holder.avatarContainer)
+            row.addView(holder.llContent)
+            row.addView(holder.statusContainer)
         }
         val g = if (isMine) Gravity.END else Gravity.START
-        root.gravity = g or Gravity.CENTER_VERTICAL
+        row.gravity = g or Gravity.CENTER_VERTICAL
         holder.llContent.gravity = g or Gravity.CENTER_VERTICAL
         holder.llSenderInfo.gravity = g
         holder.tvTitle.gravity = g
@@ -547,8 +547,8 @@ class TopicAdapter(
         val ctx = holder.itemView.context
         val dp = ctx.resources.displayMetrics.density
 
-        // 气泡宽度自适应内容，上限屏宽 72%，长文本自动换行
-        val maxW = (ctx.resources.displayMetrics.widthPixels * 0.72f).toInt()
+        // 气泡宽度自适应内容，上限屏宽 66%（约2/3），长文本自动换行
+        val maxW = (ctx.resources.displayMetrics.widthPixels * 0.66f).toInt()
         holder.tvTitle.maxWidth = maxW
         holder.tvText.maxWidth = maxW
         val lp = holder.bubbleInner.layoutParams as android.widget.LinearLayout.LayoutParams
