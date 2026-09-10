@@ -1,24 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 对方消息气泡：左下角小箭头指向发送方 -->
+<!-- 对方消息气泡：左下角小箭头指向发送方，箭头与气泡融为一体 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:left="8dp">
+    <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/bubble_own" />
-            <corners android:radius="16dp" />
+            <solid android:color="@color/bubble_other" />
+            <corners
+                android:topLeftRadius="16dp"
+                android:topRightRadius="16dp"
+                android:bottomRightRadius="16dp"
+                android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item
-        android:width="8dp"
+        android:width="9dp"
         android:height="14dp"
         android:gravity="bottom|left">
         <vector
-            android:width="8dp"
+            android:width="9dp"
             android:height="14dp"
-            android:viewportWidth="8"
+            android:viewportWidth="9"
             android:viewportHeight="14">
             <path
-                android:fillColor="@color/bubble_own"
-                android:pathData="M8,0 L8,14 L0,7 Z" />
+                android:fillColor="@color/bubble_other"
+                android:pathData="M9,0 L9,14 L0,8 Q2,5 5,4 Q7,3 9,5 Z" />
         </vector>
     </item>
 </layer-list>
