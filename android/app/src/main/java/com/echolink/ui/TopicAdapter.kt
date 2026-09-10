@@ -983,6 +983,12 @@ class TopicAdapter(
                         setTextColor(ctx.getColor(R.color.brand_primary))
                         setBackgroundResource(android.R.color.transparent)
                         setPadding((16 * dp).toInt(), (14 * dp).toInt(), (16 * dp).toInt(), (14 * dp).toInt())
+                        // 跑马灯效果：文字过长时自动滚动
+                        isSingleLine = true
+                        setHorizontallyScrolling(true)
+                        ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
+                        marqueeRepeatLimit = -1
+                        isSelected = true
                         setOnClickListener {
                             // 点击反馈：按钮变灰
                             isEnabled = false
