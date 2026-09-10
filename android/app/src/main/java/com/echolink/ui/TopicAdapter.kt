@@ -385,10 +385,14 @@ class TopicAdapter(
             holder.avatarContainer.visibility = View.VISIBLE
             holder.llSenderInfo.visibility = View.VISIBLE
         }
-        // 一对一对话：Telegram 风格，完全去掉头像和发送人名字，气泡紧贴边缘
+        // 一对一对话：Telegram 风格，去掉头像
+        // 留言板和我的设备特殊：只隐藏头像，保留发送人名字（名字+号码/设备名）
+        // 其他一对一对话（MP/私聊/通知）：头像和发送人名字都隐藏
         if (hideAvatar) {
             holder.avatarContainer.visibility = View.GONE
-            holder.llSenderInfo.visibility = View.GONE
+            if (!isMessageWall && !isMyDevice) {
+                holder.llSenderInfo.visibility = View.GONE
+            }
         }
 
         // Sender display name: prefer display_name, fallback to sender_name (username)
@@ -539,8 +543,9 @@ class TopicAdapter(
         // 已读回执仅在 dm 私聊自己消息时显示，要放在消息气泡左侧，不要卡在头像和气泡之间。
         row.removeAllViews()
         if (isMine) {
-            row.addView(holder.statusContainer)
+            // 自己的消息：[气泡, 已读标志, 头像] —— 已读标志紧挨气泡右边，不能放到最左边
             row.addView(holder.llContent)
+            row.addView(holder.statusContainer)
             row.addView(holder.avatarContainer)
         } else {
             row.addView(holder.avatarContainer)
