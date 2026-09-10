@@ -415,10 +415,13 @@ class TopicAdapter(
 
         // Title and text
         // 留言板：title 是访客 ID+联系方式，放到发送人位置单独显示，气泡里只放内容
+        // MP：title 和 text 内容重复（MP 插件把截断文本当 title），只显示 text
         if (isMessageWall && item.title.isNotEmpty()) {
             holder.tvSender.text = item.title
             holder.tvTitle.visibility = View.GONE
             holder.llSenderInfo.visibility = View.VISIBLE
+        } else if (isMoviePilot) {
+            holder.tvTitle.visibility = View.GONE
         } else {
             holder.tvTitle.text = item.title
             holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
