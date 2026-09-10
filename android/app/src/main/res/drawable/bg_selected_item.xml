@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 长按选中高亮：圆角矩形，匹配新拟态卡片的圆角 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/brand_primary_light" />
+    <corners android:radius="16dp" />
+</shape>

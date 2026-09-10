@@ -534,12 +534,12 @@ class TopicAdapter(
             holder.pbSending.visibility = View.GONE
         }
 
-        // Selection visual
-        holder.itemView.setBackgroundColor(
-            if (selectionMode && selected.contains(item.id))
-                holder.itemView.context.getColor(R.color.brand_primary_light)
-            else 0x00000000
-        )
+        // Selection visual：圆角矩形高亮，匹配新拟态卡片
+        if (selectionMode && selected.contains(item.id)) {
+            holder.itemView.setBackgroundResource(R.drawable.bg_selected_item)
+        } else {
+            holder.itemView.setBackgroundResource(0)
+        }
     }
 
     /**
