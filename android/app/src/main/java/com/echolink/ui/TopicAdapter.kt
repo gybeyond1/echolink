@@ -902,22 +902,17 @@ class TopicAdapter(
                 holder.llCardButtons.visibility = View.VISIBLE
                 holder.llCardButtons.removeAllViews()
                 val dp = ctx.resources.displayMetrics.density
-                // 每两个按钮一行，用水平 LinearLayout 包裹，按钮 weight=1 平均分配宽度
-                var rowLayout: android.widget.LinearLayout? = null
-                for (i in 0 until buttons.length()) {
-                    if (i % 2 == 0) {
-                        rowLayout = android.widget.LinearLayout(ctx).apply {
-                            orientation = android.widget.LinearLayout.HORIZONTAL
-                            layoutParams = android.widget.LinearLayout.LayoutParams(
-                                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-                            )
-                        }
-                        holder.llCardButtons.addView(rowLayout)
-                    }
-                    val b = buttons.getJSONObject(i)
+                // DEBUG: 打印 buttons 原始结构
+                com.echolink.util.DebugLogger.d("MPButtons", "raw buttons: ${buttons.toString().take(200)}")
+
+                // 检测 buttons 是一维数组还是二维数组
+                val is2D = buttons.length() > 0 && buttons.opt(0) is org.json.JSONArray
+                com.echolink.util.DebugLogger.d("MPButtons", "is2D=$is2D, length=${buttons.length()}")
+
+                fun createButton(b: org.json.JSONObject, rowLayout: android.widget.LinearLayout) {
                     val btnText = b.optString("text", "按钮")
                     val callbackData = b.optString("callback_data", "")
+                    com.echolink.util.DebugLogger.d("MPButtons", "  btn text='$btnText' callback='$callbackData'")
                     val btn = android.widget.Button(ctx).apply {
                         text = btnText
                         textSize = 13f
@@ -929,6 +924,7 @@ class TopicAdapter(
                             isEnabled = false
                             text = "已选择"
                             alpha = 0.6f
+                            com.echolink.util.DebugLogger.d("MPButtons", "clicked text='$btnText' callback='$callbackData'")
                             // 回调给 Fragment：插入用户选择的消息 + 调用 callback API
                             onMpButtonClick?.invoke(btnText, callbackData)
                             scope.launch(Dispatchers.IO) {
@@ -955,7 +951,41 @@ class TopicAdapter(
                     ).apply {
                         setMargins((4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt())
                     }
-                    rowLayout?.addView(btn, btnLp)
+                    rowLayout.addView(btn, btnLp)
+                }
+
+                if (is2D) {
+                    // 二维数组：外层是行，内层是按钮
+                    for (rowIdx in 0 until buttons.length()) {
+                        val rowArr = buttons.getJSONArray(rowIdx)
+                        val rowLayout = android.widget.LinearLayout(ctx).apply {
+                            orientation = android.widget.LinearLayout.HORIZONTAL
+                            layoutParams = android.widget.LinearLayout.LayoutParams(
+                                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                            )
+                        }
+                        holder.llCardButtons.addView(rowLayout)
+                        for (btnIdx in 0 until rowArr.length()) {
+                            createButton(rowArr.getJSONObject(btnIdx), rowLayout)
+                        }
+                    }
+                } else {
+                    // 一维数组：每两个按钮一行
+                    var rowLayout: android.widget.LinearLayout? = null
+                    for (i in 0 until buttons.length()) {
+                        if (i % 2 == 0) {
+                            rowLayout = android.widget.LinearLayout(ctx).apply {
+                                orientation = android.widget.LinearLayout.HORIZONTAL
+                                layoutParams = android.widget.LinearLayout.LayoutParams(
+                                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                                )
+                            }
+                            holder.llCardButtons.addView(rowLayout)
+                        }
+                        createButton(buttons.getJSONObject(i), rowLayout!!)
+                    }
                 }
             } else {
                 holder.llCardButtons.visibility = View.GONE
