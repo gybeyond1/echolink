@@ -1,10 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 自己的消息气泡：Telegram 绿 + 右下小尾角 -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="@color/bubble_own" />
-    <corners
-        android:topLeftRadius="18dp"
-        android:topRightRadius="18dp"
-        android:bottomLeftRadius="18dp"
-        android:bottomRightRadius="4dp" />
-</shape>
+<!-- 自己的消息气泡：右下角小箭头指向发送方 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:right="8dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/bubble_own" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item
+        android:width="8dp"
+        android:height="14dp"
+        android:gravity="bottom|right">
+        <vector
+            android:width="8dp"
+            android:height="14dp"
+            android:viewportWidth="8"
+            android:viewportHeight="14">
+            <path
+                android:fillColor="@color/bubble_own"
+                android:pathData="M0,0 L0,14 L8,7 Z" />
+        </vector>
+    </item>
+</layer-list>

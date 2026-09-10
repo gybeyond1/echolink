@@ -127,18 +127,21 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
 
     private fun load() {
         // 先展示本地内存缓存，避免切换 tab 时列表空掉/过会儿才出
+        // 过滤掉 MoviePilot 虚拟好友：MP 只通过常驻入口 rowMoviePilot 显示，不在好友列表重复出现
         ApiClient.cachedFriends?.let { cached ->
             if (_binding != null) {
-                friendAdapter.setItems(cached)
-                binding.tvEmptyFriends.visibility = if (cached.isEmpty()) View.VISIBLE else View.GONE
+                val filtered = cached.filter { !it.isMoviepilot }
+                friendAdapter.setItems(filtered)
+                binding.tvEmptyFriends.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
             }
         }
         lifecycleScope.launch {
             try {
                 val friends = ApiClient.getFriends()
                 if (_binding == null) return@launch
-                friendAdapter.setItems(friends)
-                binding.tvEmptyFriends.visibility = if (friends.isEmpty()) View.VISIBLE else View.GONE
+                val filtered = friends.filter { !it.isMoviepilot }
+                friendAdapter.setItems(filtered)
+                binding.tvEmptyFriends.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
                 // 检查是否有 MoviePilot 话题，有则显示 MP 入口
                 try {
                     val topics = ApiClient.getMyTopics()
@@ -162,9 +165,9 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                     }
                 } catch (_: Exception) {}
                 // 平板双栏：首次加载后自动选中第一个好友，让右侧立即显示聊天（镜像消息页体验）
-                if (isWide && !initialAutoSelectDone && friends.isNotEmpty()) {
+                if (isWide && !initialAutoSelectDone && filtered.isNotEmpty()) {
                     initialAutoSelectDone = true
-                    showChatOnRight(friends.first())
+                    showChatOnRight(filtered.first())
                 }
             } catch (e: Exception) {
                 if (ApiClient.cachedFriends == null) {

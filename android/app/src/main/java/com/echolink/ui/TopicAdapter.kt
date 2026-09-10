@@ -554,7 +554,6 @@ class TopicAdapter(
         }
         val g = if (isMine) Gravity.END else Gravity.START
         row.gravity = g or Gravity.CENTER_VERTICAL
-        holder.llContent.gravity = g or Gravity.CENTER_VERTICAL
         holder.llSenderInfo.gravity = g
         holder.tvTitle.gravity = g
         holder.tvText.gravity = g
@@ -569,25 +568,23 @@ class TopicAdapter(
         val maxW = (ctx.resources.displayMetrics.widthPixels * 0.60f).toInt()
         holder.tvTitle.maxWidth = maxW
         holder.tvText.maxWidth = maxW
+        // bubbleInner 显式设置 layout_gravity，确保紧贴左/右边缘
         val lp = holder.bubbleInner.layoutParams as android.widget.LinearLayout.LayoutParams
         lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
         lp.weight = 0f
+        lp.gravity = g
         holder.bubbleInner.layoutParams = lp
 
         // llContent 填充剩余空间（0dp + weight=1），通过 gravity 控制气泡左右对齐
-        // 这是关键：之前用 WRAP_CONTENT 导致气泡永远靠左
         val lpContent = holder.llContent.layoutParams as android.widget.LinearLayout.LayoutParams
         lpContent.width = 0
         lpContent.weight = 1f
-        lpContent.topMargin = if (hideAvatar) 0 else (2 * dp).toInt()
+        lpContent.topMargin = 0
         lpContent.bottomMargin = 0
-        lpContent.marginStart = if (hideAvatar) 0 else (8 * dp).toInt()
-        lpContent.marginEnd = if (hideAvatar) 0 else (8 * dp).toInt()
+        lpContent.marginStart = 0
+        lpContent.marginEnd = 0
         holder.llContent.layoutParams = lpContent
-
-        // 核心修复：通过 gravity 控制气泡在 llContent 中的对齐方向
-        // 自己的消息靠右（END），对方的消息靠左（START）
-        holder.llContent.gravity = if (isMine) android.view.Gravity.END else android.view.Gravity.START
+        holder.llContent.gravity = g
 
         val padH = (8 * dp).toInt()
         val padV = (4 * dp).toInt()
