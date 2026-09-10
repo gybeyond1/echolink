@@ -125,6 +125,22 @@ router.get("/friends", authMiddleware, (req, res) => {
        WHERE f.user_id = ? ORDER BY u.username LIMIT 500`
     )
     .all(req.userId);
+
+  // 如果用户开通了 MoviePilot 通道，在好友列表最前面加一个虚拟的 MP 好友
+  const mpChannel = db.prepare(
+    "SELECT * FROM moviepilot_channels WHERE user_id = ? AND enabled = 1"
+  ).get(req.userId);
+  if (mpChannel) {
+    friends.unshift({
+      user_id: -1,
+      username: "moviepilot",
+      display_name: "MoviePilot",
+      avatar: "",
+      created_at: null,
+      is_moviepilot: true
+    });
+  }
+
   res.json({ friends });
 });
 

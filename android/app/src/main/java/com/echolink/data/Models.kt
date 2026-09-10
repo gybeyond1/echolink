@@ -301,7 +301,8 @@ data class Friend(
     val username: String,
     val createdAt: String?,
     val displayName: String? = null,
-    val avatarUrl: String? = null
+    val avatarUrl: String? = null,
+    val isMoviepilot: Boolean = false
 )
 
 data class FriendRequest(
@@ -345,7 +346,8 @@ fun parseFriends(jsonArray: JSONArray): List<Friend> {
                 username = obj.optString("username", "?"),
                 createdAt = obj.optNullable("created_at"),
                 displayName = obj.optNullable("display_name"),
-                avatarUrl = obj.optNullable("avatar")
+                avatarUrl = obj.optNullable("avatar"),
+                isMoviepilot = obj.optBoolean("is_moviepilot", false)
             )
         )
     }

@@ -194,6 +194,26 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
     // ===== 好友私聊 =====
 
     private fun openChat(friend: Friend) {
+        // MoviePilot 虚拟好友：直接打开 MP 话题，不走好友私聊接口
+        if (friend.isMoviepilot) {
+            val mpTopic = "moviepilot_${com.echolink.data.AuthManager.username}"
+            if (isWide) {
+                val frag = com.echolink.ui.TopicFragment.chatOnly(mpTopic, "MoviePilot")
+                childFragmentManager.beginTransaction()
+                    .replace(binding.chatContainer.id, frag)
+                    .commit()
+                binding.chatContainer.visibility = View.VISIBLE
+                binding.tvChatPlaceholder.visibility = View.GONE
+                val dm = resources.displayMetrics.density
+                val lp = binding.leftPane.layoutParams as LinearLayout.LayoutParams
+                lp.width = (360 * dm).toInt()
+                lp.weight = 0f
+                binding.leftPane.layoutParams = lp
+            } else {
+                (activity as? MainActivity)?.openTopic(mpTopic, "MoviePilot")
+            }
+            return
+        }
         if (isWide) {
             // 平板：右侧聊天容器打开，左栏保留好友列表（镜像消息页的双栏体验）
             showChatOnRight(friend)
@@ -435,7 +455,12 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
             val item = items[position]
             val showName = item.displayName ?: item.username
             holder.tvName.text = showName
-            if (!item.avatarUrl.isNullOrBlank()) {
+            if (item.isMoviepilot) {
+                // MoviePilot 虚拟好友：显示 MP 图标
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                holder.ivAvatar.setImageResource(R.drawable.ic_moviepilot_neo)
+            } else if (!item.avatarUrl.isNullOrBlank()) {
                 holder.tvAvatar.visibility = View.GONE
                 holder.ivAvatar.visibility = View.VISIBLE
                 AvatarLoader.load(ApiClient.fullAvatarUrl(item.avatarUrl), holder.ivAvatar)
@@ -446,7 +471,10 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
             }
             holder.itemView.setOnClickListener { onItemClick(item) }
             holder.itemView.setOnLongClickListener {
-                onItemLongClick(item)
+                // MP 虚拟好友不支持长按删除
+                if (!item.isMoviepilot) {
+                    onItemLongClick(item)
+                }
                 true
             }
         }
