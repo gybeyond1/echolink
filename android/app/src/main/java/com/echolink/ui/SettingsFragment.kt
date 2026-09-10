@@ -141,8 +141,16 @@ class SettingsFragment : Fragment() {
             startActivity(intent)
         }
 
-        // 打赏支持（微信收款二维码）
-        binding.llDonate.setOnClickListener { showDonateQrDialog() }
+        // 打赏支持：先尝试跳转微信付款，失败则显示二维码
+        binding.llDonate.setOnClickListener {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL))
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+            } catch (e: Exception) {
+                showDonateQrDialog()
+            }
+        }
 
         // 通知监听权限状态
         updatePermissionStatus()
