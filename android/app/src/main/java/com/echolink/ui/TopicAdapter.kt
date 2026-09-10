@@ -82,6 +82,10 @@ class TopicAdapter(
     /** 是否为我的设备会话：对方消息统一显示设备新拟态图标 */
     var isMyDevice: Boolean = false
 
+    /** 一对一对话隐藏头像（Telegram风格）：私聊/MP/我的设备/通知/留言板都去掉头像，只有群组保留头像区分发送者 */
+    private val hideAvatar: Boolean
+        get() = isDm || isMessageWall || isMoviePilot || isNotification || isMyDevice
+
     var selectionMode = false
         private set
     private val selected = mutableSetOf<Long>()
@@ -381,8 +385,8 @@ class TopicAdapter(
             holder.avatarContainer.visibility = View.VISIBLE
             holder.llSenderInfo.visibility = View.VISIBLE
         }
-        // MP 会话：Telegram 风格，完全去掉头像和发送人名字，气泡紧贴边缘
-        if (isMoviePilot) {
+        // 一对一对话：Telegram 风格，完全去掉头像和发送人名字，气泡紧贴边缘
+        if (hideAvatar) {
             holder.avatarContainer.visibility = View.GONE
             holder.llSenderInfo.visibility = View.GONE
         }
@@ -565,14 +569,14 @@ class TopicAdapter(
         lpContent.width = ViewGroup.LayoutParams.WRAP_CONTENT
         lpContent.weight = 0f
         // 气泡与头像之间留 8dp 间距；顶部 2dp 让头像与发送人名字顶部齐平
-        // MP 会话：Telegram 风格，无头像，气泡紧贴边缘
-        lpContent.topMargin = if (isMoviePilot) 0 else (2 * dp).toInt()
+        // 一对一对话：Telegram 风格，无头像，气泡紧贴边缘
+        lpContent.topMargin = if (hideAvatar) 0 else (2 * dp).toInt()
         lpContent.bottomMargin = 0
         if (isMine) {
             lpContent.marginStart = 0
-            lpContent.marginEnd = if (isMoviePilot) 0 else (8 * dp).toInt()
+            lpContent.marginEnd = if (hideAvatar) 0 else (8 * dp).toInt()
         } else {
-            lpContent.marginStart = if (isMoviePilot) 0 else (8 * dp).toInt()
+            lpContent.marginStart = if (hideAvatar) 0 else (8 * dp).toInt()
             lpContent.marginEnd = 0
         }
         holder.llContent.layoutParams = lpContent
