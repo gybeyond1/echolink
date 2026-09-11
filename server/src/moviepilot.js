@@ -7,6 +7,65 @@ const { URL } = require("url");
 // 默认 MP 用户（兼容旧的 /webhook/moviepilot 不带用户名的地址）
 const DEFAULT_MP_USER = "gybeyond";
 
+// ========== 长轮询消息队列 ==========
+// 内存消息队列：username -> [{update_id, message}]
+const mpMessageQueues = new Map();
+let mpUpdateIdCounter = 0;
+// 长轮询等待者：username -> [resolve函数]
+const mpPollWaiters = new Map();
+
+// 添加消息到队列（用户发的消息、按钮回调都走这里，等 MP 长轮询拉取）
+function enqueueMPMessage(username, message) {
+  if (!mpMessageQueues.has(username)) {
+    mpMessageQueues.set(username, []);
+  }
+  const queue = mpMessageQueues.get(username);
+  mpUpdateIdCounter++;
+  const update = {
+    update_id: mpUpdateIdCounter,
+    message: message,
+  };
+  queue.push(update);
+  // 限制队列长度，最多保留 200 条
+  if (queue.length > 200) {
+    queue.shift();
+  }
+  // 通知等待中的长轮询
+  const waiters = mpPollWaiters.get(username) || [];
+  while (waiters.length > 0) {
+    const resolve = waiters.shift();
+    resolve([update]);
+  }
+}
+
+// 长轮询获取消息（类似 Telegram getUpdates）
+// 有消息立即返回，没消息挂起 timeout 秒后返回空
+function getUpdates(username, offset, limit, timeout) {
+  return new Promise((resolve) => {
+    const queue = mpMessageQueues.get(username) || [];
+    // 找到 offset 之后的消息
+    const updates = queue.filter((u) => u.update_id > offset).slice(0, limit);
+    if (updates.length > 0) {
+      resolve(updates);
+      return;
+    }
+    // 没有消息，挂起等待
+    if (!mpPollWaiters.has(username)) {
+      mpPollWaiters.set(username, []);
+    }
+    const waiters = mpPollWaiters.get(username);
+    waiters.push(resolve);
+    // 超时后返回空
+    setTimeout(() => {
+      const idx = waiters.indexOf(resolve);
+      if (idx >= 0) {
+        waiters.splice(idx, 1);
+        resolve([]);
+      }
+    }, timeout * 1000);
+  });
+}
+
 // 根据用户名查找用户 id
 function getUserIdByUsername(username) {
   const db = getDB();
@@ -209,31 +268,36 @@ function _postToMP(path, body) {
   });
 }
 
-// 按钮点击回调，转发给 MP
+// 按钮点击回调，存入消息队列，等 MP 长轮询拉取
 async function callbackButton(username, callbackData, messageId) {
   const userId = getUserIdByUsername(username);
   if (!userId) return { error: "用户不存在: " + username };
 
-  // 直接通过 HTTP 发送给 MP
-  return await _postToMP("/api/v1/plugin/echolink/callback", {
-    username,
-    callback_data: callbackData,
-    message_id: messageId,
-    timestamp: Date.now(),
+  // 存入消息队列（格式跟 Telegram callback_query 一致）
+  enqueueMPMessage(username, {
+    callback_query: {
+      id: Date.now().toString(),
+      from: { id: userId, username: username },
+      message: { message_id: messageId },
+      data: callbackData,
+    },
   });
+  return { ok: true, queued: true };
 }
 
-// 用户在 EchoLink 发文字给 MP
+// 用户在 EchoLink 发文字给 MP，存入消息队列，等 MP 长轮询拉取
 async function sendUserMessageToMP(username, text) {
   const userId = getUserIdByUsername(username);
   if (!userId) return { error: "用户不存在: " + username };
 
-  // 直接通过 HTTP 发送给 MP
-  return await _postToMP("/api/v1/plugin/echolink/message", {
-    username,
-    text,
-    timestamp: Date.now(),
+  // 存入消息队列（格式跟 Telegram message 一致）
+  enqueueMPMessage(username, {
+    message_id: Date.now(),
+    from: { id: userId, username: username },
+    text: text,
+    date: Math.floor(Date.now() / 1000),
   });
+  return { ok: true, queued: true };
 }
 
 module.exports = {
@@ -250,4 +314,6 @@ module.exports = {
   appendMoviepilotMessage,
   callbackButton,
   sendUserMessageToMP,
+  enqueueMPMessage,
+  getUpdates,
 };
