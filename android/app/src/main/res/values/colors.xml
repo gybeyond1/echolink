@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 品牌色：对齐 WebUI 新拟态（蓝 #4a8fe7） -->
-    <color name="brand_primary">#4a8fe7</color>
-    <color name="brand_primary_dark">#3a7fd7</color>
-    <color name="brand_primary_light">#dbe7f7</color>
-    <color name="brand_gradient_start">#5a9ff7</color>
-    <color name="brand_gradient_end">#4a8fe7</color>
+    <!-- 品牌色：Telegram 蓝 -->
+    <color name="brand_primary">#3390EC</color>
+    <color name="brand_primary_dark">#2979D4</color>
+    <color name="brand_primary_light">#E3F0FD</color>
+    <color name="brand_gradient_start">#4AA0F5</color>
+    <color name="brand_gradient_end">#3390EC</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="secondary">#4a8fe7</color>
+    <color name="secondary">#3390EC</color>
     <color name="on_secondary">#FFFFFF</color>
 
     <!-- 新拟态核心：同色基底 + 左上高光 + 右下暗影 -->
@@ -15,17 +15,20 @@
     <color name="neu_shadow_dark">#B8BEC8</color>
     <color name="neu_shadow_light">#FFFFFF</color>
 
-    <!-- 表面 / 背景：与 neu_base 同色（新拟态凸起靠阴影） -->
+    <!-- 表面 / 背景 -->
     <color name="surface">@color/neu_base</color>
     <color name="surface_variant">#DCE2EA</color>
     <color name="background">@color/neu_base</color>
-    <color name="chat_bg">@color/neu_base</color>
+    <!-- Telegram 风格聊天背景：浅蓝色 -->
+    <color name="chat_bg">#E6EBEE</color>
+    <!-- Telegram 风格气泡：自己发的蓝色，对方发的白色 -->
     <color name="bubble_other">#FFFFFF</color>
-    <color name="bubble_own">#EFFDDE</color>
-    <color name="bubble_own_time">#6BAD6E</color>
+    <color name="bubble_own">#3390EC</color>
+    <color name="bubble_own_time">#B3D9F7</color>
+    <color name="bubble_other_time">#8A99A8</color>
     <color name="on_surface">#3A4150</color>
     <color name="on_surface_variant">#8B94A3</color>
-    <!-- 壁纸背景上的文字（浅色基底下用深字，保证可读） -->
+    <!-- 壁纸背景上的文字 -->
     <color name="on_wallpaper">#1A1A1A</color>
     <color name="outline">#D7DCE3</color>
 
@@ -43,7 +46,7 @@
     <color name="error">#E8645F</color>
     <color name="error_container">#F9DCD9</color>
 
-    <!-- 兼容旧引用（模板遗留） -->
+    <!-- 兼容旧引用 -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">@color/brand_primary</color>
     <color name="purple_700">@color/brand_primary_dark</color>
