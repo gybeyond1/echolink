@@ -322,18 +322,17 @@ class TopicFragment : Fragment() {
             onImageClick = { msg -> showImagesViewer(msg) },
             onVideoClick = { msg -> showVideoPlayer(msg) },
             onAvatarClick = { msg -> handleAvatarClick(msg) },
-                        onMpButtonClick = { btnText, callbackData ->
-                // MP 卡片按钮点击：走正常发消息流程，把按钮文字作为消息发送到服务器
-                // 这样刷新后消息不会消失，同时 callback_data 会转发给 MP 处理
+                        onMpButtonClick = { btnText, callbackData, messageId ->
+                // MP 卡片按钮点击：Telegram 风格，不发送文字消息，只转发 callback_data 给 MP
+                // 按钮已在 Adapter 中本地变灰禁用，MP 收到后会调用 edit_message 更新按钮状态
                 val topic = currentTopic
                 if (topic != null) {
-                    publish(topic, "", btnText, "text", null, null, 0, skipMpForward = true)
                     // 异步转发 callback 给 MP，Agent 会处理并回复
                     lifecycleScope.launch(Dispatchers.IO) {
                         try {
                             ApiClient.post("/api/moviepilot/callback", mapOf(
                                 "callback_data" to callbackData,
-                                "message_id" to ""
+                                "message_id" to messageId.toString()
                             ))
                         } catch (_: Exception) {}
                     }
