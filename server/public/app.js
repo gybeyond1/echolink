@@ -13,7 +13,6 @@
     display_name: "",
     avatar: "",
     tab: "messages",
-    // 当前打开的会话：{ topic, kind, display } 或 { special: "notifications" }
     chat: null,
     reqCount: 0,
     notifCount: 0,
@@ -22,13 +21,10 @@
     wsWantClose: false,
   };
 
-  // ---------- helpers ----------
-  // API 基址：浏览器同源=空字符串（相对路径）；Tauri 桌面端=配置的 server_url
   let API_BASE = "";
   function isTauri() { return !!(window.__TAURI__ && window.__TAURI__.core); }
   const BELL_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:60%;height:60%" aria-hidden="true"><path d="M18 16v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-5.5 4c0 .55-.45 1-1 1s-1-.45-1-1h2z"/></svg>';
 
-  // 桌面端（Tauri/Windows）：禁用 F5 刷新，右键菜单保留（输入框需复制粘贴）
   if (window.__TAURI__ || window.__TAURI_INTERNALS__) {
     window.addEventListener("keydown", function (e) {
       if (e.key === "F5" || (e.ctrlKey && (e.key === "r" || e.key === "R"))) e.preventDefault();
@@ -42,7 +38,6 @@
       } catch (e) { /* 忽略，保持同源 */ }
     }
   }
-  // 相对路径（/api/...、/uploads/...）拼接 API_BASE；绝对 URL 原样返回
   function absUrl(u) {
     if (!u) return u;
     if (/^https?:\/\//.test(u) || u.startsWith("p2p:")) return u;
@@ -93,7 +88,6 @@
     const s = String(name || "?").trim();
     return s ? s[0].toUpperCase() : "?";
   }
-  // 用户名 → 稳定色相（类似 Telegram 头像自动配色）
   function hueOf(name) {
     let h = 0;
     const s = String(name || "");
@@ -116,7 +110,6 @@
     return `<div class="neu-avatar" style="width:${size}px;height:${size}px;font-size:${px}px">${emoji}</div>`;
   }
 
-  // 特殊会话的友好展示名（前端兜底，服务端旧版本也能显示中文名）
   function dmFriendId(name) {
     const m = /^dm-(\d+)-(\d+)$/.exec(name || "");
     if (!m) return null;
@@ -126,7 +119,6 @@
   function topicTitle(t) {
     const kind = t.kind || "normal";
     if (kind === "devices") {
-      // 后端已返回"我的设备（用户名）"格式，直接用；兜底为"我的设备"
       return t.display_name && t.display_name !== "我的设备" ? t.display_name : "我的设备";
     }
     if (kind === "messagewall") return "留言板";
@@ -136,7 +128,6 @@
       const fid = dmFriendId(t.name);
       const f = (state.friends || []).find(x => String(x.id) === String(fid));
       if (f) return f.display_name || f.username;
-      // 兜底：管理员视角可能不在好友列表中，用对方 ID 标识而非"私聊"
       return fid ? ("用户" + fid) : (srv || "私聊");
     }
     return t.display_name || t.name;
@@ -176,11 +167,9 @@
     render();
   }
 
-  // ---------- WebSocket 实时 ----------
   function connectWS() {
     if (!state.token || state.ws) return;
     state.wsWantClose = false;
-    // 同源：ws(s)://location.host；Tauri 桌面端：从 API_BASE 推导（https→wss）
     const origin = API_BASE || location.origin;
     const proto = origin.startsWith("https") ? "wss" : "ws";
     let ws;
@@ -189,7 +178,6 @@
     } catch (e) { return; }
     state.ws = ws;
     ws.onopen = () => {
-      // 订阅我的全部会话
       state.topics.forEach(t => ws.send(JSON.stringify({ type: "subscribe", topic: t.name })));
     };
     ws.onmessage = (ev) => {
@@ -210,17 +198,14 @@
   function handleWS(m) {
     if (m.type === "topic_message" && m.data) {
       const d = m.data;
-      // 更新左侧会话预览
       const t = state.topics.find(x => x.name === m.topic);
       if (t) {
         t.last_message = d.text || d.title || mediaLabel(d);
         t.last_message_at = d.timestamp;
         if (state.tab === "messages") renderSessionList();
       } else {
-        // 收到未知话题消息（如首次收到留言板留言）→ 刷新左侧会话列表
         loadTopics().catch(() => {});
       }
-      // 当前聊天窗口追加（按 id 去重，REST 发送后本机也会收到）
       if (state.tab === "messages" && state.chat && state.chat.topic === m.topic && !msgIdSet.has(d.id)) {
         appendBubble(d);
       }
@@ -236,7 +221,6 @@
       state.notifCount++;
       if (state.tab === "messages") renderSessionList();
     } else if (m.type === "message_deleted") {
-      // 服务端软删除广播：仅删除者本机其他设备需移除该气泡
       if (m.topic && m.message_id != null) {
         const body = document.getElementById("chatBody");
         if (body && state.chat && state.chat.topic === m.topic) {
@@ -257,7 +241,6 @@
     return "";
   }
 
-  // ---------- Auth screen ----------
   function renderAuth() {
     app.innerHTML = `
       <div class="auth-wrap">
@@ -290,18 +273,15 @@
         </div>
       </div>`;
 
-    // 检查是否启用了注册两步验证
     let totpRequired = false;
     function updateTotpVisibility() {
       const wrap = document.getElementById("au-totp-wrap");
-      // 注册模式始终显示两步验证（如服务器启用则必填，未启用可留空）
       if (wrap) wrap.style.display = (mode === "register") ? "block" : "none";
     }
     fetch(API_BASE + "/api/auth/totp-status").then(r => r.json()).then(r => {
       totpRequired = !!r.enabled;
       updateTotpVisibility();
     }).catch(() => {});
-    // 桌面端（Tauri）：显示服务器地址输入框，读取已保存的地址
     if (isTauri()) {
       const wrap = document.getElementById("au-server-wrap");
       if (wrap) wrap.style.display = "block";
@@ -327,7 +307,6 @@
       updateTotpVisibility();
     };
     submit.onclick = async () => {
-      // 桌面端：先保存服务器地址
       if (isTauri()) {
         const serverUrl = document.getElementById("au-server") ? document.getElementById("au-server").value.trim() : "";
         if (!serverUrl) { toast("请填写服务器地址", "err"); return; }
@@ -340,7 +319,6 @@
       const password = document.getElementById("au-pass").value;
       const totp_code = document.getElementById("au-totp") ? document.getElementById("au-totp").value.trim() : "";
       if (!username || !password) return toast("请输入用户名和密码", "err");
-      // 两步验证留空也可提交，服务器端会验证是否必填
       submit.disabled = true;
       try {
         const ep = mode === "login" ? "/api/auth/login" : "/api/auth/register";
@@ -360,7 +338,6 @@
     };
   }
 
-  // ---------- Dashboard shell ----------
   const BASE_NAV = [
     { id: "messages", ic: "💬", label: "消息" },
     { id: "friends", ic: "👥", label: "好友" },
@@ -427,7 +404,6 @@
     }
   }
 
-  // ---------- 数据加载 ----------
   async function loadTopics() {
     try {
       const r = await api("/api/topics");
@@ -458,7 +434,6 @@
     } catch (e) { /* ignore */ }
   }
 
-  // ================= 消息页（双栏 messenger） =================
   async function renderMessages(main) {
     main.innerHTML = `
       <div class="msg-layout">
@@ -488,7 +463,6 @@
     const list = document.getElementById("sessList");
     if (!list) return;
     const parts = [];
-    // 置顶：通知
     const notifActive = state.chat && state.chat.special === "notifications";
     parts.push(sessionEntryHtml(notifActive, {
       attrs: `data-special="notifications"`,
@@ -499,7 +473,6 @@
           <div class="sess-preview">所有设备的同步通知</div>
         </div>`,
     }));
-    // 置顶：新的申请
     if (state.reqCount > 0) {
       const reqActive = state.chat && state.chat.special === "requests";
       parts.push(sessionEntryHtml(reqActive, {
@@ -512,7 +485,6 @@
           </div>`,
       }));
     }
-    // 会话列表
     state.topics.forEach(t => {
       const kind = t.kind || "normal";
       const name = topicTitle(t);
@@ -552,7 +524,6 @@
     });
   }
 
-  // 会话右键菜单
   function showSessionContextMenu(e, t) {
     hideContextMenu();
     const kind = t.kind || "normal";
@@ -668,7 +639,6 @@
     })();
   }
 
-  // ---- 聊天 ----
   let chatTopicInfo = null;
   function openChat(t) {
     state.chat = { topic: t.name, kind: t.kind || "normal", display: t.display_name || t.name, my_role: t.my_role };
@@ -732,7 +702,6 @@
       setupVoice();
     }
 
-    // 软删除：点击气泡上的删除按钮 → 仅本机隐藏（单向），并通知服务端
     const body = document.getElementById("chatBody");
     if (body) {
       body.onclick = (e) => {
@@ -770,7 +739,6 @@
   }
 
   function bubbleHtml(m) {
-    // REST 返回的消息带 user_id；WS 广播的旧字段没有 user_id，回退用 sender_name 判断
     const mine = (state.userId && m.user_id === state.userId) ||
       (!m.user_id && m.sender_name === state.username);
     const isMw = state.chat && state.chat.kind === "messagewall";
@@ -855,7 +823,6 @@
     } catch (e) { toast(e.message, "err"); }
   }
 
-  // 语音录制（浏览器 MediaRecorder）
   let recorder = null, recChunks = [], recTimer = null;
   function setupVoice() {
     const btn = document.getElementById("ci-voice");
@@ -897,7 +864,6 @@
     } catch (e) { toast(e.message, "err"); }
   }
 
-  // ---- 统一申请（好友 + 加群） ----
   function openRequests() {
     state.chat = { special: "requests" };
     renderSessionList();
@@ -984,7 +950,6 @@
           <button class="btn sm" data-ta2="${x.id}">通过</button>
           <button class="btn danger sm" data-tr2="${x.id}">拒绝</button>`,
       })).join(""));
-      // 绑定在 modal 内
       document.querySelectorAll("[data-ta2]").forEach(b => b.onclick = async () => {
         await handleTopicReq(topic, b.dataset.ta2, "approve");
         b.closest(".req-card").remove();
@@ -1011,7 +976,6 @@
     if (m) m.remove();
   }
 
-  // ================= 好友页 =================
   async function renderFriends(main) {
     main.innerHTML = `
       <div class="page-head-row">
@@ -1066,7 +1030,6 @@
           state.chat = null;
           await loadTopics();
           render();
-          // 用服务器返回直接构造会话对象，避免列表刷新时序导致找不到新 DM
           let t = state.topics.find(x => x.name === r.topic);
           if (!t) {
             t = { name: r.topic, kind: "dm", display_name: r.display_name || r.title || b.dataset.chat, my_role: "member" };
@@ -1206,7 +1169,6 @@
     };
   }
 
-  // ---------- Overview ----------
   async function renderOverview(main) {
     main.innerHTML = `<h2 class="page-title">概览</h2><p class="page-sub">服务器状态与快速信息</p><div id="ov">加载中…</div>`;
     const [info, dev, topics, stats] = await Promise.all([
@@ -1237,7 +1199,6 @@
       </div>`;
   }
 
-  // ---------- Devices ----------
   async function renderDevices(main) {
     main.innerHTML = `<h2 class="page-title">设备</h2>
       <p class="page-sub">已连接到你账号的设备（由手机 App 自动注册）</p>
@@ -1280,7 +1241,6 @@
     });
   }
 
-  // ---------- Filters ----------
   async function renderFilters(main) {
     main.innerHTML = `<h2 class="page-title">应用过滤</h2>
       <p class="page-sub">决定哪些 App 的通知会被同步。启用且列表非空时，仅列表内的 App 会同步。</p>
@@ -1324,7 +1284,6 @@
     });
   }
 
-  // ---------- Account ----------
   async function renderAccount(main) {
     main.innerHTML = `<h2 class="page-title">账号</h2>
       <p class="page-sub">当前登录：<b>@${esc(state.username)}</b>${state.role === "admin" ? "（管理员）" : ""}</p>
@@ -1394,7 +1353,6 @@
     document.getElementById("a-out").onclick = () => { logout(); };
   }
 
-  // ---------- Admin: Users ----------
   async function renderAdminUsers(main) {
     main.innerHTML = `<h2 class="page-title">用户管理</h2>
       <p class="page-sub">管理平台所有用户：新增、查看、删除。</p>
@@ -1440,7 +1398,6 @@
     });
   }
 
-  // ---------- Admin: All Topics ----------
   async function renderAdminTopics(main) {
     main.innerHTML = `<h2 class="page-title">全部话题</h2>
       <p class="page-sub">查看平台上所有话题及其消息（管理员可见）。</p>
@@ -1475,7 +1432,6 @@
     });
   }
 
-  // ---------- Admin: All Notifications ----------
   async function renderAdminNotifs(main) {
     main.innerHTML = `<h2 class="page-title">全部通知</h2>
       <p class="page-sub">平台上所有用户的通知记录（按用户筛选）。</p>
@@ -1517,7 +1473,6 @@
     await load();
   }
 
-  // ---------- Admin: MoviePilot 通道管理 ----------
   async function renderAdminMoviepilot(main) {
     main.innerHTML = `<h2 class="page-title">MoviePilot 通道</h2>
       <p class="page-sub">为每个用户生成独立的 MoviePilot 通知通道，支持两种模式：<b>直接模式</b>（通过 WebHook 直接通信）和 <b>Telegram 桥接模式</b>（通过 Telegram Bot 中转，复用 MP 的 Telegram 渠道完整功能）。</p>
@@ -1710,16 +1665,13 @@
       if (!channel) return;
       editingToken = channel.token;
       document.getElementById("mp-edit-title").textContent = "设置 " + (channel.display_name || channel.username) + " 的 MP 通道";
-      // 通道模式
       const mode = channel.channel_mode || "direct";
       document.getElementById("mp-edit-channel-mode").value = mode;
       document.getElementById("mp-direct-section").style.display = mode === "direct" ? "block" : "none";
       document.getElementById("mp-telegram-section").style.display = mode === "telegram" ? "block" : "none";
-      // 直接模式配置
       document.getElementById("mp-edit-public-url").value = channel.public_base_url || "";
       document.getElementById("mp-edit-api-key").value = channel.mp_api_key || "";
       document.getElementById("mp-edit-callback-url").value = channel.callback_url || "";
-      // Telegram 配置
       document.getElementById("mp-edit-tg-bot-token").value = channel.telegram_bot_token || "";
       document.getElementById("mp-edit-tg-chat-id").value = channel.telegram_chat_id || "";
       document.getElementById("mp-edit-tg-proxy-enabled").checked = channel.telegram_proxy_enabled ? true : false;
@@ -1737,22 +1689,18 @@
     const updateWebhookPreview = () => {
       const publicUrl = document.getElementById("mp-edit-public-url").value.trim();
       const username = document.getElementById("mp-edit-title").textContent.replace("设置 ", "").replace(" 的 MP 通道", "");
-      // 从 channels 里找 username
       const webhook = publicUrl ? publicUrl.replace(/\/$/, "") + "/api/webhook/moviepilot/" + username : "（填写公网地址后自动生成）";
       document.getElementById("mp-edit-webhook").textContent = webhook;
     };
 
-    // 通道模式切换
     document.getElementById("mp-edit-channel-mode").onchange = function() {
       const mode = this.value;
       document.getElementById("mp-direct-section").style.display = mode === "direct" ? "block" : "none";
       document.getElementById("mp-telegram-section").style.display = mode === "telegram" ? "block" : "none";
     };
-    // 代理开关
     document.getElementById("mp-edit-tg-proxy-enabled").onchange = function() {
       document.getElementById("mp-edit-tg-proxy-section").style.display = this.checked ? "block" : "none";
     };
-    // 测试 Telegram 连接
     document.getElementById("mp-edit-tg-test").onclick = async function() {
       const resultEl = document.getElementById("mp-edit-tg-test-result");
       resultEl.textContent = "测试中...";
@@ -1813,7 +1761,6 @@
     load();
   }
 
-  // ---------- Admin: Server Settings ----------
   async function renderAdminSettings(main) {
     main.innerHTML = `<h2 class="page-title">服务器设置</h2>
       <p class="page-sub">配置话题中可发送的 图片 / 语音 / 文件 大小上限，以及每个话题保留的消息历史条数。设置即时生效。</p>
@@ -1927,7 +1874,6 @@
     } catch (e) { box.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`; }
   }
 
-  // ---------- Admin: 留言板 Webhook 配置 ----------
   async function renderAdminMessagewall(main) {
     main.innerHTML = `<h2 class="page-title">留言板 Webhook</h2>
       <p class="page-sub">门边留言板应用可把访客留言推送到这里。默认 Webhook 地址会推送给所有开启了留言功能的用户，每个用户也有独立地址 <code>/api/webhook/messagewall/用户名</code>。</p>
@@ -2003,7 +1949,6 @@
     };
   }
 
-  // ---------- 主题切换（浅色 / 深色 / 跟随系统 三态循环） ----------
   const THEME_ICON = { light: "🌙", dark: "☀️", system: "🖥️" };
   const THEME_LABEL = { light: "已切换到浅色主题", dark: "已切换到深色主题", system: "已跟随系统外观" };
   function applyTheme(mode) {
@@ -2012,7 +1957,6 @@
     document.documentElement.setAttribute("data-theme-mode", mode);
     const btn = document.getElementById("themeToggle");
     if (btn) btn.textContent = THEME_ICON[mode] || THEME_ICON.system;
-    // 桌面端同步原生标题栏主题
     if (isTauri()) {
       try {
         const win = window.__TAURI__.window.getCurrentWindow();
@@ -2040,8 +1984,6 @@
     }
   }
 
-  // ---------- boot ----------
-  // 桌面端（Tauri）：未配置服务器地址时，先展示「服务器地址」输入页
   function renderServerSetup() {
     app.innerHTML = `
       <div class="auth-wrap">
@@ -2067,7 +2009,6 @@
       try {
         await window.__TAURI__.core.invoke("save_server_url", { url });
         API_BASE = url;
-        // 切换/首次配置服务器后，旧 token 失效，清除避免自动登录失败
         ["ns_token", "ns_username", "ns_role", "ns_uid"].forEach(k => localStorage.removeItem(k));
         state.token = ""; state.username = ""; state.userId = 0; state.role = "user";
         toast("已保存，正在连接…", "ok");
@@ -2100,6 +2041,5 @@
   }
 
   setupThemeToggle();
-  // Tauri 桌面端：先异步取 server_url 作为 API 基址再启动；浏览器同源直接启动
   initApiBase().then(boot);
 })();
