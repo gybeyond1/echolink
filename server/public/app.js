@@ -742,7 +742,14 @@
     const mine = (state.userId && m.user_id === state.userId) ||
       (!m.user_id && m.sender_name === state.username);
     const isMw = state.chat && state.chat.kind === "messagewall";
-    const senderName = m.sender_display_name || m.sender_name || "未知";
+    const isDevices = state.chat && state.chat.kind === "devices";
+    // 设备话题：直接显示设备名，不显示用户名
+    let senderName;
+    if (isDevices) {
+      senderName = m.device_name || m.sender_display_name || m.sender_name || "未知设备";
+    } else {
+      senderName = m.sender_display_name || m.sender_name || "未知";
+    }
     const time = fmtShort(m.timestamp);
     let media = "";
     if (m.media_type && m.media_type !== "text" && m.media_url) {
@@ -758,10 +765,12 @@
         media = `<div class="bubble-media"><a class="btn ghost sm" href="${url}" target="_blank" download>📄 ${esc(m.media_name || "文件")}（${fmtSize(m.media_size)}）</a></div>`;
       }
     }
+    // 设备话题不显示 device_name 后缀（已经直接显示在 senderName 里了）
+    const devSuffix = (isDevices || !m.device_name) ? "" : `<span class="bubble-dev"> · ${esc(m.device_name)}</span>`;
     return `<div class="msg-row ${mine ? "mine" : ""}" data-mid="${m.id}">
       ${isMw && !mine ? mwAvatar(34) : avatarHtml(senderName, m.sender_avatar, 34)}
       <div class="bubble ${mine ? "bubble-own" : "bubble-other"}">
-        <div class="bubble-sender">${esc(senderName)}${m.device_name ? `<span class="bubble-dev"> · ${esc(m.device_name)}</span>` : ""}<span class="bubble-time">${time}</span></div>
+        <div class="bubble-sender">${esc(senderName)}${devSuffix}<span class="bubble-time">${time}</span></div>
         ${m.title ? `<div class="bubble-title">${esc(m.title)}</div>` : ""}
         ${m.text ? `<div class="bubble-text">${esc(m.text)}</div>` : ""}
         ${media}
@@ -989,6 +998,7 @@
           <button class="btn ghost" id="fr-newtopic">＃ 新建话题</button>
         </div>
       </div>
+      <div id="mpEntry"></div>
       <div id="frList" class="friend-grid"><div class="empty" style="grid-column:1/-1">加载中…</div></div>
       <h3 class="section-title">我收到的申请</h3>
       <div id="frIn"></div>
@@ -998,6 +1008,42 @@
     document.getElementById("fr-add").onclick = showAddFriend;
     document.getElementById("fr-discover").onclick = showDiscover;
     document.getElementById("fr-newtopic").onclick = showNewTopic;
+
+    // 检查 MP 通道状态，如果开通了则显示常驻 MP 入口
+    try {
+      const mpStatus = await api("/api/moviepilot/status").catch(() => null);
+      if (mpStatus && mpStatus.enabled) {
+        const mpEntry = document.getElementById("mpEntry");
+        mpEntry.innerHTML = `
+          <div class="card friend-card" style="margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:18px">MP</div>
+              <div style="flex:1;min-width:0">
+                <b>MoviePilot</b>
+                <div style="color:var(--muted);font-size:12px">智能助手 · 媒体库管理</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn sm" id="mp-chat" style="flex:1">💬 对话</button>
+            </div>
+          </div>`;
+        document.getElementById("mp-chat").onclick = async () => {
+          try {
+            await api("/api/moviepilot/ensure");
+            state.tab = "messages";
+            state.chat = null;
+            await loadTopics();
+            render();
+            let t = state.topics.find(x => x.name === "moviepilot_" + state.username);
+            if (!t) {
+              t = { name: "moviepilot_" + state.username, kind: "moviepilot", title: "MoviePilot", my_role: "member" };
+              state.topics.unshift(t);
+            }
+            openChat(t);
+          } catch (e) { toast(e.message, "err"); }
+        };
+      }
+    } catch (e) { /* MP 通道未开通，不显示 */ }
 
     const [fr, reqs] = await Promise.all([
       api("/api/friends").catch(() => ({ friends: [] })),
@@ -1475,115 +1521,13 @@
 
   async function renderAdminMoviepilot(main) {
     main.innerHTML = `<h2 class="page-title">MoviePilot 通道</h2>
-      <p class="page-sub">为每个用户生成独立的 MoviePilot 通知通道，支持两种模式：<b>直接模式</b>（通过 WebHook 直接通信）和 <b>Telegram 桥接模式</b>（通过 Telegram Bot 中转，复用 MP 的 Telegram 渠道完整功能）。</p>
+      <p class="page-sub">为每个用户生成独立的 MoviePilot 通知通道 Token。用户在 MP 后台配置 EchoLink 渠道时，填写服务器地址、用户名和此 Token 即可。</p>
       <div class="card">
         <label>用户通道列表</label>
         <div id="mp-list">加载中…</div>
-      </div>
-      <div id="mp-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
-        <div class="card" style="width:480px;max-width:90vw;max-height:90vh;overflow:auto">
-          <h3 id="mp-edit-title">设置 MP 通道</h3>
-          <div style="margin-bottom:12px">
-            <label>通道模式</label>
-            <select id="mp-edit-channel-mode" style="width:100%">
-              <option value="direct">直接模式（WebHook 直接通信）</option>
-              <option value="telegram">Telegram 桥接模式（通过 Telegram Bot 中转）</option>
-            </select>
-            <div style="color:var(--muted);font-size:12px;margin-top:4px">Telegram 桥接模式：复用 MP 的 Telegram 渠道，支持完整的交互按钮和卡片功能</div>
-          </div>
-          <div id="mp-direct-section" style="display:none">
-          <div style="margin-bottom:12px">
-            <label>EchoLink 公网地址（用于生成 Webhook 地址）</label>
-            <input id="mp-edit-public-url" placeholder="https://你的域名:端口" style="width:100%" />
-            <div style="color:var(--muted);font-size:12px;margin-top:4px">填该用户的 EchoLink 公网访问地址，例如 https://echolink.yourdomain.com</div>
-          </div>
-          <div style="margin-bottom:12px">
-            <label>MoviePilot API Key（EchoLink 回调 MP 时用）</label>
-            <input id="mp-edit-api-key" placeholder="MP 的 API Token" type="password" style="width:100%" />
-          </div>
-          <div style="margin-bottom:12px">
-            <label>MoviePilot 回调地址（MP 的访问地址）</label>
-            <input id="mp-edit-callback-url" placeholder="http://192.168.1.100:3000" style="width:100%" />
-          </div>
-          <div style="margin-bottom:12px">
-            <label>Webhook 地址（自动生成，在 MP 插件里配置）</label>
-            <div style="display:flex;align-items:center;gap:8px">
-              <code id="mp-edit-webhook" style="flex:1;word-break:break-all;font-size:12px;padding:8px;background:var(--bg-alt);border-radius:6px"></code>
-              <button class="btn ghost sm" id="mp-edit-copy-webhook">复制</button>
-            </div>
-          </div>
-          <div style="margin-bottom:16px">
-            <label>Token（在 MP 插件里配置）</label>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="flex:1;color:var(--muted);font-size:12px">点击右侧按钮复制 Token</span>
-              <button class="btn ghost sm" id="mp-edit-copy-token">复制 Token</button>
-            </div>
-          </div>
-          </div>
-          <!-- Telegram 桥接模式配置 -->
-          <div id="mp-telegram-section" style="display:none">
-          <div style="margin-bottom:12px">
-            <label>Telegram Bot Token</label>
-            <input id="mp-edit-tg-bot-token" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" type="password" style="width:100%" />
-            <div style="color:var(--muted);font-size:12px;margin-top:4px">在 Telegram 里找 @BotFather 创建机器人，获取 Token</div>
-          </div>
-          <div style="margin-bottom:12px">
-            <label>Telegram Chat ID（MP 的 Telegram 聊天 ID）</label>
-            <input id="mp-edit-tg-chat-id" placeholder="例如：123456789" style="width:100%" />
-            <div style="color:var(--muted);font-size:12px;margin-top:4px">在 MP 的 Telegram 渠道配置里查看 Chat ID，或找 @userinfobot 获取</div>
-          </div>
-          <div style="margin-bottom:12px">
-            <button class="btn ghost sm" id="mp-edit-tg-test">测试 Telegram 连接</button>
-            <span id="mp-edit-tg-test-result" style="margin-left:8px;font-size:12px"></span>
-          </div>
-          <div style="margin-bottom:12px;padding:12px;background:var(--bg-alt);border-radius:8px">
-            <label style="display:flex;align-items:center;gap:8px">
-              <input type="checkbox" id="mp-edit-tg-proxy-enabled" />
-              <span>启用代理（只有 Telegram 模块走代理，其他模块不走）</span>
-            </label>
-          </div>
-          <div id="mp-edit-tg-proxy-section" style="display:none">
-            <div style="margin-bottom:12px">
-              <label>代理类型</label>
-              <select id="mp-edit-tg-proxy-type" style="width:100%">
-                <option value="http">HTTP / HTTPS</option>
-                <option value="socks5">SOCKS5</option>
-              </select>
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:12px">
-              <div style="flex:1">
-                <label>代理地址</label>
-                <input id="mp-edit-tg-proxy-host" placeholder="192.168.1.100" style="width:100%" />
-              </div>
-              <div style="width:120px">
-                <label>代理端口</label>
-                <input id="mp-edit-tg-proxy-port" type="number" placeholder="7890" style="width:100%" />
-              </div>
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:12px">
-              <div style="flex:1">
-                <label>代理用户名（可选）</label>
-                <input id="mp-edit-tg-proxy-username" placeholder="留空表示无需认证" style="width:100%" />
-              </div>
-              <div style="flex:1">
-                <label>代理密码（可选）</label>
-                <input id="mp-edit-tg-proxy-password" type="password" placeholder="留空表示无需认证" style="width:100%" />
-              </div>
-            </div>
-          </div>
-          </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn ghost" id="mp-edit-cancel">取消</button>
-            <button class="btn" id="mp-edit-save">保存</button>
-          </div>
-        </div>
       </div>`;
 
-    let editingUserId = null;
-    let editingToken = "";
-
     const box = document.getElementById("mp-list");
-    const modal = document.getElementById("mp-edit-modal");
 
     const load = async () => {
       try {
@@ -1592,20 +1536,13 @@
         if (!channels.length) {
           box.innerHTML = `<div class="empty">暂无通道，点击下方按钮为用户创建。</div>`;
         } else {
-          box.innerHTML = `<table><thead><tr><th>用户</th><th>模式</th><th>配置状态</th><th>状态</th><th></th></tr></thead><tbody>
+          box.innerHTML = `<table><thead><tr><th>用户</th><th>Token</th><th>状态</th><th></th></tr></thead><tbody>
             ${channels.map(c => {
-              const publicUrl = (c.public_base_url || "").trim();
-              const webhookUrl = publicUrl ? publicUrl.replace(/\/$/, "") + "/api/webhook/moviepilot/" + c.username : "（未设置公网地址）";
-              const mode = c.channel_mode || "direct";
-              const configured = mode === "telegram" ? (c.telegram_bot_token && c.telegram_chat_id) : (c.public_base_url && c.mp_api_key && c.callback_url);
-              const modeBadge = mode === "telegram" ? '<span class="badge" style="background:#e3f2fd;color:#1565c0">Telegram</span>' : '<span class="badge" style="background:#f3e5f5;color:#7b1fa2">直接</span>';
               return `<tr>
                 <td><b>${esc(c.display_name || c.username)}</b><div style="color:var(--muted);font-size:12px">@${esc(c.username)}</div></td>
-                <td>${modeBadge}</td>
-                <td><span class="badge ${configured ? "admin" : "member"}">${configured ? "已配置" : "未配置"}</span></td>
+                <td><code style="font-size:11px;word-break:break-all">${esc(c.token.substring(0, 12))}...</code> <button class="btn ghost sm" data-copy-token="${c.user_id}" data-token="${esc(c.token)}">复制</button></td>
                 <td><span class="badge ${c.enabled ? "admin" : "member"}">${c.enabled ? "启用" : "禁用"}</span></td>
                 <td style="text-align:right;white-space:nowrap">
-                  <button class="btn sm" data-edit="${c.user_id}">设置</button>
                   <button class="btn ghost sm" data-toggle="${c.user_id}" data-enabled="${c.enabled ? 1 : 0}">${c.enabled ? "禁用" : "启用"}</button>
                   <button class="btn sm" data-reset="${c.user_id}">重置Token</button>
                   <button class="btn danger sm" data-del="${c.user_id}">删除</button>
@@ -1653,109 +1590,13 @@
             toast("已创建", "ok"); load();
           } catch (e) { toast(e.message, "err"); }
         });
-        box.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => openEditModal(b.dataset.edit, channels));
+        box.querySelectorAll("[data-copy-token]").forEach(b => b.onclick = () => {
+          const token = b.dataset.token;
+          if (navigator.clipboard) navigator.clipboard.writeText(token).then(() => toast("Token 已复制", "ok")).catch(() => {});
+        });
       } catch (e) {
         box.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
       }
-    };
-
-    const openEditModal = async (userId, channels) => {
-      editingUserId = parseInt(userId);
-      const channel = channels.find(c => c.user_id === editingUserId);
-      if (!channel) return;
-      editingToken = channel.token;
-      document.getElementById("mp-edit-title").textContent = "设置 " + (channel.display_name || channel.username) + " 的 MP 通道";
-      const mode = channel.channel_mode || "direct";
-      document.getElementById("mp-edit-channel-mode").value = mode;
-      document.getElementById("mp-direct-section").style.display = mode === "direct" ? "block" : "none";
-      document.getElementById("mp-telegram-section").style.display = mode === "telegram" ? "block" : "none";
-      document.getElementById("mp-edit-public-url").value = channel.public_base_url || "";
-      document.getElementById("mp-edit-api-key").value = channel.mp_api_key || "";
-      document.getElementById("mp-edit-callback-url").value = channel.callback_url || "";
-      document.getElementById("mp-edit-tg-bot-token").value = channel.telegram_bot_token || "";
-      document.getElementById("mp-edit-tg-chat-id").value = channel.telegram_chat_id || "";
-      document.getElementById("mp-edit-tg-proxy-enabled").checked = channel.telegram_proxy_enabled ? true : false;
-      document.getElementById("mp-edit-tg-proxy-section").style.display = channel.telegram_proxy_enabled ? "block" : "none";
-      document.getElementById("mp-edit-tg-proxy-type").value = channel.telegram_proxy_type || "http";
-      document.getElementById("mp-edit-tg-proxy-host").value = channel.telegram_proxy_host || "";
-      document.getElementById("mp-edit-tg-proxy-port").value = channel.telegram_proxy_port || "";
-      document.getElementById("mp-edit-tg-proxy-username").value = channel.telegram_proxy_username || "";
-      document.getElementById("mp-edit-tg-proxy-password").value = channel.telegram_proxy_password || "";
-      document.getElementById("mp-edit-tg-test-result").textContent = "";
-      updateWebhookPreview();
-      modal.style.display = "flex";
-    };
-
-    const updateWebhookPreview = () => {
-      const publicUrl = document.getElementById("mp-edit-public-url").value.trim();
-      const username = document.getElementById("mp-edit-title").textContent.replace("设置 ", "").replace(" 的 MP 通道", "");
-      const webhook = publicUrl ? publicUrl.replace(/\/$/, "") + "/api/webhook/moviepilot/" + username : "（填写公网地址后自动生成）";
-      document.getElementById("mp-edit-webhook").textContent = webhook;
-    };
-
-    document.getElementById("mp-edit-channel-mode").onchange = function() {
-      const mode = this.value;
-      document.getElementById("mp-direct-section").style.display = mode === "direct" ? "block" : "none";
-      document.getElementById("mp-telegram-section").style.display = mode === "telegram" ? "block" : "none";
-    };
-    document.getElementById("mp-edit-tg-proxy-enabled").onchange = function() {
-      document.getElementById("mp-edit-tg-proxy-section").style.display = this.checked ? "block" : "none";
-    };
-    document.getElementById("mp-edit-tg-test").onclick = async function() {
-      const resultEl = document.getElementById("mp-edit-tg-test-result");
-      resultEl.textContent = "测试中...";
-      resultEl.style.color = "var(--muted)";
-      try {
-        const r = await api("/api/admin/moviepilot/channels/" + editingUserId + "/test-telegram", { method: "POST" });
-        if (r.ok) {
-          resultEl.textContent = "连接成功！机器人：" + (r.bot ? r.bot.first_name + " (@" + r.bot.username + ")" : "");
-          resultEl.style.color = "#4caf50";
-        } else {
-          resultEl.textContent = "连接失败：" + (r.error || "未知错误");
-          resultEl.style.color = "#f44336";
-        }
-      } catch (e) {
-        resultEl.textContent = "测试失败：" + e.message;
-        resultEl.style.color = "#f44336";
-      }
-    };
-    document.getElementById("mp-edit-public-url").oninput = updateWebhookPreview;
-    document.getElementById("mp-edit-copy-webhook").onclick = () => {
-      const text = document.getElementById("mp-edit-webhook").textContent;
-      if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast("Webhook 地址已复制", "ok")).catch(() => {});
-    };
-    document.getElementById("mp-edit-copy-token").onclick = () => {
-      if (navigator.clipboard) navigator.clipboard.writeText(editingToken).then(() => toast("Token 已复制", "ok")).catch(() => {});
-    };
-    document.getElementById("mp-edit-cancel").onclick = () => { modal.style.display = "none"; };
-    document.getElementById("mp-edit-save").onclick = async () => {
-      try {
-        const mode = document.getElementById("mp-edit-channel-mode").value;
-        const body = {
-          channel_mode: mode,
-        };
-        if (mode === "direct") {
-          body.public_base_url = document.getElementById("mp-edit-public-url").value.trim();
-          body.mp_api_key = document.getElementById("mp-edit-api-key").value.trim();
-          body.callback_url = document.getElementById("mp-edit-callback-url").value.trim();
-        } else {
-          body.telegram_bot_token = document.getElementById("mp-edit-tg-bot-token").value.trim();
-          body.telegram_chat_id = document.getElementById("mp-edit-tg-chat-id").value.trim();
-          body.telegram_proxy_enabled = document.getElementById("mp-edit-tg-proxy-enabled").checked;
-          body.telegram_proxy_type = document.getElementById("mp-edit-tg-proxy-type").value;
-          body.telegram_proxy_host = document.getElementById("mp-edit-tg-proxy-host").value.trim();
-          body.telegram_proxy_port = parseInt(document.getElementById("mp-edit-tg-proxy-port").value) || 0;
-          body.telegram_proxy_username = document.getElementById("mp-edit-tg-proxy-username").value.trim();
-          body.telegram_proxy_password = document.getElementById("mp-edit-tg-proxy-password").value.trim();
-        }
-        await api("/api/admin/moviepilot/channels/" + editingUserId, {
-          method: "PUT",
-          body: body
-        });
-        toast("已保存", "ok");
-        modal.style.display = "none";
-        load();
-      } catch (e) { toast(e.message, "err"); }
     };
 
     load();
