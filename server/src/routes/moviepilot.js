@@ -1,11 +1,59 @@
 const express = require("express");
 const { authMiddleware } = require("../middleware/auth");
-const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic } = require("../moviepilot");
+const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic, getOrCreateChannel, verifyToken, appendMoviepilotMessage } = require("../moviepilot");
 
 const router = express.Router();
 
+// MP 消息接收端点（MP 通知渠道调用此接口发送消息到 EchoLink）
+// 不需要登录，通过 token 鉴权
+router.post("/receive", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+  const username = channel.username;
+
+  // 兼容两种格式：MP 插件发送 {card: {...}}，旧格式直接平铺
+  const card = (body.card && typeof body.card === "object") ? body.card : body;
+  const cardData = {
+    title: card.title || body.title || "MoviePilot",
+    text: card.text || body.text || "",
+    poster: card.poster || body.poster || "",
+    details: Array.isArray(card.details) ? card.details : (Array.isArray(body.details) ? body.details : []),
+    buttons: Array.isArray(card.buttons) ? card.buttons : (Array.isArray(body.buttons) ? body.buttons : []),
+  };
+  const text = card.text || body.text || body.content || "";
+
+  try {
+    const r = appendMoviepilotMessage(username, cardData, text);
+    if (r.error) {
+      return res.status(400).json({ error: r.error });
+    }
+    return res.status(200).json({ ok: true, delivered: r.delivered, message_id: r.message?.id });
+  } catch (e) {
+    console.error("[moviepilot] receive error:", e);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
 // 所有接口需要登录
 router.use(authMiddleware);
+
+// 查询当前用户的 MP 通道状态（用于前端判断是否显示常驻 MP 入口）
+router.get("/status", (req, res) => {
+  try {
+    const channel = getOrCreateChannel(req.userId);
+    res.json({
+      enabled: channel.enabled === 1,
+      hasChannel: true,
+      topic: "moviepilot_" + req.username,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // 按钮点击回调：用户在 EchoLink 点击 MP 卡片上的按钮，转发给 MP 插件
 router.post("/callback", async (req, res) => {
