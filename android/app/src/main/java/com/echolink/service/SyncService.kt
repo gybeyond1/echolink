@@ -58,6 +58,13 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
 
     private var notificationIdCounter = SYNCED_NOTIFICATION_START_ID
 
+    // 话题消息去重：记录最近处理过的消息 ID，避免 WebSocket 重连/重复推送导致双通知
+    private val processedTopicMsgIds = object : LinkedHashMap<Long, Boolean>(100, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Boolean>?): Boolean {
+            return size > 200
+        }
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -301,6 +308,16 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         // 过滤本机自己发布的消息（服务器已排除，这里双保险）
         val fromDeviceId = data.optLong("device_id", -1)
         if (fromDeviceId == AuthManager.deviceId) return
+
+        // 消息去重：同一条消息 ID 只处理一次，避免 WebSocket 重连/重复推送导致双通知
+        val msgId = data.optLong("id", 0)
+        if (msgId > 0) {
+            if (processedTopicMsgIds.containsKey(msgId)) {
+                com.echolink.util.DebugLogger.d("handleTopicMessage", "重复消息跳过 id=$msgId")
+                return
+            }
+            processedTopicMsgIds[msgId] = true
+        }
 
         val title = data.optString("title", "")
         val text = data.optString("text", "")
