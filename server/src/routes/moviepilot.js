@@ -25,6 +25,16 @@ router.post("/callback", async (req, res) => {
   }
 });
 
+// 确保 MP 话题存在（用户从好友页点击 MP 入口时调用，避免删除会话后找不到入口）
+router.get("/ensure", (req, res) => {
+  try {
+    const topic = ensureUserMoviepilotTopic(req.userId, req.username);
+    res.json({ ok: true, topic: { name: topic.name, title: topic.title, kind: topic.kind } });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 用户在 MP 话题发文字消息，转发给 MP 插件当作远程命令
 router.post("/send", async (req, res) => {
   const { text } = req.body || {};
