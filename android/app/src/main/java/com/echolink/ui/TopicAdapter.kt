@@ -186,6 +186,22 @@ class TopicAdapter(
         notifyItemRemoved(pos)
     }
 
+    /** 本地更新一条消息（MP 编辑消息后同步更新，如交互菜单点击后更新按钮状态） */
+    fun updateMessage(id: Long, newText: String, cardDataStr: String?) {
+        val pos = items.indexOfFirst { it.id == id }
+        if (pos < 0) return
+        val oldMsg = items[pos]
+        // 解析 card_data
+        val newCardData = if (cardDataStr != null) {
+            try { org.json.JSONObject(cardDataStr) } catch (_: Exception) { oldMsg.cardData }
+        } else {
+            // 如果没有传 card_data，保留原 card_data，只更新 text
+            oldMsg.cardData
+        }
+        items[pos] = oldMsg.copy(text = newText, cardData = newCardData)
+        notifyItemChanged(pos)
+    }
+
     fun getSelectedIds(): List<Long> = selected.filter { it > 0 }
     val selectedCount: Int get() = selected.size
 
