@@ -1,293 +1,394 @@
-/**
- * 管理员路由
- */
-
 const express = require("express");
+const bcrypt = require("bcryptjs");
+const { getDB, getSettings, setSettings } = require("../db");
+const { authMiddleware, requireAdmin } = require("../middleware/auth");
+const { getAllChannels, getOrCreateChannel, deleteChannel, toggleChannel, updateChannel } = require("../moviepilot");
+
 const router = express.Router();
-const crypto = require("crypto");
 
-const { getDB, getUserIdByUsername } = require("../db");
-const moviepilot = require("../moviepilot");
-const telegramBridge = require("../telegram_bridge");
+// 所有管理接口都需要管理员权限
+router.use(authMiddleware);
+router.use(requireAdmin);
 
-// 中间件：验证管理员权限
-router.use((req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "未授权" });
-  }
-  const token = authHeader.substring(7);
+// 概览统计
+router.get("/stats", (req, res) => {
   const db = getDB();
-  // 这里简化处理，实际应该验证 token
-  const user = db.prepare("SELECT * FROM users WHERE role = 'admin' LIMIT 1").get();
-  if (!user) {
-    return res.status(403).json({ error: "需要管理员权限" });
-  }
-  req.adminUser = user;
-  next();
+  const count = (sql) => db.prepare(sql).get().c;
+  res.json({
+    users: count("SELECT COUNT(*) c FROM users"),
+    admins: count("SELECT COUNT(*) c FROM users WHERE role='admin'"),
+    topics: count("SELECT COUNT(*) c FROM topics"),
+    messages: count("SELECT COUNT(*) c FROM topic_messages"),
+    notifications: count("SELECT COUNT(*) c FROM notifications"),
+    devices: count("SELECT COUNT(*) c FROM devices"),
+  });
 });
 
-// 获取所有用户
+// 服务器设置（文件/图片/语音大小上限等）
+router.get("/settings", (req, res) => {
+  res.json({ settings: getSettings() });
+});
+
+router.put("/settings", (req, res) => {
+  const patch = req.body && req.body.settings ? req.body.settings : req.body;
+  try {
+    const updated = setSettings(patch);
+    res.json({ message: "Settings updated", settings: updated });
+  } catch (e) {
+    res.status(400).json({ error: "更新失败: " + e.message });
+  }
+});
+
+// 用户列表（含各用户的数据量统计）
 router.get("/users", (req, res) => {
   const db = getDB();
-  const users = db.prepare(`
-    SELECT u.id, u.username, u.display_name, u.role, u.created_at,
-      (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id) as notification_count,
-      (SELECT COUNT(*) FROM topic_members tm WHERE tm.user_id = u.id) as topic_count,
-      (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id) as device_count
-    FROM users u ORDER BY u.created_at DESC
-  `).all();
+  const users = db
+    .prepare(
+      `SELECT u.id, u.username, u.role, u.created_at,
+              (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id) as notification_count,
+              (SELECT COUNT(*) FROM topic_members tm WHERE tm.user_id = u.id) as topic_count,
+              (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id) as device_count
+       FROM users u ORDER BY u.created_at DESC`
+    )
+    .all();
   res.json({ users });
 });
 
-// 创建用户
+// 新建用户（可指定角色）
 router.post("/users", (req, res) => {
   const { username, password, role } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: "用户名和密码不能为空" });
-  }
+  if (!username || !password) return res.status(400).json({ error: "username and password required" });
+  if (username.length < 3 || username.length > 32) return res.status(400).json({ error: "Username must be 3-32 chars" });
+  if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 chars" });
+  const r = role === "admin" ? "admin" : "user";
   const db = getDB();
-  const existing = db.prepare("SELECT id FROM users WHERE username = ?").get(username);
-  if (existing) {
-    return res.status(409).json({ error: "用户名已存在" });
+  if (db.prepare("SELECT id FROM users WHERE username = ?").get(username)) {
+    return res.status(409).json({ error: "Username already exists" });
   }
-  const passwordHash = crypto.createHash("sha256").update(password).digest("hex");
-  const result = db.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run(
-    username, passwordHash, role || "user"
-  );
-  res.json({ id: result.lastInsertRowid, username, role: role || "user" });
+  const hash = bcrypt.hashSync(password, 10);
+  const info = db.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run(username, hash, r);
+  res.status(201).json({ message: "User created", user: { id: info.lastInsertRowid, username, role: r } });
 });
 
-// 删除用户
+// 删除用户（不能删自己）。
+// 开启 foreign_keys 后数据库会级联清理其 devices/topic_members/owned topics 等；
+// 这里显式清理设备会话与该用户作为 owner 的群聊消息，避免 topic_messages 等无主残留。
 router.delete("/users/:id", (req, res) => {
-  const { id } = req.params;
   const db = getDB();
+  const id = parseInt(req.params.id);
+  if (id === req.userId) return res.status(400).json({ error: "Cannot delete yourself" });
+  const user = db.prepare("SELECT id, username FROM users WHERE id = ?").get(id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  // 联动删除留言板对应用户（异步，不阻塞删除）
+  try {
+    const { getSettings } = require("../db");
+    const settings = getSettings();
+    const mwSyncUrl = settings.messagewall_sync_url || '';
+    if (mwSyncUrl && user.username) {
+      fetch(mwSyncUrl.replace(/\/$/, '') + '/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.username })
+      }).catch(e => console.error("[admin] delete messagewall user failed:", e.message));
+    }
+  } catch (e) { console.error("[admin] delete messagewall user error:", e.message); }
+
+  // 1. 清理默认设备会话 u{id}-devices
+  const deviceTopic = `u${id}-devices`;
+  db.prepare(
+    "DELETE FROM topic_message_deletes WHERE message_id IN (SELECT id FROM topic_messages WHERE topic = ?)"
+  ).run(deviceTopic);
+  db.prepare("DELETE FROM topic_messages WHERE topic = ?").run(deviceTopic);
+  db.prepare("DELETE FROM topic_members WHERE topic_id IN (SELECT id FROM topics WHERE name = ?)").run(deviceTopic);
+  db.prepare("DELETE FROM topics WHERE name = ?").run(deviceTopic);
+
+  // 2. 清理该用户作为 owner 的普通群聊（否则 topic_messages 会因 topic 被级联删除而残留）
+  const owned = db.prepare("SELECT name FROM topics WHERE owner_id = ?").all(id);
+  for (const t of owned) {
+    db.prepare(
+      "DELETE FROM topic_message_deletes WHERE message_id IN (SELECT id FROM topic_messages WHERE topic = ?)"
+    ).run(t.name);
+    db.prepare("DELETE FROM topic_messages WHERE topic = ?").run(t.name);
+    db.prepare("DELETE FROM topic_join_requests WHERE topic_id IN (SELECT id FROM topics WHERE name = ?)").run(t.name);
+    db.prepare("DELETE FROM topic_members WHERE topic_id IN (SELECT id FROM topics WHERE name = ?)").run(t.name);
+    db.prepare("DELETE FROM topics WHERE name = ?").run(t.name);
+  }
+
+  // 3. 删除用户本身（外键级联处理其余关联）
   db.prepare("DELETE FROM users WHERE id = ?").run(id);
-  res.json({ ok: true });
+  res.json({ message: "User deleted" });
 });
 
-// 获取所有话题
+// 某用户的设备
+router.get("/users/:id/devices", (req, res) => {
+  const db = getDB();
+  const devices = db.prepare("SELECT * FROM devices WHERE user_id = ? ORDER BY last_seen DESC").all(parseInt(req.params.id));
+  res.json({ devices });
+});
+
+// 所有话题（含拥有者）
 router.get("/topics", (req, res) => {
   const db = getDB();
-  const topics = db.prepare(`
-    SELECT t.*, u.username as owner_name,
-      (SELECT COUNT(*) FROM topic_members tm WHERE tm.topic_id = t.id) as member_count,
-      (SELECT COUNT(*) FROM messages m WHERE m.topic_id = t.id) as message_count
-    FROM topics t LEFT JOIN users u ON t.owner_id = u.id ORDER BY t.created_at DESC
-  `).all();
+  const topics = db
+    .prepare(
+      `SELECT t.id, t.name, t.title, t.description, t.owner_id, u.username as owner_name, t.created_at,
+              (SELECT COUNT(*) FROM topic_members tm WHERE tm.topic_id = t.id) as member_count,
+              (SELECT COUNT(*) FROM topic_messages tm2 WHERE tm2.topic = t.name) as message_count
+       FROM topics t LEFT JOIN users u ON t.owner_id = u.id
+       ORDER BY t.created_at DESC LIMIT 200`
+    )
+    .all();
   res.json({ topics });
 });
 
-// 删除话题
-router.delete("/topics/:name", (req, res) => {
-  const { name } = req.params;
+// 话题消息（管理员可见全部）
+router.get("/topics/:topic/messages", (req, res) => {
   const db = getDB();
-  db.prepare("DELETE FROM topics WHERE name = ?").run(name);
-  res.json({ ok: true });
+  const name = req.params.topic;
+  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+  const messages = db.prepare("SELECT * FROM topic_messages WHERE topic = ? ORDER BY id DESC LIMIT ?").all(name, limit).reverse();
+  res.json({ topic: name, messages });
 });
 
-// 获取话题消息
-router.get("/topics/:name/messages", (req, res) => {
-  const { name } = req.params;
-  const limit = parseInt(req.query.limit) || 100;
+// 删除某话题（管理员）
+router.delete("/topics/:topic", (req, res) => {
   const db = getDB();
-  const topic = db.prepare("SELECT * FROM topics WHERE name = ?").get(name);
-  if (!topic) {
-    return res.status(404).json({ error: "话题不存在" });
-  }
-  const messages = db.prepare(
-    "SELECT * FROM messages WHERE topic_id = ? ORDER BY id DESC LIMIT ?"
-  ).all(topic.id, limit);
-  res.json({ messages: messages.reverse() });
+  const name = req.params.topic;
+  const topic = db.prepare("SELECT id FROM topics WHERE name = ?").get(name);
+  if (!topic) return res.status(404).json({ error: "Topic not found" });
+  db.prepare("DELETE FROM topic_messages WHERE topic = ?").run(name);
+  db.prepare("DELETE FROM topics WHERE id = ?").run(topic.id);
+  res.json({ message: "Topic deleted by admin" });
 });
 
-// 获取所有通知
+// 所有通知（可按 ?userId= 过滤）
 router.get("/notifications", (req, res) => {
   const db = getDB();
-  let query = `
-    SELECT n.*, u.username 
-    FROM notifications n 
-    LEFT JOIN users u ON n.user_id = u.id
-  `;
-  const params = [];
-  if (req.query.userId) {
-    query += " WHERE n.user_id = ?";
-    params.push(req.query.userId);
+  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+  const userId = req.query.userId ? parseInt(req.query.userId) : null;
+  let rows;
+  if (userId) {
+    rows = db
+      .prepare(`SELECT n.*, u.username, d.device_name FROM notifications n
+                LEFT JOIN users u ON n.user_id = u.id LEFT JOIN devices d ON n.device_id = d.id
+                WHERE n.user_id = ? ORDER BY n.timestamp DESC LIMIT ?`)
+      .all(userId, limit);
+  } else {
+    rows = db
+      .prepare(`SELECT n.*, u.username, d.device_name FROM notifications n
+                LEFT JOIN users u ON n.user_id = u.id LEFT JOIN devices d ON n.device_id = d.id
+                ORDER BY n.timestamp DESC LIMIT ?`)
+      .all(limit);
   }
-  query += " ORDER BY n.timestamp DESC LIMIT ?";
-  params.push(parseInt(req.query.limit) || 200);
-  const notifications = db.prepare(query).all(...params);
-  res.json({ notifications });
+  res.json({ notifications: rows });
 });
 
-// 删除通知
+// 删除某条通知（管理员）
 router.delete("/notifications/:id", (req, res) => {
-  const { id } = req.params;
   const db = getDB();
-  db.prepare("DELETE FROM notifications WHERE id = ?").run(id);
-  res.json({ ok: true });
+  const result = db.prepare("DELETE FROM notifications WHERE id = ?").run(parseInt(req.params.id));
+  if (result.changes === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ message: "Notification deleted" });
 });
 
-// 获取服务器设置
-router.get("/settings", (req, res) => {
-  const db = getDB();
-  const settings = db.prepare("SELECT * FROM settings WHERE id = 1").get();
-  res.json({ settings });
+// 留言板 Webhook 配置（已废弃）：留言板现在按 webhook 地址中的用户名自动路由到对应用户，
+// 无需管理员手动配置接收账号。保留接口仅为向后兼容，返回空列表。
+// 留言板配置：获取所有用户 + 开启了留言功能的用户列表
+router.get("/messagewall", async (req, res) => {
+  try {
+    const { getMessagewallEnabledUsers } = require("../messagewall");
+    const db = require("../db").getDB();
+    const users = db.prepare("SELECT id, username, display_name, role FROM users ORDER BY id ASC").all();
+    const enabled = getMessagewallEnabledUsers();
+    const baseRow = db.prepare("SELECT value FROM settings WHERE key = 'messagewall_webhook_base'").get();
+    const webhookBase = baseRow ? baseRow.value : "";
+    res.json({ users, enabledUsers: enabled, webhookBase });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// 更新服务器设置
-router.put("/settings", (req, res) => {
-  const { settings } = req.body;
-  const db = getDB();
-  const allowedFields = [
-    "max_image_size", "max_voice_size", "max_file_size",
-    "max_topic_history", "messagewall_sync_url"
-  ];
-  const sets = [];
-  const values = [];
-  for (const field of allowedFields) {
-    if (settings[field] !== undefined) {
-      sets.push(`${field} = ?`);
-      values.push(settings[field]);
+// 留言板配置：保存开启了留言功能的用户列表
+router.put("/messagewall", async (req, res) => {
+  try {
+    const { setMessagewallEnabledUsers } = require("../messagewall");
+    const { enabledUsers, webhookBase } = req.body || {};
+    if (enabledUsers !== undefined && !Array.isArray(enabledUsers)) return res.status(400).json({ error: "enabledUsers must be array" });
+    if (enabledUsers !== undefined) setMessagewallEnabledUsers(enabledUsers);
+    if (webhookBase !== undefined) {
+      const val = (webhookBase || "").trim().replace(/\/+$/, "");
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('messagewall_webhook_base', ?)").run(val);
     }
+    const baseRow = db.prepare("SELECT value FROM settings WHERE key = 'messagewall_webhook_base'").get();
+    res.json({ ok: true, enabledUsers: getMessagewallEnabledUsers(), webhookBase: baseRow ? baseRow.value : "" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
-  if (sets.length > 0) {
-    db.prepare(`UPDATE settings SET ${sets.join(", ")} WHERE id = 1`).run(...values);
-  }
-  const updated = db.prepare("SELECT * FROM settings WHERE id = 1").get();
-  res.json({ settings: updated });
 });
 
-// ============================================
-// MoviePilot 通道管理
-// ============================================
+router.put("/messagewall", (req, res) => {
+  res.json({ ok: true, targets: [], deprecated: true, note: "留言板已改为按 webhook 地址 /:username 自动路由，无需配置接收账号" });
+});
 
-// 获取所有 MP 通道
+
+// ========== TOTP 两步验证（注册时需要输入动态码） ==========
+const totp = require("../totp");
+
+// 获取当前 TOTP 配置
+router.get("/totp", (req, res) => {
+  const settings = getSettings();
+  const enabled = settings.totp_enabled === true || settings.totp_enabled === "true";
+  const secret = settings.totp_secret || "";
+  res.json({
+    enabled,
+    secret,
+    otpauth_url: secret ? totp.otpauthUrl(secret, "EchoLink", "admin") : "",
+  });
+});
+
+// 生成新的 TOTP 密钥（未启用，需验证后启用）
+router.post("/totp/generate", (req, res) => {
+  const secret = totp.generateSecret();
+  res.json({
+    secret,
+    otpauth_url: totp.otpauthUrl(secret, "EchoLink", "admin"),
+  });
+});
+
+// 启用 TOTP（需要输入当前6位码验证）
+router.post("/totp/enable", (req, res) => {
+  const { secret, code } = req.body || {};
+  if (!secret || !code) return res.status(400).json({ error: "secret and code required" });
+  if (!totp.verifyTOTP(secret, code)) {
+    return res.status(400).json({ error: "验证码错误，请检查 OTP 应用时间是否同步" });
+  }
+  setSettings({ totp_secret: secret, totp_enabled: true });
+  res.json({ ok: true, message: "TOTP 两步验证已启用" });
+});
+
+// 禁用 TOTP
+router.post("/totp/disable", (req, res) => {
+  setSettings({ totp_enabled: false });
+  res.json({ ok: true, message: "TOTP 两步验证已禁用" });
+});
+
+// ===== MoviePilot 通道管理 =====
+
+// 获取所有用户的 MP 通道
 router.get("/moviepilot/channels", (req, res) => {
-  const channels = moviepilot.getAllChannels();
-  res.json({ channels });
+  try {
+    const channels = getAllChannels();
+    res.json({ channels });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// 创建用户的 MP 通道
+// 为用户创建/重置 MP 通道（生成新 token）
 router.post("/moviepilot/channels/:userId", (req, res) => {
-  const { userId } = req.params;
-  try {
-    const channel = moviepilot.createChannel(parseInt(userId));
-    res.json({ ok: true, channel });
-  } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
-  }
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  const db = getDB();
+  const user = db.prepare("SELECT id, username FROM users WHERE id = ?").get(userId);
+  if (!user) return res.status(404).json({ error: "用户不存在" });
+  // 先删旧的再创建新的（重置 token）
+  deleteChannel(userId);
+  const channel = getOrCreateChannel(userId);
+  res.json({ ok: true, channel: { ...channel, username: user.username } });
 });
 
-// 更新用户的 MP 通道配置
-router.put("/moviepilot/channels/:userId", (req, res) => {
-  const { userId } = req.params;
-  try {
-    const channel = moviepilot.updateChannel(parseInt(userId), req.body);
-    res.json({ ok: true, channel });
-  } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
-  }
-});
-
-// 切换通道启用/禁用
-router.put("/moviepilot/channels/:userId/toggle", (req, res) => {
-  const { userId } = req.params;
-  const { enabled } = req.body;
-  try {
-    const channel = moviepilot.updateChannel(parseInt(userId), { enabled: enabled ? 1 : 0 });
-    res.json({ ok: true, channel });
-  } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
-  }
-});
-
-// 重置 Token
-router.post("/moviepilot/channels/:userId/reset-token", (req, res) => {
-  const { userId } = req.params;
-  try {
-    const channel = moviepilot.resetToken(parseInt(userId));
-    res.json({ ok: true, channel });
-  } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
-  }
-});
-
-// 删除通道
+// 删除用户的 MP 通道
 router.delete("/moviepilot/channels/:userId", (req, res) => {
-  const { userId } = req.params;
-  try {
-    moviepilot.deleteChannel(parseInt(userId));
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
-  }
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  deleteChannel(userId);
+  res.json({ ok: true, message: "通道已删除" });
 });
 
-// 测试 Telegram 连接
+// 切换通道启用状态
+router.put("/moviepilot/channels/:userId/toggle", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  const { enabled } = req.body || {};
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  toggleChannel(userId, enabled ? 1 : 0);
+  res.json({ ok: true, enabled: enabled ? 1 : 0 });
+});
+
+// 更新通道配置（callback_url、public_base_url、mp_api_key、telegram 配置等）
+router.put("/moviepilot/channels/:userId", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  const body = req.body || {};
+  const updates = {};
+
+  // 直接模式配置
+  if (body.callback_url !== undefined) updates.callback_url = body.callback_url;
+  if (body.public_base_url !== undefined) updates.public_base_url = body.public_base_url;
+  if (body.mp_api_key !== undefined) updates.mp_api_key = body.mp_api_key;
+  if (body.enabled !== undefined) updates.enabled = body.enabled ? 1 : 0;
+
+  // 通道模式：direct（直接模式）或 telegram（Telegram 桥接模式）
+  if (body.channel_mode !== undefined) updates.channel_mode = body.channel_mode;
+
+  // Telegram 桥接模式配置
+  if (body.telegram_bot_token !== undefined) updates.telegram_bot_token = body.telegram_bot_token;
+  if (body.telegram_chat_id !== undefined) updates.telegram_chat_id = body.telegram_chat_id;
+  if (body.telegram_proxy_enabled !== undefined) updates.telegram_proxy_enabled = body.telegram_proxy_enabled ? 1 : 0;
+  if (body.telegram_proxy_type !== undefined) updates.telegram_proxy_type = body.telegram_proxy_type;
+  if (body.telegram_proxy_host !== undefined) updates.telegram_proxy_host = body.telegram_proxy_host;
+  if (body.telegram_proxy_port !== undefined) updates.telegram_proxy_port = parseInt(body.telegram_proxy_port) || 0;
+  if (body.telegram_proxy_username !== undefined) updates.telegram_proxy_username = body.telegram_proxy_username;
+  if (body.telegram_proxy_password !== undefined) updates.telegram_proxy_password = body.telegram_proxy_password;
+
+  const channel = updateChannel(userId, updates);
+  const db = getDB();
+  const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId);
+
+  // 如果切换到 Telegram 模式，启动长轮询监控
+  if (body.channel_mode === "telegram" && channel.telegram_bot_token && channel.telegram_chat_id) {
+    try {
+      const { startPolling, stopPolling } = require("../telegram_bridge");
+      stopPolling(userId); // 先停止旧的
+      startPolling(userId, user.username, channel).catch((e) => {
+        console.error(`[Admin] 启动用户 ${user.username} 的 Telegram 监控失败:`, e.message);
+      });
+    } catch (e) {
+      console.error("[Admin] 启动 Telegram 监控异常:", e.message);
+    }
+  }
+  // 如果切换到直接模式或禁用，停止 Telegram 监控
+  if (body.channel_mode === "direct" || (body.enabled !== undefined && !body.enabled)) {
+    try {
+      require("../telegram_bridge").stopPolling(userId);
+    } catch (e) { /* ignore */ }
+  }
+
+  res.json({ ok: true, channel: { ...channel, username: user ? user.username : null } });
+});
+
+// 测试 Telegram 连接（可选）
 router.post("/moviepilot/channels/:userId/test-telegram", async (req, res) => {
-  const { userId } = req.params;
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  const db = getDB();
+  const channel = db.prepare("SELECT * FROM moviepilot_channels WHERE user_id = ?").get(userId);
+  if (!channel) return res.status(404).json({ error: "通道不存在" });
+  if (channel.channel_mode !== "telegram") return res.status(400).json({ error: "当前不是 Telegram 模式" });
+  if (!channel.telegram_bot_token) return res.status(400).json({ error: "未配置 Telegram Bot Token" });
+
   try {
-    const db = getDB();
-    const channel = db.prepare("SELECT * FROM moviepilot_channels WHERE user_id = ?").get(parseInt(userId));
-    if (!channel) {
-      return res.status(404).json({ ok: false, error: "通道不存在" });
-    }
-    if (!channel.telegram_bot_token) {
-      return res.json({ ok: false, error: "未配置 Telegram Bot Token" });
-    }
-    const result = await telegramBridge.telegramRequest(channel, "getMe", {});
+    const { telegramRequest } = require("../telegram_bridge");
+    // 获取机器人信息来测试连接
+    const result = await telegramRequest(channel, "getMe");
     if (result.ok) {
-      res.json({ ok: true, bot: result.result });
+      res.json({ ok: true, bot: result.result, message: "Telegram 连接成功" });
     } else {
-      res.json({ ok: false, error: result.description || result.error || "连接失败" });
+      res.status(400).json({ ok: false, error: result.description || "Telegram 连接失败" });
     }
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
-});
-
-// ============================================
-// 留言板 WebHook 配置（已废弃，保留兼容）
-// ============================================
-
-// 获取留言板配置（已废弃，返回提示）
-router.get("/messagewall", (req, res) => {
-  const db = getDB();
-  const users = db.prepare("SELECT id, username, display_name, role FROM users ORDER BY created_at DESC").all();
-  const enabledUsers = db.prepare(`
-    SELECT u.username 
-    FROM messagewall_targets mwt 
-    JOIN users u ON mwt.user_id = u.id 
-    WHERE mwt.enabled = 1
-  `).all().map(u => u.username);
-  const settings = db.prepare("SELECT * FROM settings WHERE id = 1").get();
-  res.json({
-    deprecated: true,
-    message: "留言板 WebHook 配置已迁移到留言板用户管理",
-    users,
-    enabledUsers,
-    webhookBase: settings?.messagewall_sync_url || "",
-  });
-});
-
-// 更新留言板配置（已废弃，返回提示）
-router.put("/messagewall", (req, res) => {
-  res.json({
-    deprecated: true,
-    message: "留言板 WebHook 配置已迁移到留言板用户管理",
-  });
-});
-
-// 获取统计信息
-router.get("/stats", (req, res) => {
-  const db = getDB();
-  const users = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
-  const devices = db.prepare("SELECT COUNT(*) as count FROM devices").get().count;
-  const topics = db.prepare("SELECT COUNT(*) as count FROM topics").get().count;
-  const messages = db.prepare("SELECT COUNT(*) as count FROM messages").get().count;
-  const notifications = db.prepare("SELECT COUNT(*) as count FROM notifications").get().count;
-  res.json({ users, devices, topics, messages, notifications });
 });
 
 module.exports = router;
