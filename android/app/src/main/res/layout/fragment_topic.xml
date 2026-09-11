@@ -455,16 +455,16 @@
                 android:src="@drawable/ic_attachment"
                 android:contentDescription="附件" />
 
-            <Button
+            <ImageButton
                 android:id="@+id/btnSend"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_gravity="center_vertical"
                 android:layout_marginStart="4dp"
-                android:backgroundTint="@color/brand_primary"
-                android:text="发送"
-                android:textColor="?attr/colorOnPrimary"
-                android:textSize="14sp"
+                android:background="@drawable/bg_send_button"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_send_plane"
+                android:contentDescription="发送"
                 android:visibility="gone" />
         </LinearLayout>
 
