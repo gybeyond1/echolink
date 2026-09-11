@@ -315,80 +315,20 @@ router.put("/moviepilot/channels/:userId/toggle", (req, res) => {
   res.json({ ok: true, enabled: enabled ? 1 : 0 });
 });
 
-// 更新通道配置（callback_url、public_base_url、mp_api_key、telegram 配置等）
+// 更新通道配置（只保留 enabled）
 router.put("/moviepilot/channels/:userId", (req, res) => {
   const userId = parseInt(req.params.userId);
   if (!userId) return res.status(400).json({ error: "invalid user id" });
   const body = req.body || {};
   const updates = {};
 
-  // 直接模式配置
-  if (body.callback_url !== undefined) updates.callback_url = body.callback_url;
-  if (body.public_base_url !== undefined) updates.public_base_url = body.public_base_url;
-  if (body.mp_api_key !== undefined) updates.mp_api_key = body.mp_api_key;
   if (body.enabled !== undefined) updates.enabled = body.enabled ? 1 : 0;
-
-  // 通道模式：direct（直接模式）或 telegram（Telegram 桥接模式）
-  if (body.channel_mode !== undefined) updates.channel_mode = body.channel_mode;
-
-  // Telegram 桥接模式配置
-  if (body.telegram_bot_token !== undefined) updates.telegram_bot_token = body.telegram_bot_token;
-  if (body.telegram_chat_id !== undefined) updates.telegram_chat_id = body.telegram_chat_id;
-  if (body.telegram_proxy_enabled !== undefined) updates.telegram_proxy_enabled = body.telegram_proxy_enabled ? 1 : 0;
-  if (body.telegram_proxy_type !== undefined) updates.telegram_proxy_type = body.telegram_proxy_type;
-  if (body.telegram_proxy_host !== undefined) updates.telegram_proxy_host = body.telegram_proxy_host;
-  if (body.telegram_proxy_port !== undefined) updates.telegram_proxy_port = parseInt(body.telegram_proxy_port) || 0;
-  if (body.telegram_proxy_username !== undefined) updates.telegram_proxy_username = body.telegram_proxy_username;
-  if (body.telegram_proxy_password !== undefined) updates.telegram_proxy_password = body.telegram_proxy_password;
 
   const channel = updateChannel(userId, updates);
   const db = getDB();
   const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId);
 
-  // 如果切换到 Telegram 模式，启动长轮询监控
-  if (body.channel_mode === "telegram" && channel.telegram_bot_token && channel.telegram_chat_id) {
-    try {
-      const { startPolling, stopPolling } = require("../telegram_bridge");
-      stopPolling(userId); // 先停止旧的
-      startPolling(userId, user.username, channel).catch((e) => {
-        console.error(`[Admin] 启动用户 ${user.username} 的 Telegram 监控失败:`, e.message);
-      });
-    } catch (e) {
-      console.error("[Admin] 启动 Telegram 监控异常:", e.message);
-    }
-  }
-  // 如果切换到直接模式或禁用，停止 Telegram 监控
-  if (body.channel_mode === "direct" || (body.enabled !== undefined && !body.enabled)) {
-    try {
-      require("../telegram_bridge").stopPolling(userId);
-    } catch (e) { /* ignore */ }
-  }
-
   res.json({ ok: true, channel: { ...channel, username: user ? user.username : null } });
-});
-
-// 测试 Telegram 连接（可选）
-router.post("/moviepilot/channels/:userId/test-telegram", async (req, res) => {
-  const userId = parseInt(req.params.userId);
-  if (!userId) return res.status(400).json({ error: "invalid user id" });
-  const db = getDB();
-  const channel = db.prepare("SELECT * FROM moviepilot_channels WHERE user_id = ?").get(userId);
-  if (!channel) return res.status(404).json({ error: "通道不存在" });
-  if (channel.channel_mode !== "telegram") return res.status(400).json({ error: "当前不是 Telegram 模式" });
-  if (!channel.telegram_bot_token) return res.status(400).json({ error: "未配置 Telegram Bot Token" });
-
-  try {
-    const { telegramRequest } = require("../telegram_bridge");
-    // 获取机器人信息来测试连接
-    const result = await telegramRequest(channel, "getMe");
-    if (result.ok) {
-      res.json({ ok: true, bot: result.result, message: "Telegram 连接成功" });
-    } else {
-      res.status(400).json({ ok: false, error: result.description || "Telegram 连接失败" });
-    }
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
 });
 
 module.exports = router;
