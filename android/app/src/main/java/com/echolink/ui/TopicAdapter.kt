@@ -191,13 +191,8 @@ class TopicAdapter(
         val pos = items.indexOfFirst { it.id == id }
         if (pos < 0) return
         val oldMsg = items[pos]
-        // 解析 card_data
-        val newCardData = if (cardDataStr != null) {
-            try { org.json.JSONObject(cardDataStr) } catch (_: Exception) { oldMsg.cardData }
-        } else {
-            // 如果没有传 card_data，保留原 card_data，只更新 text
-            oldMsg.cardData
-        }
+        // cardData 是 String? 类型，如果传了新的 card_data 就用新的，否则保留原有的
+        val newCardData = cardDataStr ?: oldMsg.cardData
         items[pos] = oldMsg.copy(text = newText, cardData = newCardData)
         notifyItemChanged(pos)
     }
@@ -1013,9 +1008,10 @@ class TopicAdapter(
                             // 点击反馈：按钮变灰
                             isEnabled = false
                             alpha = 0.4f
-                            com.echolink.util.DebugLogger.d("MPButtons", "clicked text='$btnText' callback='$callbackData' msgId=${holder.item.id}")
+                            val msgId = holder.item?.id ?: 0L
+                            com.echolink.util.DebugLogger.d("MPButtons", "clicked text='$btnText' callback='$callbackData' msgId=$msgId")
                             // 回调给 Fragment：只转发 callback 给 MP，不发送文字消息（Telegram 风格）
-                            onMpButtonClick?.invoke(btnText, callbackData, holder.item.id)
+                            onMpButtonClick?.invoke(btnText, callbackData, msgId)
                         }
                     }
                     val btnLp = android.widget.LinearLayout.LayoutParams(
