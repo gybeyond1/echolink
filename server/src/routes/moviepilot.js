@@ -1,6 +1,6 @@
 const express = require("express");
 const { authMiddleware } = require("../middleware/auth");
-const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic, getOrCreateChannel, verifyToken, appendMoviepilotMessage } = require("../moviepilot");
+const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic, getOrCreateChannel, verifyToken, appendMoviepilotMessage, getUpdates } = require("../moviepilot");
 
 const router = express.Router();
 
@@ -35,6 +35,29 @@ router.post("/receive", (req, res) => {
   } catch (e) {
     console.error("[moviepilot] receive error:", e);
     return res.status(500).json({ error: "internal error" });
+  }
+});
+
+// 长轮询获取消息端点（MP 通知渠道调用此接口拉取用户消息）
+// 不需要登录，通过 token 鉴权
+// 类似 Telegram getUpdates：有消息立即返回，没消息挂起 timeout 秒后返回空
+router.get("/updates/:username", async (req, res) => {
+  const { username } = req.params;
+  const token = req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel || channel.username !== username) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+  const offset = parseInt(req.query.offset) || 0;
+  const limit = parseInt(req.query.limit) || 100;
+  const timeout = Math.min(parseInt(req.query.timeout) || 30, 60);
+
+  try {
+    const updates = await getUpdates(username, offset, limit, timeout);
+    res.json({ ok: true, updates });
+  } catch (e) {
+    console.error("[moviepilot] getUpdates error:", e);
+    res.status(500).json({ error: "internal error" });
   }
 });
 
