@@ -624,10 +624,10 @@ class TopicAdapter(
         holder.bubbleInner.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
 
         if (isMine) {
-            // Telegram 风：蓝色气泡 + 白色正文 + 浅蓝时间
+            // 新拟态风格：浅绿气泡 + 深色正文 + 绿色时间
             holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
-            holder.tvTitle.setTextColor(ctx.getColor(R.color.white))
-            holder.tvText.setTextColor(ctx.getColor(R.color.white))
+            holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))
+            holder.tvText.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvSender.setTextColor(ctx.getColor(R.color.bubble_own_time))
             holder.tvTime.setTextColor(ctx.getColor(R.color.bubble_own_time))
         } else {
