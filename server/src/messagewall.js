@@ -134,14 +134,11 @@ function appendMessagewallMessage(title, text, description, imageDataUri, voiceD
     peer_avatar: null,
   };
 
-  // 推送给目标用户的所有在线设备
-  const { broadcastToUser, publishToTopic } = require("./websocket");
+  // 推送给目标用户的所有在线设备（只用 broadcastToUser，避免和 publishToTopic 重复导致双通知）
+  const { broadcastToUser } = require("./websocket");
   try {
     broadcastToUser(userId, { type: "topic_message", topic: topicName, data: message });
   } catch (_) { /* WS 不可用忽略 */ }
-  try {
-    publishToTopic(topicName, message, {});
-  } catch (_) { /* 忽略 */ }
 
   // 清理旧消息
   const maxHistory = parseInt(process.env.MAX_TOPIC_HISTORY || "200");
