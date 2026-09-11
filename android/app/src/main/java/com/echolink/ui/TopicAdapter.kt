@@ -46,7 +46,7 @@ class TopicAdapter(
     private val onImageClick: ((TopicMessage) -> Unit)? = null,
     private val onVideoClick: ((TopicMessage) -> Unit)? = null,
     private val onAvatarClick: ((TopicMessage) -> Unit)? = null,
-    private val onMpButtonClick: ((String, String) -> Unit)? = null
+    private val onMpButtonClick: ((String, String, Long) -> Unit)? = null
 ) : RecyclerView.Adapter<TopicAdapter.ViewHolder>() {
 
     private val items = mutableListOf<TopicMessage>()
@@ -1013,9 +1013,9 @@ class TopicAdapter(
                             // 点击反馈：按钮变灰
                             isEnabled = false
                             alpha = 0.4f
-                            com.echolink.util.DebugLogger.d("MPButtons", "clicked text='$btnText' callback='$callbackData'")
-                            // 回调给 Fragment：走正常发消息流程 + 转发 callback 给 MP
-                            onMpButtonClick?.invoke(btnText, callbackData)
+                            com.echolink.util.DebugLogger.d("MPButtons", "clicked text='$btnText' callback='$callbackData' msgId=${holder.item.id}")
+                            // 回调给 Fragment：只转发 callback 给 MP，不发送文字消息（Telegram 风格）
+                            onMpButtonClick?.invoke(btnText, callbackData, holder.item.id)
                         }
                     }
                     val btnLp = android.widget.LinearLayout.LayoutParams(
