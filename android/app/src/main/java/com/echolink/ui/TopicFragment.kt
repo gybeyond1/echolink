@@ -178,6 +178,18 @@ class TopicFragment : Fragment() {
                         if (mid > 0) chatAdapter.removeMessage(mid)
                     }
                 }
+                "com.echolink.MESSAGE_EDITED" -> {
+                    // MP 编辑了某条消息（如更新交互菜单状态）→ 局部更新消息
+                    val t = intent?.getStringExtra("topic") ?: return
+                    if (t == currentTopic) {
+                        val mid = intent.getLongExtra("message_id", -1)
+                        val newText = intent.getStringExtra("text") ?: ""
+                        val cardDataStr = intent.getStringExtra("card_data")
+                        if (mid > 0) {
+                            chatAdapter.updateMessage(mid, newText, cardDataStr)
+                        }
+                    }
+                }
                 else -> {
                     val topic = intent?.getStringExtra("topic") ?: return
                     com.echolink.util.DebugLogger.d("topicReceiver", "收到广播 action=${intent?.action} topic=$topic currentTopic=$currentTopic chatLayoutVisible=${binding.chatLayout.visibility}")
