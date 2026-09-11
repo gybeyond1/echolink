@@ -1539,7 +1539,7 @@
           box.innerHTML = `<table><thead><tr><th>用户</th><th>Token</th><th>状态</th><th></th></tr></thead><tbody>
             ${channels.map(c => {
               return `<tr>
-                <td><b>${esc(c.display_name || c.username)}</b><div style="color:var(--muted);font-size:12px">@${esc(c.username)}</div></td>
+                <td><b>${esc(c.display_name || c.username)}</b><div style="color:var(--muted);font-size:12px">@${esc(c.username)} · ID: ${c.user_id}</div></td>
                 <td><code style="font-size:11px;word-break:break-all">${esc(c.token.substring(0, 12))}...</code> <button class="btn ghost sm" data-copy-token="${c.user_id}" data-token="${esc(c.token)}">复制</button></td>
                 <td><span class="badge ${c.enabled ? "admin" : "member"}">${c.enabled ? "启用" : "禁用"}</span></td>
                 <td style="text-align:right;white-space:nowrap">
@@ -1559,7 +1559,7 @@
           box.innerHTML += `<div style="margin-top:12px">
             <label>为以下用户创建通道：</label>
             <div class="chips">
-              ${noChannelUsers.map(u => `<button class="btn sm" data-create="${u.id}">+ ${esc(u.display_name || u.username)}</button>`).join(" ")}
+              ${noChannelUsers.map(u => `<button class="btn sm" data-create="${u.id}">+ ${esc(u.display_name || u.username)} (ID: ${u.id})</button>`).join(" ")}
             </div>
           </div>`;
         }
