@@ -350,7 +350,9 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
         com.echolink.util.DebugLogger.d("handleTopicMessage", "收到话题消息 topic=$topicName sender=$sender id=${data.optLong("id",0)} text=${text.take(30)}")
 
         // 通知标题统一用 EchoLink，不带话题名/发送者，简洁美观
-        showLocalNotification("EchoLink", text, topicName)
+        //  trim 掉消息前面的空行，避免通知只显示空行（MP 消息常带前置换行）
+        val notificationText = text.trimStart('\n', '\r', ' ', '\t')
+        showLocalNotification("EchoLink", notificationText, topicName)
 
         // 广播给 UI（话题页刷新），含媒体字段（图片/语音/文件实时渲染）
         val broadcastIntent = Intent("com.echolink.TOPIC_MESSAGE_RECEIVED").apply {
