@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 品牌色：对齐 WebUI 新拟态（蓝 #4a8fe7） -->
     <color name="brand_primary">#4a8fe7</color>
@@ -23,6 +23,7 @@
     <color name="bubble_other">#FFFFFF</color>
     <color name="bubble_own">#EFFDDE</color>
     <color name="bubble_own_time">#6BAD6E</color>
+    <color name="bubble_other_time">#8B94A3</color>
     <color name="on_surface">#3A4150</color>
     <color name="on_surface_variant">#8B94A3</color>
     <!-- 壁纸背景上的文字（浅色基底下用深字，保证可读） -->
@@ -52,4 +53,3 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>
-
