@@ -1,29 +1,22 @@
 {
   "name": "echolink-server",
   "version": "1.0.0",
-  "description": "EchoLink - 跨设备消息互联 · 通知同步 · 好友",
+  "description": "EchoLink — cross-device messaging & notification hub",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node --watch src/index.js"
   },
-  "keywords": [
-    "echolink",
-    "notification",
-    "sync",
-    "messaging"
-  ],
-  "author": "gybeyond",
-  "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^11.3.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.7.0",
     "cors": "^2.8.5",
-    "express": "^4.21.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
     "https-proxy-agent": "^7.0.6",
-    "socks-proxy-agent": "^8.0.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.7"
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0",
+    "socks-proxy-agent": "^8.0.5",
+    "ws": "^8.18.0"
   }
 }
