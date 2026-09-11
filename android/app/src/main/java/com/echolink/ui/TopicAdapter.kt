@@ -596,8 +596,8 @@ class TopicAdapter(
         val ctx = holder.itemView.context
         val dp = ctx.resources.displayMetrics.density
 
-        // 气泡宽度自适应内容，上限屏宽 60%，长文本自动换行
-        val maxW = (ctx.resources.displayMetrics.widthPixels * 0.60f).toInt()
+        // Telegram 风格：气泡宽度自适应内容，上限屏宽 75%，长文本自动换行
+        val maxW = (ctx.resources.displayMetrics.widthPixels * 0.75f).toInt()
         holder.tvTitle.maxWidth = maxW
         holder.tvText.maxWidth = maxW
         // bubbleInner 显式设置 layout_gravity，确保紧贴左/右边缘
@@ -624,19 +624,19 @@ class TopicAdapter(
         holder.bubbleInner.elevation = 1.5f * dp  // 悬浮感（shape 背景自动生成圆角阴影轮廓）
 
         if (isMine) {
-            // Telegram 风：绿色气泡 + 深色正文 + 淡绿时间
+            // Telegram 风：蓝色气泡 + 白色正文 + 浅蓝时间
             holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_own)
-            holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))
-            holder.tvText.setTextColor(ctx.getColor(R.color.on_surface))
-            holder.tvSender.setTextColor(ctx.getColor(R.color.on_surface_variant))
+            holder.tvTitle.setTextColor(ctx.getColor(R.color.white))
+            holder.tvText.setTextColor(ctx.getColor(R.color.white))
+            holder.tvSender.setTextColor(ctx.getColor(R.color.bubble_own_time))
             holder.tvTime.setTextColor(ctx.getColor(R.color.bubble_own_time))
         } else {
-            // 对方气泡：同色浅绿 + 左下尾角（仅翻转气泡方向，内容不变）
+            // 对方气泡：白色气泡 + 深色正文 + 灰色时间，左下尾角
             holder.bubbleInner.setBackgroundResource(R.drawable.bg_msg_other)
             holder.tvTitle.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvText.setTextColor(ctx.getColor(R.color.on_surface))
             holder.tvSender.setTextColor(ctx.getColor(R.color.on_surface_variant))
-            holder.tvTime.setTextColor(ctx.getColor(R.color.bubble_own_time))
+            holder.tvTime.setTextColor(ctx.getColor(R.color.bubble_other_time))
         }
     }
 
