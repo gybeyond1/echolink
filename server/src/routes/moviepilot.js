@@ -1,6 +1,6 @@
 const express = require("express");
 const { authMiddleware } = require("../middleware/auth");
-const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic, getOrCreateChannel, verifyToken, appendMoviepilotMessage, getUpdates } = require("../moviepilot");
+const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic, getOrCreateChannel, verifyToken, appendMoviepilotMessage, editMoviepilotMessage, deleteMoviepilotMessage, answerCallbackQuery, getUpdates } = require("../moviepilot");
 
 const router = express.Router();
 
@@ -34,6 +34,87 @@ router.post("/receive", (req, res) => {
     return res.status(200).json({ ok: true, delivered: r.delivered, message_id: r.message?.id });
   } catch (e) {
     console.error("[moviepilot] receive error:", e);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+// 编辑消息端点（MP 通知渠道调用此接口编辑已发送的消息，如更新交互菜单状态）
+// 不需要登录，通过 token 鉴权
+router.post("/edit_message", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+
+  const messageId = parseInt(body.message_id) || 0;
+  const text = body.text || "";
+  const buttons = Array.isArray(body.buttons) ? body.buttons : [];
+  const details = Array.isArray(body.details) ? body.details : [];
+
+  if (!messageId) {
+    return res.status(400).json({ error: "message_id 是必填的" });
+  }
+
+  try {
+    const r = editMoviepilotMessage(messageId, text, buttons, details);
+    if (r.error) {
+      return res.status(400).json({ error: r.error });
+    }
+    return res.status(200).json({ ok: true, message_id: messageId });
+  } catch (e) {
+    console.error("[moviepilot] edit_message error:", e);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+// 删除消息端点（MP 通知渠道调用此接口删除已发送的消息）
+// 不需要登录，通过 token 鉴权
+router.post("/delete_message", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+
+  const messageId = parseInt(body.message_id) || 0;
+  if (!messageId) {
+    return res.status(400).json({ error: "message_id 是必填的" });
+  }
+
+  try {
+    const r = deleteMoviepilotMessage(messageId);
+    if (r.error) {
+      return res.status(400).json({ error: r.error });
+    }
+    return res.status(200).json({ ok: true, message_id: messageId });
+  } catch (e) {
+    console.error("[moviepilot] delete_message error:", e);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+// 回答按钮回调端点（MP 通知渠道调用此接口给用户一个反馈提示）
+// 不需要登录，通过 token 鉴权
+router.post("/answer_callback", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+
+  const callbackQueryId = body.callback_query_id || "";
+  const text = body.text || "";
+  const showAlert = !!body.show_alert;
+
+  try {
+    const r = answerCallbackQuery(callbackQueryId, text, showAlert);
+    return res.status(200).json({ ok: true, ...r });
+  } catch (e) {
+    console.error("[moviepilot] answer_callback error:", e);
     return res.status(500).json({ error: "internal error" });
   }
 });
