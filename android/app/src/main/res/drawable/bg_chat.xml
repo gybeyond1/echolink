@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 聊天区背景：Telegram Day 底色 + 六边形蛛网纹理 -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape>
-            <solid android:color="@color/chat_bg" />
-        </shape>
-    </item>
-    <item>
-        <bitmap
-            android:src="@drawable/bg_chat_pattern"
-            android:tileMode="repeat" />
-    </item>
-</layer-list>
+<!-- Telegram 风格聊天背景：浅蓝色渐变 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:startColor="#E6EBEE"
+        android:endColor="#D4DCE3"
+        android:angle="270" />
+</shape>
