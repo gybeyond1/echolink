@@ -14,6 +14,26 @@ let mpUpdateIdCounter = 0;
 // 长轮询等待者：username -> [resolve函数]
 const mpPollWaiters = new Map();
 
+// MP 消息去重缓存：防止 MP 端重复发送导致数据库里有重复消息
+// key = username + "|" + text，value = timestamp
+const mpDedupCache = new Map();
+const MP_DEDUP_WINDOW = 10000; // 10秒内相同内容的消息视为重复
+
+function isMPDuplicate(username, text) {
+  const key = username + "|" + (text || "");
+  const now = Date.now();
+  // 清理过期缓存
+  for (const [k, v] of mpDedupCache) {
+    if (now - v > MP_DEDUP_WINDOW) mpDedupCache.delete(k);
+  }
+  if (mpDedupCache.has(key)) {
+    console.log("[moviepilot] 重复消息跳过:", username, text?.slice(0, 50));
+    return true;
+  }
+  mpDedupCache.set(key, now);
+  return false;
+}
+
 // 添加消息到队列（用户发的消息、按钮回调都走这里，等 MP 长轮询拉取）
 function enqueueMPMessage(username, message) {
   if (!mpMessageQueues.has(username)) {
@@ -21,10 +41,19 @@ function enqueueMPMessage(username, message) {
   }
   const queue = mpMessageQueues.get(username);
   mpUpdateIdCounter++;
-  const update = {
-    update_id: mpUpdateIdCounter,
-    message: message,
-  };
+  // 如果 message 里有 callback_query，把它提到顶层（Telegram 格式：callback_query 与 message 同级）
+  let update;
+  if (message && message.callback_query) {
+    update = {
+      update_id: mpUpdateIdCounter,
+      callback_query: message.callback_query,
+    };
+  } else {
+    update = {
+      update_id: mpUpdateIdCounter,
+      message: message,
+    };
+  }
   queue.push(update);
   // 限制队列长度，最多保留 200 条
   if (queue.length > 200) {
@@ -169,11 +198,17 @@ function appendMoviepilotMessage(username, cardData, text) {
     return { delivered: 0, message: null, error: "用户不存在: " + mpUser };
   }
 
+  const msgText = String(text || cardData?.text || "").slice(0, 2000);
+
+  // 消息去重：10秒内相同用户+相同内容的消息视为重复，防止 MP 端重复发送
+  if (isMPDuplicate(mpUser, msgText)) {
+    return { delivered: 0, message: null, duplicate: true };
+  }
+
   const topic = ensureUserMoviepilotTopic(userId, mpUser);
   const topicName = topic.name;
   const ts = Date.now();
   const cardJson = cardData ? JSON.stringify(cardData) : null;
-  const msgText = String(text || cardData?.text || "").slice(0, 2000);
 
   const result = db
     .prepare(
