@@ -118,14 +118,16 @@ function handleMoviepilot(req, res, username) {
     return res.status(403).json({ error: "token 与用户不匹配" });
   }
 
+  // 兼容两种格式：MP 插件发送 {card: {...}}，旧格式直接平铺
+  const card = (body.card && typeof body.card === "object") ? body.card : body;
   const cardData = {
-    title: body.title || "MoviePilot",
-    text: body.text || "",
-    poster: body.poster || "",
-    details: Array.isArray(body.details) ? body.details : [],
-    buttons: Array.isArray(body.buttons) ? body.buttons : [],
+    title: card.title || body.title || "MoviePilot",
+    text: card.text || body.text || "",
+    poster: card.poster || body.poster || "",
+    details: Array.isArray(card.details) ? card.details : (Array.isArray(body.details) ? body.details : []),
+    buttons: Array.isArray(card.buttons) ? card.buttons : (Array.isArray(body.buttons) ? body.buttons : []),
   };
-  const text = body.text || body.content || "";
+  const text = card.text || body.text || body.content || "";
 
   try {
     const r = appendMoviepilotMessage(username, cardData, text);
