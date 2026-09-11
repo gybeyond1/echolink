@@ -142,13 +142,6 @@ const HOST = "0.0.0.0";
   // 迁移旧的 messagewall 话题
   try { require("./messagewall").migrateLegacyMessagewallTopic(); } catch (e) { console.error("messagewall migrate failed:", e.message); }
 
-  // 启动 Telegram 桥接监控（所有 Telegram 模式用户的长轮询）
-  try {
-    require("./telegram_bridge").startAllPolling();
-  } catch (e) {
-    console.error("[TelegramBridge] start polling failed:", e.message);
-  }
-
 server.listen(PORT, HOST, () => {
   console.log(`\n========================================`);
   console.log(`  EchoLink Server`);
