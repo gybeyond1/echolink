@@ -1,120 +1,87 @@
-/**
- * WebHook 路由
- * 
- * 支持：
- * 1. 留言板 WebHook（/messagewall 和 /messagewall/:username）- 保留
- * 2. MoviePilot WebHook 已移除，改为 Telegram 桥接模式
- */
-
 const express = require("express");
+const { appendMessagewallMessage, DEFAULT_WALL_USER, getMessagewallEnabledUsers } = require("../messagewall");
+
 const router = express.Router();
 
-const { getDB, getUserIdByUsername } = require("../db");
-const messagewall = require("../messagewall");
+// ===== MessageWall（留言板 WebHook，保留不动）=====
 
-const DEFAULT_WALL_USER = "gybeyond";
-
-/**
- * 留言板 WebHook - 默认地址（推送给所有开启了留言功能的用户）
- */
-router.post("/messagewall", (req, res) => {
-  try {
-    const { source, sourceName, sourceDesc, title, content, image, voice } = req.body || {};
-    const db = getDB();
-
-    // 获取所有开启了留言功能的用户
-    const targets = db.prepare(`
-      SELECT mwt.user_id, u.username 
-      FROM messagewall_targets mwt 
-      JOIN users u ON mwt.user_id = u.id 
-      WHERE mwt.enabled = 1
-    `).all();
-
-    if (targets.length === 0) {
-      return res.json({ ok: true, delivered: 0, message: "没有开启留言功能的用户" });
-    }
-
-    let delivered = 0;
-    for (const target of targets) {
-      try {
-        messagewall.appendMessagewallMessage(
-          sourceName || "留言板",
-          title || "匿名访客",
-          content || "",
-          sourceDesc || "",
-          image || null,
-          voice || null,
-          target.username
-        );
-        delivered++;
-      } catch (e) {
-        console.error(`推送给用户 ${target.username} 失败:`, e.message);
-      }
-    }
-
-    res.json({ ok: true, delivered: delivered });
-  } catch (e) {
-    console.error("留言板 WebHook 错误:", e);
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
-
-/**
- * 留言板 WebHook - 用户独立地址
- * 格式：/messagewall/:username
- */
-router.post("/messagewall/:username", (req, res) => {
-  try {
-    const { username } = req.params;
-    const { source, sourceName, sourceDesc, title, content, image, voice } = req.body || {};
-
-    const userId = getUserIdByUsername(username);
-    if (!userId) {
-      return res.status(404).json({ ok: false, error: "用户不存在" });
-    }
-
-    // 检查用户是否开启了留言功能
-    const db = getDB();
-    const target = db.prepare("SELECT * FROM messagewall_targets WHERE user_id = ? AND enabled = 1").get(userId);
-    if (!target) {
-      return res.status(403).json({ ok: false, error: "该用户未开启留言功能" });
-    }
-
-    messagewall.appendMessagewallMessage(
-      sourceName || "留言板",
-      title || "匿名访客",
-      content || "",
-      sourceDesc || "",
-      image || null,
-      voice || null,
-      username
-    );
-
-    res.json({ ok: true, delivered: 1 });
-  } catch (e) {
-    console.error("留言板用户 WebHook 错误:", e);
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
-
-/**
- * 留言板 WebHook - GET 方法（用于测试连接）
- */
+// 健康/说明：GET 用于确认端点可达
 router.get("/messagewall", (req, res) => {
   res.json({
     ok: true,
-    message: "留言板 WebHook 已就绪",
-    endpoints: [
-      "POST /api/webhook/messagewall - 推送给所有开启留言的用户",
-      "POST /api/webhook/messagewall/:username - 推送给指定用户",
-    ],
+    endpoint: "messagewall",
+    method: "POST",
+    defaultUser: DEFAULT_WALL_USER,
+    note: "POST /webhook/messagewall 或 /webhook/messagewall/:username，发送 JSON: { source: 'messagewall', title: '<名字>', content: '<正文>', image: '<可选base64>', voice: '<可选base64>' }",
   });
 });
 
-// ============================================
-// MoviePilot WebHook 已移除
-// 改为 Telegram 桥接模式，通过 Telegram Bot API 与 MP 通信
-// 相关代码请查看 telegram_bridge.js 和 moviepilot.js
-// ============================================
+// 留言板 Webhook 接收（指定用户名）→ 消息进入该用户的独立留言板话题
+router.post("/messagewall/:username", (req, res) => {
+  handleMessagewall(req, res, req.params.username);
+});
+
+// 留言板 Webhook 接收（兼容旧地址，不带用户名）→ 推送给所有开启了留言功能的用户
+router.post("/messagewall", (req, res) => {
+  const body = req.body || {};
+  if (body.source !== "messagewall") {
+    return res.status(400).json({ error: "unsupported source (expected 'messagewall')" });
+  }
+  const title = String(body.title || "").trim();
+  const content = String(body.content || "").trim();
+  const image = body.image ? String(body.image) : "";
+  const voice = body.voice ? String(body.voice) : "";
+  if (!title) return res.status(400).json({ error: "title is required" });
+  if (!content && !image && !voice) return res.status(400).json({ error: "content or image or voice is required" });
+  const sourceName = String(body.sourceName || "留言板");
+  const sourceDesc = String(body.sourceDesc || `来自「${sourceName}」的留言`);
+
+  const enabledUsers = getMessagewallEnabledUsers();
+  let delivered = 0;
+  const errors = [];
+  for (const username of enabledUsers) {
+    try {
+      const r = appendMessagewallMessage(title, content, sourceDesc, image || null, voice || null, username);
+      if (r.error) errors.push(username + ": " + r.error);
+      else delivered++;
+    } catch (e) {
+      errors.push(username + ": " + e.message);
+    }
+  }
+  return res.status(200).json({ ok: true, delivered, users: enabledUsers, errors: errors.length ? errors : undefined });
+});
+
+function handleMessagewall(req, res, username) {
+  const body = req.body || {};
+  if (body.source !== "messagewall") {
+    return res.status(400).json({ error: "unsupported source (expected 'messagewall')" });
+  }
+  const title = String(body.title || "").trim();
+  const content = String(body.content || "").trim();
+  const image = body.image ? String(body.image) : "";
+  const voice = body.voice ? String(body.voice) : "";
+  if (!title) {
+    return res.status(400).json({ error: "title is required" });
+  }
+  if (!content && !image && !voice) {
+    return res.status(400).json({ error: "title and (content or image or voice) are required" });
+  }
+  const sourceName = String(body.sourceName || "留言板");
+  const sourceDesc = String(body.sourceDesc || `来自「${sourceName}」的留言`);
+
+  try {
+    const r = appendMessagewallMessage(title, content, sourceDesc, image || null, voice || null, username);
+    if (r.error) {
+      return res.status(400).json({ error: r.error });
+    }
+    return res.status(200).json({ ok: true, delivered: r.delivered, user: username });
+  } catch (e) {
+    console.error("[webhook] messagewall error:", e);
+    return res.status(500).json({ error: "internal error" });
+  }
+}
+
+// 注意：MoviePilot 的 WebHook 已移除，改为 Telegram 桥接模式
+// MP 消息现在通过 Telegram Bot API 中转，不再直接通过 WebHook 推送
 
 module.exports = router;
