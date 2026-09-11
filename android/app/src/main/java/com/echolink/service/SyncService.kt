@@ -245,6 +245,26 @@ class SyncService : Service(), WebSocketClient.WsEventListener {
                     sendBroadcast(intent)
                 }
             }
+            // MP 编辑了某条消息（如更新交互菜单状态）→ 通知正在打开对应会话的页面局部更新
+            "message_edited" -> {
+                val t = topic ?: data?.optString("topic", "") ?: ""
+                val mid = data?.optLong("message_id", -1) ?: -1
+                if (t.isNotEmpty() && mid > 0) {
+                    val intent = Intent("com.echolink.MESSAGE_EDITED").apply {
+                        putExtra("topic", t)
+                        putExtra("message_id", mid)
+                        putExtra("text", data?.optString("text", "") ?: "")
+                        // 传递 buttons 和 details
+                        data?.optString("buttons")?.let { putExtra("buttons", it) }
+                        data?.optString("details")?.let { putExtra("details", it) }
+                        // card_data 可能是 JSONObject
+                        if (data?.has("card_data") == true) {
+                            putExtra("card_data", data.getJSONObject("card_data").toString())
+                        }
+                    }
+                    sendBroadcast(intent)
+                }
+            }
             "connected" -> {
                 connectionStatus = "已连接"
                 updateForegroundNotification("已连接 - 同步中")
