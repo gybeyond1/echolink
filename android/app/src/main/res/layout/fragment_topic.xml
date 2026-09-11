@@ -303,6 +303,7 @@
         android:layout_height="match_parent"
         android:layout_weight="1"
         android:orientation="vertical"
+        android:background="@drawable/bg_chat"
         android:visibility="gone">
 
         <!-- 消息区：列表与「空态」叠加，空态不会挤压底部输入栏 -->
