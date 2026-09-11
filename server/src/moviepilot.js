@@ -251,6 +251,100 @@ function appendMoviepilotMessage(username, cardData, text) {
   return { delivered: 1, message };
 }
 
+// 编辑 MP 消息（更新交互菜单状态等）
+function editMoviepilotMessage(messageId, text, buttons, details) {
+  const db = getDB();
+  // 查找消息
+  const msg = db.prepare("SELECT * FROM topic_messages WHERE id = ?").get(messageId);
+  if (!msg) {
+    return { error: "消息不存在: " + messageId };
+  }
+  // 只允许编辑 MP 发来的消息（sender_name = 'MoviePilot'）
+  if (msg.sender_name !== "MoviePilot") {
+    return { error: "只能编辑 MoviePilot 发来的消息" };
+  }
+
+  const newText = text || msg.text;
+  // 更新 card_data
+  let cardData = {};
+  try {
+    cardData = msg.card_data ? JSON.parse(msg.card_data) : {};
+  } catch (_) {
+    cardData = {};
+  }
+  if (buttons) cardData.buttons = buttons;
+  if (details) cardData.details = details;
+  const cardJson = JSON.stringify(cardData);
+
+  db.prepare(
+    "UPDATE topic_messages SET text = ?, card_data = ? WHERE id = ?"
+  ).run(newText, cardJson, messageId);
+
+  // 构造更新后的消息对象
+  const updatedMsg = {
+    ...msg,
+    text: newText,
+    card_data: cardData,
+  };
+
+  // 通过 WebSocket 推送消息编辑事件
+  const { broadcastToUser } = require("./websocket");
+  const userId = msg.user_id || 0;
+  // 从 topic 名中提取用户名（topic 格式：moviepilot_用户名）
+  const topicName = msg.topic;
+  try {
+    broadcastToUser(userId, {
+      type: "message_edited",
+      topic: topicName,
+      data: {
+        message_id: messageId,
+        text: newText,
+        card_data: cardData,
+        buttons: buttons || [],
+        details: details || [],
+      },
+    });
+  } catch (_) {}
+
+  return { ok: true, message_id: messageId };
+}
+
+// 删除 MP 消息
+function deleteMoviepilotMessage(messageId) {
+  const db = getDB();
+  const msg = db.prepare("SELECT * FROM topic_messages WHERE id = ?").get(messageId);
+  if (!msg) {
+    return { error: "消息不存在: " + messageId };
+  }
+  if (msg.sender_name !== "MoviePilot") {
+    return { error: "只能删除 MoviePilot 发来的消息" };
+  }
+
+  db.prepare("DELETE FROM topic_messages WHERE id = ?").run(messageId);
+
+  // 通过 WebSocket 推送消息删除事件
+  const { broadcastToUser } = require("./websocket");
+  const userId = msg.user_id || 0;
+  const topicName = msg.topic;
+  try {
+    broadcastToUser(userId, {
+      type: "message_deleted",
+      topic: topicName,
+      data: { message_id: messageId },
+    });
+  } catch (_) {}
+
+  return { ok: true, message_id: messageId };
+}
+
+// 回答按钮回调（给用户一个反馈提示）
+function answerCallbackQuery(callbackQueryId, text, showAlert) {
+  // 这个功能主要是给安卓端/WebUI 一个提示，通过 WebSocket 推送
+  // 由于 callback_query_id 是临时的，我们直接广播给所有设备
+  // 实际上安卓端在点击按钮后会立即显示加载状态，这里主要用于 show_alert 弹窗
+  return { ok: true, callback_query_id: callbackQueryId, text: text || "", show_alert: !!showAlert };
+}
+
 // 向 MP 发送 HTTP 请求（按钮回调或用户消息）
 // MP 地址和 API Key 从全局设置中读取（管理员在服务器设置中配置）
 function _postToMP(path, body) {
@@ -347,6 +441,9 @@ module.exports = {
   deleteChannel,
   toggleChannel,
   appendMoviepilotMessage,
+  editMoviepilotMessage,
+  deleteMoviepilotMessage,
+  answerCallbackQuery,
   callbackButton,
   sendUserMessageToMP,
   enqueueMPMessage,
