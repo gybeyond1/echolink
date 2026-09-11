@@ -44,32 +44,19 @@ function getOrCreateChannel(userId) {
   let channel = db.prepare("SELECT * FROM moviepilot_channels WHERE user_id = ?").get(userId);
   if (!channel) {
     const token = generateToken();
-    db.prepare("INSERT INTO moviepilot_channels (user_id, token, callback_url, enabled) VALUES (?, ?, '', 1)").run(userId, token);
+    db.prepare("INSERT INTO moviepilot_channels (user_id, token, enabled) VALUES (?, ?, 1)").run(userId, token);
     channel = db.prepare("SELECT * FROM moviepilot_channels WHERE user_id = ?").get(userId);
   }
   return channel;
 }
 
-// 更新用户的 MP 通道配置（callback_url、public_base_url、mp_api_key、telegram 配置等）
+// 更新用户的 MP 通道配置（只保留 token 和 enabled）
 function updateChannel(userId, updates) {
   const db = getDB();
   const fields = [];
   const values = [];
-  if (updates.callback_url !== undefined) { fields.push("callback_url = ?"); values.push(updates.callback_url); }
-  if (updates.public_base_url !== undefined) { fields.push("public_base_url = ?"); values.push(updates.public_base_url); }
-  if (updates.mp_api_key !== undefined) { fields.push("mp_api_key = ?"); values.push(updates.mp_api_key); }
   if (updates.enabled !== undefined) { fields.push("enabled = ?"); values.push(updates.enabled ? 1 : 0); }
   if (updates.token !== undefined) { fields.push("token = ?"); values.push(updates.token); }
-  // Telegram 桥接模式配置
-  if (updates.channel_mode !== undefined) { fields.push("channel_mode = ?"); values.push(updates.channel_mode); }
-  if (updates.telegram_bot_token !== undefined) { fields.push("telegram_bot_token = ?"); values.push(updates.telegram_bot_token); }
-  if (updates.telegram_chat_id !== undefined) { fields.push("telegram_chat_id = ?"); values.push(updates.telegram_chat_id); }
-  if (updates.telegram_proxy_enabled !== undefined) { fields.push("telegram_proxy_enabled = ?"); values.push(updates.telegram_proxy_enabled ? 1 : 0); }
-  if (updates.telegram_proxy_type !== undefined) { fields.push("telegram_proxy_type = ?"); values.push(updates.telegram_proxy_type); }
-  if (updates.telegram_proxy_host !== undefined) { fields.push("telegram_proxy_host = ?"); values.push(updates.telegram_proxy_host); }
-  if (updates.telegram_proxy_port !== undefined) { fields.push("telegram_proxy_port = ?"); values.push(updates.telegram_proxy_port); }
-  if (updates.telegram_proxy_username !== undefined) { fields.push("telegram_proxy_username = ?"); values.push(updates.telegram_proxy_username); }
-  if (updates.telegram_proxy_password !== undefined) { fields.push("telegram_proxy_password = ?"); values.push(updates.telegram_proxy_password); }
   if (fields.length === 0) return getOrCreateChannel(userId);
   values.push(userId);
   db.prepare(`UPDATE moviepilot_channels SET ${fields.join(", ")} WHERE user_id = ?`).run(...values);
@@ -91,7 +78,8 @@ function verifyToken(token) {
 function getAllChannels() {
   const db = getDB();
   const rows = db.prepare(`
-    SELECT c.*, u.username, u.display_name
+    SELECT c.id, c.user_id, c.token, c.enabled, c.created_at,
+           u.username, u.display_name
     FROM moviepilot_channels c
     JOIN users u ON u.id = c.user_id
     ORDER BY u.username
@@ -169,13 +157,17 @@ function appendMoviepilotMessage(username, cardData, text) {
   return { delivered: 1, message };
 }
 
-// 向 MP 插件发送 HTTP 请求（按钮回调或用户消息）
-function _postToMP(channel, path, body) {
-  const mpBase = (channel.callback_url || "").trim();
+// 向 MP 发送 HTTP 请求（按钮回调或用户消息）
+// MP 地址和 API Key 从全局设置中读取（管理员在服务器设置中配置）
+function _postToMP(path, body) {
+  const db = getDB();
+  const settings = getSetting ? getSetting() : {};
+  // 从全局设置中读取 MP 配置
+  const mpBase = (settings.moviepilot_callback_url || process.env.MP_CALLBACK_URL || "").trim();
   if (!mpBase) {
-    return { error: "未配置 MoviePilot 回调地址，请在用户的 MP 通道设置中填写" };
+    return { error: "未配置 MoviePilot 回调地址，请在服务器设置中填写 moviepilot_callback_url" };
   }
-  const mpApiKey = (channel.mp_api_key || "").trim();
+  const mpApiKey = (settings.moviepilot_api_key || process.env.MP_API_KEY || "").trim();
   let url;
   try {
     const base = mpBase.replace(/\/+$/, "");
@@ -217,20 +209,13 @@ function _postToMP(channel, path, body) {
   });
 }
 
-// 按钮点击回调，转发给 MP（根据通道模式选择直接模式或 Telegram 模式）
+// 按钮点击回调，转发给 MP
 async function callbackButton(username, callbackData, messageId) {
   const userId = getUserIdByUsername(username);
   if (!userId) return { error: "用户不存在: " + username };
-  const channel = getOrCreateChannel(userId);
 
-  // Telegram 桥接模式：通过 Telegram Bot API 发送回调数据
-  if (channel.channel_mode === "telegram") {
-    const { sendButtonCallbackViaTelegram } = require("./telegram_bridge");
-    return await sendButtonCallbackViaTelegram(userId, username, callbackData, messageId);
-  }
-
-  // 直接模式：通过 HTTP 直接发送给 MP 插件
-  return await _postToMP(channel, "/api/v1/plugin/echolink/callback", {
+  // 直接通过 HTTP 发送给 MP
+  return await _postToMP("/api/v1/plugin/echolink/callback", {
     username,
     callback_data: callbackData,
     message_id: messageId,
@@ -238,20 +223,13 @@ async function callbackButton(username, callbackData, messageId) {
   });
 }
 
-// 用户在 EchoLink 发文字给 MP（根据通道模式选择直接模式或 Telegram 模式）
+// 用户在 EchoLink 发文字给 MP
 async function sendUserMessageToMP(username, text) {
   const userId = getUserIdByUsername(username);
   if (!userId) return { error: "用户不存在: " + username };
-  const channel = getOrCreateChannel(userId);
 
-  // Telegram 桥接模式：通过 Telegram Bot API 发送消息
-  if (channel.channel_mode === "telegram") {
-    const { sendUserMessageViaTelegram } = require("./telegram_bridge");
-    return await sendUserMessageViaTelegram(userId, username, text);
-  }
-
-  // 直接模式：通过 HTTP 直接发送给 MP 插件
-  return await _postToMP(channel, "/api/v1/plugin/echolink/message", {
+  // 直接通过 HTTP 发送给 MP
+  return await _postToMP("/api/v1/plugin/echolink/message", {
     username,
     text,
     timestamp: Date.now(),
