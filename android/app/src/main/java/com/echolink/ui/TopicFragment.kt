@@ -98,11 +98,11 @@ class TopicFragment : Fragment() {
                 if (msgId > 0) {
                     activity?.runOnUiThread {
                         chatAdapter.updateMessage(msgId, newText, cardData)
-                        // 流式消息更新时，如果用户在底部（气泡在可见区域内）就自动滚动到底部
-                        // 如果用户手动上滑浏览历史，则不自动滚动，不打断当前浏览
-                        // 用 post 延迟到布局完成后再检查和滚动，确保高度计算正确
-                        binding.recyclerView.post {
-                            if (isAtBottom()) scrollToBottom()
+                        // 流式消息更新时，如果用户没有手动上滑浏览历史，就自动滚动到底部
+                        // 保持最后一条消息的底部始终可见
+                        // 用 post 延迟到布局完成后再滚动，确保高度计算正确
+                        if (!userScrolledUp) {
+                            binding.recyclerView.post { scrollToBottom() }
                         }
                     }
                 }
@@ -364,6 +364,29 @@ class TopicFragment : Fragment() {
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = chatAdapter
+
+        // 监听用户手动滚动：上滑时停止自动滚动，滑回底部时恢复
+        binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                // dy > 0 表示手指上滑（内容向上滚动，查看更早的消息）
+                if (dy > 0) {
+                    userScrolledUp = true
+                } else if (dy < 0 && isAtBottom()) {
+                    // 下滑且到达底部，恢复自动滚动
+                    userScrolledUp = false
+                }
+            }
+        })
+
+        // 输入法弹出/收起时，如果用户没有手动上滑，自动滚动到底部
+        // 保持最后一条消息的底部始终可见
+        binding.recyclerView.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
+            if (bottom != oldBottom && !userScrolledUp) {
+                binding.recyclerView.post { scrollToBottom() }
+            }
+        }
+
 
         // 输入法弹出/收起时，如果用户在底部，自动滚动到底部
         // 这样输入法弹出时消息列表会跟着上移，保持最后一条消息可见
