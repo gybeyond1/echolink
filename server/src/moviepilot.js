@@ -251,6 +251,58 @@ function appendMoviepilotMessage(username, cardData, text) {
   return { delivered: 1, message };
 }
 
+
+// ========== 流式消息支持 ==========
+function startStreamMessage(username, initialText) {
+  const db = getDB();
+  const mpUser = (username && username.trim()) ? username.trim() : DEFAULT_MP_USER;
+  const userId = getUserIdByUsername(mpUser);
+  if (!userId) return { delivered: 0, message: null, error: "用户不存在: " + mpUser };
+  const topic = ensureUserMoviepilotTopic(userId, mpUser);
+  const topicName = topic.name;
+  const ts = Date.now();
+  const text = initialText || "";
+  const cardData = { title: "MoviePilot", text: text, poster: "", details: [], buttons: [], streaming: true };
+  const cardJson = JSON.stringify(cardData);
+  const result = db.prepare("INSERT INTO topic_messages (topic, user_id, sender_name, title, text, media_type, media_url, media_name, media_size, timestamp, card_data) VALUES (?, NULL, 'MoviePilot', ?, ?, 'card', NULL, NULL, 0, ?, ?)").run(topicName, "MoviePilot", text, ts, cardJson);
+  const message = { id: result.lastInsertRowid, topic: topicName, title: "MoviePilot", text: text, sender_name: "MoviePilot", sender_display_name: null, sender_avatar: null, user_id: 0, timestamp: ts, device_id: null, device_name: null, media_type: "card", media_url: null, media_name: null, media_size: 0, card_data: cardData, peer_avatar: null };
+  const { broadcastToUser } = require("./websocket");
+  try { broadcastToUser(userId, { type: "topic_message", topic: topicName, data: message }); } catch (_) {}
+  return { delivered: 1, message, message_id: result.lastInsertRowid };
+}
+
+function appendStreamMessage(messageId, appendText) {
+  const db = getDB();
+  const msg = db.prepare("SELECT * FROM topic_messages WHERE id = ?").get(messageId);
+  if (!msg) return { error: "消息不存在: " + messageId };
+  if (msg.sender_name !== "MoviePilot") return { error: "只能追加 MoviePilot 发来的消息" };
+  const newText = (msg.text || "") + (appendText || "");
+  let cardData = {};
+  try { cardData = msg.card_data ? JSON.parse(msg.card_data) : {}; } catch (_) { cardData = {}; }
+  cardData.text = newText;
+  const cardJson = JSON.stringify(cardData);
+  db.prepare("UPDATE topic_messages SET text = ?, card_data = ? WHERE id = ?").run(newText, cardJson, messageId);
+  const { broadcastToUser } = require("./websocket");
+  const mpUser1 = msg.topic.startsWith("moviepilot_") ? msg.topic.substring("moviepilot_".length) : null;
+  const uid1 = mpUser1 ? (getUserIdByUsername(mpUser1) || 0) : (msg.user_id || 0);
+  try { broadcastToUser(uid1, { type: "message_updated", topic: msg.topic, data: { id: messageId, text: newText, card_data: cardData, streaming: true } }); } catch (_) {}
+  return { ok: true, message_id: messageId, full_text: newText };
+}
+
+function endStreamMessage(messageId) {
+  const db = getDB();
+  const msg = db.prepare("SELECT * FROM topic_messages WHERE id = ?").get(messageId);
+  if (!msg) return { error: "消息不存在: " + messageId };
+  let cardData = {};
+  try { cardData = msg.card_data ? JSON.parse(msg.card_data) : {}; } catch (_) { cardData = {}; }
+  delete cardData.streaming;
+  const cardJson = JSON.stringify(cardData);
+  db.prepare("UPDATE topic_messages SET card_data = ? WHERE id = ?").run(cardJson, messageId);
+  const { broadcastToUser } = require("./websocket");
+  try { broadcastToUser((msg.topic.startsWith("moviepilot_") ? (getUserIdByUsername(msg.topic.substring("moviepilot_".length)) || 0) : (msg.user_id || 0)), { type: "message_updated", topic: msg.topic, data: { id: messageId, text: msg.text || "", card_data: cardData, streaming: false } }); } catch (_) {}
+  return { ok: true, message_id: messageId };
+}
+
 // 编辑 MP 消息（更新交互菜单状态等）
 function editMoviepilotMessage(messageId, text, buttons, details) {
   const db = getDB();
@@ -289,9 +341,11 @@ function editMoviepilotMessage(messageId, text, buttons, details) {
 
   // 通过 WebSocket 推送消息编辑事件
   const { broadcastToUser } = require("./websocket");
-  const userId = msg.user_id || 0;
-  // 从 topic 名中提取用户名（topic 格式：moviepilot_用户名）
+  // 从 topic 名中提取用户名（topic 格式：moviepilot_用户名），然后查用户 ID
+  // 注意：MP 发来的消息 user_id 是 0（系统消息），不能直接用 msg.user_id
   const topicName = msg.topic;
+  const mpUsername = topicName.startsWith("moviepilot_") ? topicName.substring("moviepilot_".length) : null;
+  const userId = mpUsername ? (getUserIdByUsername(mpUsername) || 0) : (msg.user_id || 0);
   try {
     broadcastToUser(userId, {
       type: "message_edited",
