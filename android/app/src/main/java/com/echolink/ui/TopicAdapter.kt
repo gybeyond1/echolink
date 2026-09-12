@@ -41,6 +41,10 @@ import java.util.Locale
 import com.echolink.util.MediaCacheManager
 
 class TopicAdapter(
+    // 流式消息渐变透明：最后 N 个字渐变
+    private val streamingFadeChars = 5,
+    // 流式消息超时（毫秒）：超过这个时间没有更新就认为生成完成
+    private val streamingTimeoutMs = 2000L,
     private val onItemLongClick: (TopicMessage) -> Unit,
     private val onItemClick: (TopicMessage) -> Unit,
     private val onImageClick: ((TopicMessage) -> Unit)? = null,
@@ -187,14 +191,32 @@ class TopicAdapter(
     }
 
     /** 本地更新一条消息（MP 编辑消息后同步更新，如交互菜单点击后更新按钮状态） */
+    // 流式消息超时 Handler：用于在一段时间没有更新后标记消息为生成完成
+    private val streamingHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val streamingTimeouts = mutableMapOf<Long, Runnable>()
+
     fun updateMessage(id: Long, newText: String, cardDataStr: String?) {
         val pos = items.indexOfFirst { it.id == id }
         if (pos < 0) return
         val oldMsg = items[pos]
         // cardData 是 String? 类型，如果传了新的 card_data 就用新的，否则保留原有的
         val newCardData = cardDataStr ?: oldMsg.cardData
-        items[pos] = oldMsg.copy(text = newText, cardData = newCardData)
+        // 设置 streaming = true，表示正在流式生成中
+        items[pos] = oldMsg.copy(text = newText, cardData = newCardData, streaming = true)
         notifyItemChanged(pos)
+
+        // 重置超时：如果在 streamingTimeoutMs 内没有新的更新，就标记为生成完成
+        streamingTimeouts[id]?.let { streamingHandler.removeCallbacks(it) }
+        val timeoutRunnable = Runnable {
+            val p = items.indexOfFirst { it.id == id }
+            if (p >= 0 && items[p].streaming) {
+                items[p] = items[p].copy(streaming = false)
+                notifyItemChanged(p)
+            }
+            streamingTimeouts.remove(id)
+        }
+        streamingTimeouts[id] = timeoutRunnable
+        streamingHandler.postDelayed(timeoutRunnable, streamingTimeoutMs)
     }
 
     fun getSelectedIds(): List<Long> = selected.filter { it > 0 }
@@ -449,7 +471,12 @@ class TopicAdapter(
             holder.tvTitle.text = item.title
             holder.tvTitle.visibility = if (item.title.isNotEmpty()) View.VISIBLE else View.GONE
         }
-        holder.tvText.text = item.text
+        // 流式消息：如果正在生成中，最后几个字渐变透明
+        if (item.streaming && item.text.isNotEmpty()) {
+            applyStreamingFade(holder.tvText, item.text, ctx.getColor(R.color.on_surface))
+        } else {
+            holder.tvText.text = item.text
+        }
         holder.tvText.visibility = if (item.text.isNotEmpty()) View.VISIBLE else View.GONE
 
         // Media rendering
@@ -870,6 +897,33 @@ class TopicAdapter(
     /**
      * 渲染 MoviePilot 富文本卡片消息
      */
+    /**
+     * 渲染流式消息的渐变透明效果：最后 streamingFadeChars 个字从 100% 渐变到 20% 透明度
+     */
+    private fun applyStreamingFade(tv: android.widget.TextView, text: String, baseColor: Int) {
+        if (text.length <= streamingFadeChars) {
+            tv.text = text
+            return
+        }
+        val spannable = android.text.SpannableString(text)
+        val fadeStart = text.length - streamingFadeChars
+        for (i in fadeStart until text.length) {
+            // 从 100% 到 20%：第 0 个（倒数第 5 个）= 100%，第 4 个（倒数第 1 个）= 20%
+            val ratio = (i - fadeStart).toFloat() / (streamingFadeChars - 1)
+            val alpha = (255 * (1.0f - ratio * 0.8f)).toInt()  // 255 -> 51 (100% -> 20%)
+            val color = android.graphics.Color.argb(alpha,
+                android.graphics.Color.red(baseColor),
+                android.graphics.Color.green(baseColor),
+                android.graphics.Color.blue(baseColor))
+            spannable.setSpan(
+                android.text.style.ForegroundColorSpan(color),
+                i, i + 1,
+                android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+        tv.text = spannable
+    }
+
     private fun bindCard(holder: ViewHolder, item: TopicMessage) {
         val ctx = holder.itemView.context
         holder.bubbleInner.visibility = View.GONE
@@ -951,7 +1005,12 @@ class TopicAdapter(
             // 修复：edit_message 更新时 cardData.text 可能未同步，导致显示旧文本
             val extraText = item.text.ifEmpty { card.optString("text", "") }
             if (extraText.isNotEmpty()) {
-                holder.tvCardText.text = extraText
+                // 流式消息：如果正在生成中，最后几个字渐变透明
+        if (item.streaming && extraText.isNotEmpty()) {
+            applyStreamingFade(holder.tvCardText, extraText, ctx.getColor(R.color.on_surface_variant))
+        } else {
+            holder.tvCardText.text = extraText
+        }
                 holder.tvCardText.visibility = View.VISIBLE
             } else {
                 holder.tvCardText.visibility = View.GONE
