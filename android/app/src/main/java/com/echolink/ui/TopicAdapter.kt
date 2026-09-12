@@ -887,7 +887,7 @@ class TopicAdapter(
         // 卡片最大宽度为屏幕宽度的 3/4
         val screenWidth = ctx.resources.displayMetrics.widthPixels
         val maxCardWidth = (screenWidth * 0.75).toInt()
-        holder.cardContainer.maxWidth = maxCardWidth
+        holder.cardContainer.setMaxWidth(maxCardWidth)
 
         holder.llCardDetails.removeAllViews()
         holder.llCardButtons.removeAllViews()
