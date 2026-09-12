@@ -100,7 +100,10 @@ class TopicFragment : Fragment() {
                         chatAdapter.updateMessage(msgId, newText, cardData)
                         // 流式消息更新时，如果用户在底部（气泡在可见区域内）就自动滚动到底部
                         // 如果用户手动上滑浏览历史，则不自动滚动，不打断当前浏览
-                        if (isAtBottom()) scrollToBottom()
+                        // 用 post 延迟到布局完成后再检查和滚动，确保高度计算正确
+                        binding.recyclerView.post {
+                            if (isAtBottom()) scrollToBottom()
+                        }
                     }
                 }
                 return
