@@ -947,7 +947,9 @@ class TopicAdapter(
                 holder.llCardDetails.visibility = View.GONE
             }
 
-            val extraText = card.optString("text", "")
+            // 优先用 item.text（流式更新时 item.text 是最新的），为空才 fallback 到 card.text
+            // 修复：edit_message 更新时 cardData.text 可能未同步，导致显示旧文本
+            val extraText = item.text.ifEmpty { card.optString("text", "") }
             if (extraText.isNotEmpty()) {
                 holder.tvCardText.text = extraText
                 holder.tvCardText.visibility = View.VISIBLE
