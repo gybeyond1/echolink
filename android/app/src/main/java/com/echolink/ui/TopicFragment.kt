@@ -73,6 +73,8 @@ import com.echolink.util.MediaCacheManager
 class TopicFragment : Fragment() {
     // 用户是否手动上滑浏览历史：true 时停止自动滚动，滑回底部后恢复
     private var userScrolledUp = false
+    // 程序是否正在自动滚动：防止自动滚动触发的 onScrolled 回调误设 userScrolledUp
+    private var isAutoScrolling = false
 
     private var _binding: FragmentTopicBinding? = null
     private val binding get() = _binding!!
@@ -373,10 +375,21 @@ class TopicFragment : Fragment() {
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = chatAdapter
 
-        // 监听用户手动滚动：上滑时停止自动滚动，滑回底部时恢复
+        // 监听用户手动滚动：只在用户主动拖动时才更新 userScrolledUp
+        // 自动滚动（程序调用 scrollBy/scrollToPosition）触发的 onScrolled 不影响 userScrolledUp
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            private var isUserDragging = false
+
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                super.onScrollStateChanged(recyclerView, newState)
+                // SCROLL_STATE_DRAGGING = 用户正在用手指拖动
+                isUserDragging = (newState == RecyclerView.SCROLL_STATE_DRAGGING)
+            }
+
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
+                // 只有用户主动拖动时才更新 userScrolledUp
+                if (!isUserDragging || isAutoScrolling) return
                 // dy > 0 表示手指上滑（内容向上滚动，查看更早的消息）
                 if (dy > 0) {
                     userScrolledUp = true
@@ -1078,10 +1091,12 @@ class TopicFragment : Fragment() {
     private fun scrollToBottom() {
         if (chatAdapter.itemCount == 0) return
         val position = chatAdapter.itemCount - 1
+        isAutoScrolling = true
         binding.recyclerView.post {
             val lm = binding.recyclerView.layoutManager as? LinearLayoutManager
             if (lm == null) {
                 binding.recyclerView.scrollToPosition(position)
+                isAutoScrolling = false
                 return@post
             }
             val view = lm.findViewByPosition(position)
@@ -1096,6 +1111,8 @@ class TopicFragment : Fragment() {
                 // view 还没布局完成，先滚动到位置
                 lm.scrollToPosition(position)
             }
+            // 滚动完成后延迟重置标志，确保 onScrolled 回调已经处理完
+            binding.recyclerView.postDelayed({ isAutoScrolling = false }, 100)
         }
     }
 
