@@ -18,14 +18,28 @@ router.post(["/receive", "/send_message"], (req, res) => {
 
   // 兼容两种格式：MP 插件发送 {card: {...}}，旧格式直接平铺
   const card = (body.card && typeof body.card === "object") ? body.card : body;
+  // 优先使用 rich_message 中的结构化数据
+  let richData = null;
+  if (body.rich_message) {
+    try {
+      if (typeof body.rich_message === "string") {
+        richData = JSON.parse(body.rich_message);
+      } else {
+        richData = body.rich_message;
+      }
+    } catch (e) {
+      console.log("[moviepilot] 解析 rich_message 失败:", e.message);
+    }
+  }
+  
   const cardData = {
-    title: card.title || body.title || "MoviePilot",
-    text: card.text || body.text || "",
-    poster: card.poster || body.poster || "",
-    details: Array.isArray(card.details) ? card.details : (Array.isArray(body.details) ? body.details : []),
+    title: (richData && richData.title) || card.title || body.title || "MoviePilot",
+    text: (richData && richData.text) || card.text || body.text || "",
+    poster: (richData && richData.poster) || (richData && richData.image) || card.poster || body.poster || body.image || "",
+    details: (richData && Array.isArray(richData.details)) ? richData.details : (Array.isArray(card.details) ? card.details : (Array.isArray(body.details) ? body.details : [])),
     buttons: Array.isArray(card.buttons) ? card.buttons : (Array.isArray(body.buttons) ? body.buttons : []),
   };
-  const text = card.text || body.text || body.content || "";
+  const text = cardData.text || body.text || body.content || "";
 
   try {
     const r = appendMoviepilotMessage(username, cardData, text);
