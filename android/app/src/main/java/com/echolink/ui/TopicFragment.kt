@@ -1045,7 +1045,27 @@ class TopicFragment : Fragment() {
     }
 
     private fun scrollToBottom() {
-        if (chatAdapter.itemCount > 0) binding.recyclerView.scrollToPosition(chatAdapter.itemCount - 1)
+        if (chatAdapter.itemCount == 0) return
+        val position = chatAdapter.itemCount - 1
+        binding.recyclerView.post {
+            val lm = binding.recyclerView.layoutManager as? LinearLayoutManager
+            if (lm == null) {
+                binding.recyclerView.scrollToPosition(position)
+                return@post
+            }
+            val view = lm.findViewByPosition(position)
+            if (view != null) {
+                // 手动计算滚动距离，让 item 的底部对齐到 RecyclerView 的底部
+                // 这样即使气泡很高（超过屏幕高度），也能持续看到最新的文本
+                val dy = view.bottom - (binding.recyclerView.height - binding.recyclerView.paddingBottom)
+                if (dy > 0) {
+                    binding.recyclerView.scrollBy(0, dy)
+                }
+            } else {
+                // view 还没布局完成，先滚动到位置
+                lm.scrollToPosition(position)
+            }
+        }
     }
 
     /** 是否在聊天底部（最后一条消息可见即可，不管气泡多高）：用于决定是否自动滚动 / 显示未读气泡 */
