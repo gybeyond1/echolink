@@ -71,6 +71,9 @@ import java.util.regex.Pattern
 import com.echolink.util.MediaCacheManager
 
 class TopicFragment : Fragment() {
+    // 用户是否手动上滑浏览历史：true 时停止自动滚动，滑回底部后恢复
+    private var userScrolledUp = false
+
     private var _binding: FragmentTopicBinding? = null
     private val binding get() = _binding!!
 
