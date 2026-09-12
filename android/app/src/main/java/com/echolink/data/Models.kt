@@ -70,7 +70,8 @@ data class TopicMessage(
     val peerAvatar: String? = null,
     val read: Boolean = false,
     val sending: Boolean = false,  // 本地发送中状态（仅客户端用，不参与序列化）
-    val cardData: String? = null  // 富文本卡片 JSON（MoviePilot 等）
+    val cardData: String? = null,  // 富文本卡片 JSON（MoviePilot 等）
+    val streaming: Boolean = false  // 流式生成中状态（仅客户端用，不参与序列化）
 )
 
 // ===== JSON 解析扩展 =====
