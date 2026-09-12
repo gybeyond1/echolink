@@ -522,6 +522,8 @@ class TopicFragment : Fragment() {
                 addAction("com.echolink.FRIENDS_CHANGED")
                 addAction("com.echolink.PROFILE_CHANGED")
                 addAction("com.echolink.MESSAGE_READ")
+                addAction("com.echolink.MESSAGE_EDITED")
+                addAction("com.echolink.MESSAGE_DELETED")
             },
             Context.RECEIVER_NOT_EXPORTED
         )
