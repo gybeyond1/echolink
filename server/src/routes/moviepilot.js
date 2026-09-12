@@ -1,6 +1,6 @@
 const express = require("express");
 const { authMiddleware } = require("../middleware/auth");
-const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic, getOrCreateChannel, verifyToken, appendMoviepilotMessage, editMoviepilotMessage, deleteMoviepilotMessage, answerCallbackQuery, getUpdates } = require("../moviepilot");
+const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic, getOrCreateChannel, verifyToken, appendMoviepilotMessage, editMoviepilotMessage, deleteMoviepilotMessage, answerCallbackQuery, getUpdates, startStreamMessage, appendStreamMessage, endStreamMessage } = require("../moviepilot");
 
 const router = express.Router();
 
@@ -349,6 +349,63 @@ router.post("/send", async (req, res) => {
     res.json({ ok: true, mp_status: result.status, mp_response: result.body });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+
+// ========== 流式消息 API ==========
+// 开始流式消息：创建一条空消息，返回 message_id
+router.post("/stream_start", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) return res.status(401).json({ error: "无效或缺失的通道 token" });
+  const username = body.username || channel.username;
+  const initialText = body.text || "";
+  try {
+    const r = startStreamMessage(username, initialText);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json({ ok: true, message_id: r.message_id, delivered: r.delivered });
+  } catch (e) {
+    console.error("[moviepilot] stream_start error:", e);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// 追加流式消息：在已有消息后追加文本，实时推送更新
+router.post("/stream_append", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) return res.status(401).json({ error: "无效或缺失的通道 token" });
+  const messageId = parseInt(body.message_id) || 0;
+  const text = body.text || "";
+  if (!messageId) return res.status(400).json({ error: "message_id 是必填的" });
+  try {
+    const r = appendStreamMessage(messageId, text);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json({ ok: true, message_id: messageId, full_text_length: r.full_text ? r.full_text.length : 0 });
+  } catch (e) {
+    console.error("[moviepilot] stream_append error:", e);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// 结束流式消息：移除 streaming 标记
+router.post("/stream_end", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) return res.status(401).json({ error: "无效或缺失的通道 token" });
+  const messageId = parseInt(body.message_id) || 0;
+  if (!messageId) return res.status(400).json({ error: "message_id 是必填的" });
+  try {
+    const r = endStreamMessage(messageId);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json({ ok: true, message_id: messageId });
+  } catch (e) {
+    console.error("[moviepilot] stream_end error:", e);
+    res.status(500).json({ error: "internal error" });
   }
 });
 
