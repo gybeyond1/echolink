@@ -188,7 +188,7 @@
             <!-- MoviePilot 富文本卡片（海报+详情+按钮），卡片消息时显示，气泡隐藏 -->
             <LinearLayout
                 android:id="@+id/cardContainer"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="@drawable/bg_neumorph"
@@ -196,14 +196,14 @@
                 android:layout_marginTop="2dp"
                 android:visibility="gone">
 
-                <!-- 海报 -->
+                <!-- 海报：卡片内部顶部，横版，宽度和卡片一致，高度按比例 -->
                 <ImageView
                     android:id="@+id/ivCardPoster"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:adjustViewBounds="true"
                     android:scaleType="fitCenter"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="6dp"
                     android:visibility="gone" />
 
                 <TextView
@@ -212,7 +212,7 @@
                     android:layout_height="wrap_content"
                     android:textSize="15sp"
                     android:textStyle="bold"
-                    android:layout_marginTop="6dp" />
+                    android:layout_marginTop="2dp" />
 
                 <LinearLayout
                     android:id="@+id/llCardDetails"
