@@ -139,11 +139,16 @@ class TopicFragment : Fragment() {
                         senderDisplayName = if (!json.isNull("sender_display_name")) json.optNullable("sender_display_name") else null,
                         cardData = if (!json.isNull("card_data")) json.optString("card_data", null) else null
                     )
-                    val wasAtBottom = isAtBottom()
                     chatAdapter.appendItems(listOf(msg))
                     com.echolink.util.DebugLogger.d("wsListener", "WS直接收到消息 id=${msg.id} text=${msg.text.take(20)} items=${chatAdapter.itemCount}")
-                    if (wasAtBottom) scrollToBottom()
-                    else { unreadChatCount++; showUnreadPill() }
+                    // 如果用户没有手动上滑浏览历史，自动滚动到底部
+                    // 否则增加未读计数并显示未读气泡
+                    if (!userScrolledUp) {
+                        binding.recyclerView.post { scrollToBottom() }
+                    } else {
+                        unreadChatCount++
+                        showUnreadPill()
+                    }
                 } catch (e: Exception) {
                     com.echolink.util.DebugLogger.d("wsListener", "解析消息异常: ${e.message}")
                 }
