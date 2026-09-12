@@ -198,7 +198,7 @@ function appendMoviepilotMessage(username, cardData, text) {
     return { delivered: 0, message: null, error: "用户不存在: " + mpUser };
   }
 
-  const msgText = String(text || cardData?.text || "").slice(0, 2000);
+  const msgText = String(text || cardData?.text || "");
 
   // 消息去重：10秒内相同用户+相同内容的消息视为重复，防止 MP 端重复发送
   if (isMPDuplicate(mpUser, msgText)) {
