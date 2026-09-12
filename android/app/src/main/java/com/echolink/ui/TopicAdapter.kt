@@ -41,16 +41,16 @@ import java.util.Locale
 import com.echolink.util.MediaCacheManager
 
 class TopicAdapter(
-    // 流式消息渐变透明：最后 N 个字渐变
-    private val streamingFadeChars = 5,
-    // 流式消息超时（毫秒）：超过这个时间没有更新就认为生成完成
-    private val streamingTimeoutMs = 2000L,
     private val onItemLongClick: (TopicMessage) -> Unit,
     private val onItemClick: (TopicMessage) -> Unit,
     private val onImageClick: ((TopicMessage) -> Unit)? = null,
     private val onVideoClick: ((TopicMessage) -> Unit)? = null,
     private val onAvatarClick: ((TopicMessage) -> Unit)? = null,
-    private val onMpButtonClick: ((String, String, Long) -> Unit)? = null
+    private val onMpButtonClick: ((String, String, Long) -> Unit)? = null,
+    // 流式消息渐变透明：最后 N 个字渐变
+    private val streamingFadeChars: Int = 5,
+    // 流式消息超时（毫秒）：超过这个时间没有更新就认为生成完成
+    private val streamingTimeoutMs: Long = 2000L
 ) : RecyclerView.Adapter<TopicAdapter.ViewHolder>() {
 
     private val items = mutableListOf<TopicMessage>()
