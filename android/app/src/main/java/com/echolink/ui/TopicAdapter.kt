@@ -884,6 +884,10 @@ class TopicAdapter(
         holder.cardContainer.setBackgroundResource(if (isMine) R.drawable.bg_msg_own else R.drawable.bg_msg_other)
         val dp = ctx.resources.displayMetrics.density
         holder.cardContainer.setPadding((10*dp).toInt(), (8*dp).toInt(), (10*dp).toInt(), (8*dp).toInt())
+        // 卡片最大宽度为屏幕宽度的 3/4
+        val screenWidth = ctx.resources.displayMetrics.widthPixels
+        val maxCardWidth = (screenWidth * 0.75).toInt()
+        holder.cardContainer.maxWidth = maxCardWidth
 
         holder.llCardDetails.removeAllViews()
         holder.llCardButtons.removeAllViews()
