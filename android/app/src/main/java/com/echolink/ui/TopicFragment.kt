@@ -86,10 +86,13 @@ class TopicFragment : Fragment() {
         override fun onError(error: String) {}
         override fun onMessage(type: String, data: org.json.JSONObject?, topic: String?) {
             // 处理消息更新（流式传输：MP 一边生成一边推送，安卓端动态更新气泡内容）
-            if (type == "message_updated" && data != null) {
+            // message_updated：新的流式 API（stream_append）
+            // message_edited：MP Agent 用 edit_message 方式不断编辑同一条消息
+            if ((type == "message_updated" || type == "message_edited") && data != null) {
                 val t = topic ?: data.optString("topic", "")
                 if (t != currentTopic) return
-                val msgId = data.optLong("id", -1)
+                // message_updated 用 "id" 字段，message_edited 用 "message_id" 字段
+                val msgId = if (data.has("id")) data.optLong("id", -1) else data.optLong("message_id", -1)
                 val newText = data.optString("text", "")
                 val cardData = if (!data.isNull("card_data")) data.optString("card_data", null) else null
                 if (msgId > 0) {
