@@ -365,6 +365,15 @@ class TopicFragment : Fragment() {
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = chatAdapter
 
+        // 输入法弹出/收起时，如果用户在底部，自动滚动到底部
+        // 这样输入法弹出时消息列表会跟着上移，保持最后一条消息可见
+        binding.recyclerView.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
+            if (bottom != oldBottom && isAtBottom()) {
+                binding.recyclerView.post { scrollToBottom() }
+            }
+        }
+
+
         // 滚动到聊天底部时自动隐藏未读气泡并清零
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
@@ -1039,16 +1048,16 @@ class TopicFragment : Fragment() {
         if (chatAdapter.itemCount > 0) binding.recyclerView.scrollToPosition(chatAdapter.itemCount - 1)
     }
 
-    /** 是否在聊天底部（最后一条消息基本可见）：用于决定是否自动滚动 / 显示未读气泡 */
+    /** 是否在聊天底部（最后一条消息可见即可，不管气泡多高）：用于决定是否自动滚动 / 显示未读气泡 */
     private fun isAtBottom(): Boolean {
         val rv = binding.recyclerView
         val lm = rv.layoutManager as? LinearLayoutManager ?: return true
         val count = chatAdapter.itemCount
         if (count == 0) return true
         val lastVisible = lm.findLastVisibleItemPosition()
-        if (lastVisible < count - 1) return false
-        val lastChild = rv.getChildAt(rv.childCount - 1)
-        return lastChild != null && lastChild.bottom <= rv.height + 40
+        // 只要最后一条消息在可见区域内（即使只有一部分可见），就认为在底部
+        // 这样气泡很高时也能持续自动滚动
+        return lastVisible >= count - 1
     }
 
     private fun showUnreadPill() {
