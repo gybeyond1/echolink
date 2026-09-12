@@ -141,13 +141,14 @@ class TopicFragment : Fragment() {
                         senderDisplayName = if (!json.isNull("sender_display_name")) json.optNullable("sender_display_name") else null,
                         cardData = if (!json.isNull("card_data")) json.optString("card_data", null) else null
                     )
+                    // 用户是否已经在底部：在追加前判断，避免新插入项导致判断失真
+                    val wasAtBottom = isAtBottom()
                     chatAdapter.appendItems(listOf(msg))
                     com.echolink.util.DebugLogger.d("wsListener", "WS直接收到消息 id=${msg.id} text=${msg.text.take(20)} items=${chatAdapter.itemCount}")
-                    // 如果用户没有手动上滑浏览历史，自动滚动到底部
-                    // 否则增加未读计数并显示未读气泡
-                    if (!userScrolledUp) {
+                    if (wasAtBottom) {
                         binding.recyclerView.post { scrollToBottom() }
                     } else {
+                        // 用户已向上翻看历史 → 不强制滚动，弹未读气泡累计
                         unreadChatCount++
                         showUnreadPill()
                     }
