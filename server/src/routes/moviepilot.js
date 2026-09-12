@@ -6,7 +6,8 @@ const router = express.Router();
 
 // MP 消息接收端点（MP 通知渠道调用此接口发送消息到 EchoLink）
 // 不需要登录，通过 token 鉴权
-router.post("/receive", (req, res) => {
+// 兼容两种路径：/receive 和 /send_message（MP 端重构后用 /send_message）
+router.post(["/receive", "/send_message"], (req, res) => {
   const body = req.body || {};
   const token = body.token || req.query.token || req.headers["x-mp-token"];
   const channel = verifyToken(token);
@@ -117,6 +118,136 @@ router.post("/answer_callback", (req, res) => {
     console.error("[moviepilot] answer_callback error:", e);
     return res.status(500).json({ error: "internal error" });
   }
+});
+
+// 发送语音消息端点（MP 通知渠道调用此接口发送语音到 EchoLink）
+router.post("/send_voice", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+  const username = channel.username;
+
+  const voice = body.voice || ""; // base64 编码的语音数据
+  const voiceName = body.voice_name || "voice.ogg";
+  const caption = body.caption || "";
+  const chatId = body.chat_id;
+
+  try {
+    // 语音消息作为特殊卡片发送，标题标识为语音
+    const cardData = {
+      title: "🎤 语音消息",
+      text: caption || `[语音消息] ${voiceName}`,
+      poster: "",
+      details: [],
+      buttons: [],
+    };
+    const r = appendMoviepilotMessage(username, cardData, caption || `[语音消息] ${voiceName}`);
+    if (r.error) {
+      return res.status(400).json({ error: r.error });
+    }
+    return res.status(200).json({ ok: true, delivered: r.delivered, message_id: r.message?.id });
+  } catch (e) {
+    console.error("[moviepilot] send_voice error:", e);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+// 发送文件消息端点（MP 通知渠道调用此接口发送文件到 EchoLink）
+router.post("/send_file", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+  const username = channel.username;
+
+  const file = body.file || ""; // base64 编码的文件数据
+  const fileName = body.file_name || "file.bin";
+  const caption = body.caption || "";
+  const chatId = body.chat_id;
+
+  try {
+    // 文件消息作为特殊卡片发送
+    const cardData = {
+      title: "📎 文件",
+      text: caption || `[文件] ${fileName}`,
+      poster: "",
+      details: [],
+      buttons: [],
+    };
+    const r = appendMoviepilotMessage(username, cardData, caption || `[文件] ${fileName}`);
+    if (r.error) {
+      return res.status(400).json({ error: r.error });
+    }
+    return res.status(200).json({ ok: true, delivered: r.delivered, message_id: r.message?.id });
+  } catch (e) {
+    console.error("[moviepilot] send_file error:", e);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+// 发送 typing 状态端点（MP 通知渠道调用此接口显示"正在输入..."）
+router.post("/send_typing", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+  // typing 状态目前不需要实际推送，直接返回成功
+  return res.status(200).json({ ok: true });
+});
+
+// 下载文件端点（MP 通知渠道调用此接口下载 EchoLink 上的文件）
+router.get("/download_file", (req, res) => {
+  const token = req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+  const fileId = req.query.file_id || "";
+  if (!fileId) {
+    return res.status(400).json({ error: "file_id 是必填的" });
+  }
+  // 文件下载目前返回空（EchoLink 端文件存储需要后续实现）
+  return res.status(200).json({ ok: true, file_id: fileId, data: "" });
+});
+
+// 注册命令菜单端点（MP 通知渠道调用此接口注册斜杠命令菜单）
+router.post("/register_commands", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+  const commands = body.commands || {};
+  const username = channel.username;
+  // 存储命令菜单到内存（后续可以持久化到数据库）
+  if (!global.mpCommandMenus) global.mpCommandMenus = new Map();
+  global.mpCommandMenus.set(username, commands);
+  console.log(`[moviepilot] 命令菜单已注册: ${username}, ${Object.keys(commands).length} 个命令`);
+  return res.status(200).json({ ok: true, count: Object.keys(commands).length });
+});
+
+// 删除命令菜单端点
+router.post("/delete_commands", (req, res) => {
+  const body = req.body || {};
+  const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const channel = verifyToken(token);
+  if (!channel) {
+    return res.status(401).json({ error: "无效或缺失的通道 token" });
+  }
+  const username = channel.username;
+  if (global.mpCommandMenus) {
+    global.mpCommandMenus.delete(username);
+  }
+  console.log(`[moviepilot] 命令菜单已删除: ${username}`);
+  return res.status(200).json({ ok: true });
 });
 
 // 长轮询获取消息端点（MP 通知渠道调用此接口拉取用户消息）
