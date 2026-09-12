@@ -85,6 +85,20 @@ class TopicFragment : Fragment() {
         override fun onDisconnected(reason: String) {}
         override fun onError(error: String) {}
         override fun onMessage(type: String, data: org.json.JSONObject?, topic: String?) {
+            // 处理消息更新（流式传输：MP 一边生成一边推送，安卓端动态更新气泡内容）
+            if (type == "message_updated" && data != null) {
+                val t = topic ?: data.optString("topic", "")
+                if (t != currentTopic) return
+                val msgId = data.optLong("id", -1)
+                val newText = data.optString("text", "")
+                val cardData = if (!data.isNull("card_data")) data.optString("card_data", null) else null
+                if (msgId > 0) {
+                    activity?.runOnUiThread {
+                        chatAdapter.updateMessage(msgId, newText, cardData)
+                    }
+                }
+                return
+            }
             if (type != "topic_message" || data == null) return
             val t = topic ?: data.optString("topic", "")
             if (t != currentTopic) return
