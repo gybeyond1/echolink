@@ -1006,11 +1006,11 @@ class TopicAdapter(
             val extraText = item.text.ifEmpty { card.optString("text", "") }
             if (extraText.isNotEmpty()) {
                 // 流式消息：如果正在生成中，最后几个字渐变透明
-        if (item.streaming && extraText.isNotEmpty()) {
-            applyStreamingFade(holder.tvCardText, extraText, ctx.getColor(R.color.on_surface_variant))
-        } else {
-            holder.tvCardText.text = extraText
-        }
+                if (item.streaming) {
+                    applyStreamingFade(holder.tvCardText, extraText, ctx.getColor(R.color.on_surface_variant))
+                } else {
+                    holder.tvCardText.text = extraText
+                }
                 holder.tvCardText.visibility = View.VISIBLE
             } else {
                 holder.tvCardText.visibility = View.GONE
