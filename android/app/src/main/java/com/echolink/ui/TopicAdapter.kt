@@ -473,7 +473,7 @@ class TopicAdapter(
         }
         // 流式消息：如果正在生成中，最后几个字渐变透明
         if (item.streaming && item.text.isNotEmpty()) {
-            applyStreamingFade(holder.tvText, item.text, ctx.getColor(R.color.on_surface))
+            applyStreamingFade(holder.tvText, item.text, holder.itemView.context.getColor(R.color.on_surface))
         } else {
             holder.tvText.text = item.text
         }
