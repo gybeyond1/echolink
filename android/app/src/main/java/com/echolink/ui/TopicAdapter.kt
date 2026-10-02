@@ -80,6 +80,9 @@ class TopicAdapter(
     /** 是否为 MoviePilot 会话：对方消息统一显示 MP 新拟态图标 */
     var isMoviePilot: Boolean = false
 
+    /** 是否为 Octop 会话：对方消息统一显示 Octop 新拟态图标 */
+    var isOctop: Boolean = false
+
     /** 是否为通知会话：对方消息统一显示通知新拟态图标 */
     var isNotification: Boolean = false
 
@@ -88,7 +91,7 @@ class TopicAdapter(
 
     /** 一对一对话隐藏头像（Telegram风格）：私聊/MP/我的设备/通知/留言板都去掉头像，只有群组保留头像区分发送者 */
     private val hideAvatar: Boolean
-        get() = isDm || isMessageWall || isMoviePilot || isNotification || isMyDevice
+        get() = isDm || isMessageWall || isMoviePilot || isOctop || isNotification || isMyDevice
 
     var selectionMode = false
         private set
@@ -465,6 +468,12 @@ class TopicAdapter(
             holder.tvSender.text = item.title
             holder.tvTitle.visibility = View.GONE
             holder.llSenderInfo.visibility = View.VISIBLE
+        } else if (isOctop) {
+            // Octop 会话：显示 Octop 图标
+            holder.ivAvatar.visibility = View.VISIBLE
+            holder.tvAvatar.visibility = View.GONE
+            holder.ivAvatar.setImageResource(R.drawable.ic_octop_neo)
+            holder.ivAvatar.setBackgroundResource(R.drawable.bg_circle_avatar)
         } else if (isMoviePilot) {
             holder.tvTitle.visibility = View.GONE
         } else {
@@ -808,6 +817,7 @@ class TopicAdapter(
         if (!isSelfMessage(item)) {
             val iconRes = when {
                 isMoviePilot -> R.drawable.ic_moviepilot_neo
+                isOctop -> R.drawable.ic_octop_neo
                 isMessageWall -> R.drawable.ic_messagewall_neo
                 isNotification -> R.drawable.ic_notification_neo
                 isMyDevice -> R.drawable.ic_my_device_neo

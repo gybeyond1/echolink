@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const { getDB, getSettings, setSettings } = require("../db");
 const { authMiddleware, requireAdmin } = require("../middleware/auth");
 const { getAllChannels, getOrCreateChannel, deleteChannel, toggleChannel, updateChannel } = require("../moviepilot");
+const { getAllChannels: getOctopAllChannels, getOrCreateChannel: getOctopOrCreateChannel, deleteChannel: deleteOctopChannel, toggleChannel: toggleOctopChannel, updateChannel: updateOctopChannel } = require("../octop");
 
 const router = express.Router();
 
@@ -328,6 +329,62 @@ router.put("/moviepilot/channels/:userId", (req, res) => {
   const db = getDB();
   const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId);
 
+  res.json({ ok: true, channel: { ...channel, username: user ? user.username : null } });
+});
+
+
+// ===== Octop 通道管理 =====
+
+// 获取所有用户的 Octop 通道
+router.get("/octop/channels", (req, res) => {
+  try {
+    const channels = getOctopAllChannels();
+    res.json({ channels });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 为用户创建/重置 Octop 通道（生成新 token）
+router.post("/octop/channels/:userId", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  const db = getDB();
+  const user = db.prepare("SELECT id, username FROM users WHERE id = ?").get(userId);
+  if (!user) return res.status(404).json({ error: "用户不存在" });
+  deleteOctopChannel(userId);
+  const channel = getOctopOrCreateChannel(userId);
+  res.json({ ok: true, channel: { ...channel, username: user.username } });
+});
+
+// 删除用户的 Octop 通道
+router.delete("/octop/channels/:userId", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  deleteOctopChannel(userId);
+  res.json({ ok: true, message: "Octop 通道已删除" });
+});
+
+// 切换通道启用状态
+router.put("/octop/channels/:userId/toggle", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  const { enabled } = req.body || {};
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  toggleOctopChannel(userId, enabled ? 1 : 0);
+  res.json({ ok: true, enabled: enabled ? 1 : 0 });
+});
+
+// 更新通道配置
+router.put("/octop/channels/:userId", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  const body = req.body || {};
+  const updates = {};
+  if (body.enabled !== undefined) updates.enabled = body.enabled ? 1 : 0;
+  if (body.token !== undefined) updates.token = body.token;
+  const channel = updateOctopChannel(userId, updates);
+  const db = getDB();
+  const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId);
   res.json({ ok: true, channel: { ...channel, username: user ? user.username : null } });
 });
 

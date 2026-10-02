@@ -325,6 +325,10 @@ object ApiClient {
     suspend fun ensureMoviepilotTopic(): JSONObject {
         return execute(buildRequest("/api/moviepilot/ensure", "GET"))
     }
+    // 确保 Octop 话题存在（删除会话后从好友页重新进入时调用）
+    suspend fun ensureOctopTopic(): JSONObject {
+        return execute(buildRequest("/api/octop/ensure", "GET"))
+    }
 
     // 可发现（非成员）的话题列表
     suspend fun getDiscoverTopics(query: String = ""): List<DiscoverTopic> {

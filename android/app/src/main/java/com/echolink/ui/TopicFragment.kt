@@ -669,6 +669,7 @@ class TopicFragment : Fragment() {
         chatAdapter.isMessageWall = topic.kind == "messagewall"
         // MoviePilot 标记：对方消息显示 MP 新拟态图标
         chatAdapter.isMoviePilot = topic.kind == "moviepilot"
+        chatAdapter.isOctop = topic.kind == "octop"
         // 通知标记：对方消息显示通知新拟态图标
         chatAdapter.isNotification = topic.kind == "notification" || topic.name.startsWith("notification_")
         // 我的设备标记：对方消息显示设备新拟态图标
@@ -680,6 +681,7 @@ class TopicFragment : Fragment() {
             "devices" -> "我的设备"
             "messagewall" -> "留言板"
             "moviepilot" -> "MoviePilot"
+            "octop" -> "Octop"
             else -> topic.displayName ?: topic.name
         }
         binding.tvChatTitle.gravity = Gravity.CENTER

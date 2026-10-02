@@ -130,7 +130,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
         // 过滤掉 MoviePilot 虚拟好友：MP 只通过常驻入口 rowMoviePilot 显示，不在好友列表重复出现
         ApiClient.cachedFriends?.let { cached ->
             if (_binding != null) {
-                val filtered = cached.filter { !it.isMoviepilot }
+                val filtered = cached.filter { !it.isMoviepilot && !it.isOctop }
                 friendAdapter.setItems(filtered)
                 binding.tvEmptyFriends.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
             }
@@ -139,11 +139,12 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
             try {
                 val friends = ApiClient.getFriends()
                 if (_binding == null) return@launch
-                val filtered = friends.filter { !it.isMoviepilot }
+                val filtered = friends.filter { !it.isMoviepilot && !it.isOctop }
                 friendAdapter.setItems(filtered)
                 binding.tvEmptyFriends.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
                 // MP 入口始终显示（删除会话后也能从好友页重新进入）
                 binding.rowMoviePilot.visibility = View.VISIBLE
+                binding.rowOctop.visibility = View.VISIBLE
                 binding.rowMoviePilot.setOnClickListener {
                     // 直接用固定格式构造话题名，无需调 API 等待（moviepilot_<username>）
                     val topicName = "moviepilot_" + com.echolink.data.AuthManager.username
@@ -162,6 +163,23 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
                     // 后台异步确保话题存在（不阻塞 UI）
                     lifecycleScope.launch {
                         try { ApiClient.ensureMoviepilotTopic() } catch (_: Exception) {}
+                    }
+                }
+                // Octop 入口：打开 Octop 话题（双向交互：输入的文字转发给 Octop）
+                binding.rowOctop.setOnClickListener {
+                    val topicName = "octop_" + com.echolink.data.AuthManager.username
+                    if (isWide) {
+                        val frag = TopicFragment.chatOnly(topicName, "Octop")
+                        childFragmentManager.beginTransaction()
+                            .replace(binding.chatContainer.id, frag)
+                            .commit()
+                        binding.chatContainer.visibility = View.VISIBLE
+                        binding.tvChatPlaceholder.visibility = View.GONE
+                    } else {
+                        (activity as? MainActivity)?.openTopic(topicName, "Octop", fromFriends = true)
+                    }
+                    lifecycleScope.launch {
+                        try { ApiClient.ensureOctopTopic() } catch (_: Exception) {}
                     }
                 }
                 // 平板双栏：首次加载后自动选中第一个好友，让右侧立即显示聊天（镜像消息页体验）
@@ -198,6 +216,25 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
 
     private fun openChat(friend: Friend) {
         // MoviePilot 虚拟好友：直接打开 MP 话题，不走好友私聊接口
+        if (friend.isOctop) {
+            val octopTopic = "octop_${com.echolink.data.AuthManager.username}"
+            if (isWide) {
+                val frag = com.echolink.ui.TopicFragment.chatOnly(octopTopic, "Octop")
+                childFragmentManager.beginTransaction()
+                    .replace(binding.chatContainer.id, frag)
+                    .commit()
+                binding.chatContainer.visibility = View.VISIBLE
+                binding.tvChatPlaceholder.visibility = View.GONE
+                val dm = resources.displayMetrics.density
+                val lp = binding.leftPane.layoutParams as LinearLayout.LayoutParams
+                lp.width = (360 * dm).toInt()
+                lp.weight = 0f
+                binding.leftPane.layoutParams = lp
+            } else {
+                (activity as? MainActivity)?.openTopic(octopTopic, "Octop", fromFriends = true)
+            }
+            return
+        }
         if (friend.isMoviepilot) {
             val mpTopic = "moviepilot_${com.echolink.data.AuthManager.username}"
             if (isWide) {
@@ -475,7 +512,7 @@ class FriendsFragment : Fragment(), TopicFragment.ChatPaneHost {
             holder.itemView.setOnClickListener { onItemClick(item) }
             holder.itemView.setOnLongClickListener {
                 // MP 虚拟好友不支持长按删除
-                if (!item.isMoviepilot) {
+                if (!item.isMoviepilot && !item.isOctop) {
                     onItemLongClick(item)
                 }
                 true

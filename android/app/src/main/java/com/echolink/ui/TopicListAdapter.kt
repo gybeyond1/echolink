@@ -52,6 +52,12 @@ class TopicListAdapter(
                 holder.ivAvatar.setImageResource(R.drawable.ic_moviepilot_neo)
                 holder.ivAvatar.setBackgroundResource(0)
             }
+            item.kind == "octop" -> {
+                holder.tvAvatar.visibility = View.GONE
+                holder.ivAvatar.visibility = View.VISIBLE
+                holder.ivAvatar.setImageResource(R.drawable.ic_octop_neo)
+                holder.ivAvatar.setBackgroundResource(0)
+            }
             item.kind == "notification" -> {
                 holder.tvAvatar.visibility = View.GONE
                 holder.ivAvatar.visibility = View.VISIBLE
@@ -94,6 +100,7 @@ class TopicListAdapter(
             "devices" -> "我的设备"
             "messagewall" -> "留言板"
             "moviepilot" -> "MoviePilot"
+            "octop" -> "Octop"
             "notification" -> "通知"
             else -> item.displayName ?: item.name
         }

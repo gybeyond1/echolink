@@ -141,6 +141,22 @@ function initDB() {
   try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN telegram_proxy_password TEXT DEFAULT ''"); } catch (_) {}
   try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN telegram_last_update_id INTEGER DEFAULT 0"); } catch (_) {}
 
+  // Octop 通道：每个用户独立的 Octop 通知/交互通道配置
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS octop_channels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      callback_url TEXT DEFAULT '',
+      octop_api_key TEXT DEFAULT '',
+      enabled INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  try { db.exec("ALTER TABLE octop_channels ADD COLUMN callback_url TEXT DEFAULT ''"); } catch (_) {}
+  try { db.exec("ALTER TABLE octop_channels ADD COLUMN octop_api_key TEXT DEFAULT ''"); } catch (_) {}
+
   // 话题消息「软删除」标记表（per-user）：某用户删除某条消息只在本侧隐藏，不影响他人。
   // 当该话题全部成员都软删除同一条消息时，由删除路由物理清除该消息。
   db.exec(`
@@ -354,6 +370,8 @@ const SETTINGS_DEFAULTS = {
   totp_enabled: "false", // 注册两步验证
   totp_secret: "", // TOTP 密钥
   moviepilot_callback_url: "", // MoviePilot 插件回调地址（如 http://192.168.1.100:3001）
+  octop_callback_url: "", // Octop 插件回调地址
+  octop_api_key: "", // Octop API key（可选）
 };
 
 let settingsCache = null;

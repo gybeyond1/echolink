@@ -303,7 +303,8 @@ data class Friend(
     val createdAt: String?,
     val displayName: String? = null,
     val avatarUrl: String? = null,
-    val isMoviepilot: Boolean = false
+    val isMoviepilot: Boolean = false,
+    val isOctop: Boolean = false
 )
 
 data class FriendRequest(
