@@ -130,15 +130,10 @@ function initDB() {
     )
   `);
   // 兼容旧库：补列
-  for (const col of [
-    ['name', "ADD COLUMN name TEXT DEFAULT ''"],
-    ['device', "ADD COLUMN device TEXT DEFAULT 'all'"],
-    ['push_count', "ADD COLUMN push_count INTEGER DEFAULT 0"],
-    ['last_push_at', 'ADD COLUMN last_push_at DATETIME'],
-  ]) {
-    try { octopDb.exec(`ALTER TABLE octop_channels ${col[1]}`); } catch {}
-  }
-  `);
+  try { db.exec("ALTER TABLE octop_channels ADD COLUMN name TEXT DEFAULT ''"); } catch (_) {}
+  try { db.exec("ALTER TABLE octop_channels ADD COLUMN device TEXT DEFAULT 'all'"); } catch (_) {}
+  try { db.exec("ALTER TABLE octop_channels ADD COLUMN push_count INTEGER DEFAULT 0"); } catch (_) {}
+  try { db.exec("ALTER TABLE octop_channels ADD COLUMN last_push_at DATETIME"); } catch (_) {}
   // 迁移：旧表加字段
   try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN callback_url TEXT DEFAULT ''"); } catch (_) {}
   try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN public_base_url TEXT DEFAULT ''"); } catch (_) {}
