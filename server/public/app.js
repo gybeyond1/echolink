@@ -352,6 +352,7 @@
     { id: "admin_notifs", ic: "📥", label: "全部通知" },
     { id: "admin_messagewall", ic: "📝", label: "留言板" },
     { id: "admin_moviepilot", ic: "🎬", label: "MP 通道" },
+    { id: "admin_octop", ic: "🤖", label: "Octop 通道" },
     { id: "admin_settings", ic: "⚙️", label: "服务器设置" },
   ];
 
@@ -399,6 +400,7 @@
       if (state.tab === "admin_settings") return renderAdminSettings(main);
       if (state.tab === "admin_messagewall") return renderAdminMessagewall(main);
       if (state.tab === "admin_moviepilot") return renderAdminMoviepilot(main);
+      if (state.tab === "admin_octop") return renderAdminOctop(main);
     } catch (e) {
       main.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
     }
@@ -1600,6 +1602,89 @@
     };
 
     load();
+  }
+
+
+  async function renderAdminOctop(main) {
+    main.innerHTML = `<h2 class="page-title">Octop 通知通道</h2>
+      <p class="page-sub">管理 Octop AI 助手的通知通道。Octop 通过这个通道向设备推送通知和流式内容。</p>
+      <div class="card" style="max-width:680px">
+        <h3 style="margin:0 0 14px 0">通道列表</h3>
+        <table style="width:100%">
+          <thead><tr><th>通道名</th><th>设备</th><th>Token</th><th>已推送</th><th>操作</th></tr></thead>
+          <tbody id="octop-ch-tbody"><tr><td colspan="5" class="hint" style="padding:12px">加载中…</td></tr></tbody>
+        </table>
+        <div class="row" style="margin-top:16px;align-items:end">
+          <div><label>通道名</label><input id="octop-ch-name" type="text" placeholder="Octop 通知" style="width:240px" /></div>
+          <div><label>设备</label><input id="octop-ch-device" type="text" placeholder="all" style="width:160px" /></div>
+        </div>
+        <button class="btn" id="octop-ch-add" style="margin-top:14px">添加通道</button>
+        <div id="octop-ch-status" style="margin-top:12px"></div>
+      </div>
+      <div class="card" style="max-width:680px;margin-top:16px">
+        <h3 style="margin:0 0 14px 0">最近推送</h3>
+        <div id="octop-feed" class="empty">暂无</div>
+      </div>`;
+    const status = document.getElementById("octop-ch-status");
+
+    async function load() {
+      try {
+        const r = await api("/api/admin/octop/channels");
+        const tbody = document.getElementById("octop-ch-tbody");
+        if (!r.channels || !r.channels.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="hint" style="padding:12px">还没有通道，添加一个吧</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = r.channels.map(ch => `
+          <tr>
+            <td>${esc(ch.name)}</td>
+            <td>${esc(ch.device)}</td>
+            <td><span class="chip">${esc(ch.token)}</span></td>
+            <td>${ch.push_count || 0}</td>
+            <td>
+              <button class="btn danger btn-sm" data-id="${ch.id}" data-action="del">删除</button>
+            </td>
+          </tr>`).join("");
+        tbody.querySelectorAll("button[data-action=del]").forEach(btn => btn.onclick = async () => {
+          try { await api(`/api/admin/octop/channels/${btn.dataset.id}`, { method: "DELETE" }); load(); }
+          catch (e) { status.innerHTML = `<div class="alert alert-err">${esc(e.message)}</div>`; }
+        });
+      } catch (e) {
+        status.innerHTML = `<div class="alert alert-err">${esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadFeed() {
+      try {
+        const r = await api("/api/admin/octop/channels/feed");
+        const box = document.getElementById("octop-feed");
+        if (!r.feed || !r.feed.length) { box.innerHTML = `<div class="empty">暂无</div>`; return; }
+        box.innerHTML = r.feed.slice(0, 20).map(m => `
+          <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+            <strong>${esc(m.topic)}</strong>
+            <span class="hint">${new Date(m.created_at).toLocaleString()}</span>
+            <div>${esc(m.text)}</div>
+          </div>`).join("");
+      } catch {}
+    }
+
+    document.getElementById("octop-ch-add").onclick = async () => {
+      const name = document.getElementById("octop-ch-name").value.trim();
+      const device = document.getElementById("octop-ch-device").value.trim() || "all";
+      if (!name) { status.innerHTML = `<div class="hint">填写通道名</div>`; return; }
+      try {
+        const r = await api("/api/admin/octop/channels", { method: "POST", json: { name, device } });
+        document.getElementById("octop-ch-name").value = "";
+        document.getElementById("octop-ch-device").value = "";
+        status.innerHTML = `<div class="alert alert-ok">已创建！把 token 配置到 Octop：</div>
+          <div class="hint" style="font-family:monospace;margin-top:8px">export ECHOLINK_TOKEN=${esc(r.token)}</div>
+          <div class="hint" style="font-family:monospace">export ECHOLINK_URL=http://你的服务器:39000</div>`;
+        load();
+      } catch (e) { status.innerHTML = `<div class="alert alert-err">${esc(e.message)}</div>`; }
+    };
+
+    load();
+    loadFeed();
   }
 
   async function renderAdminSettings(main) {
