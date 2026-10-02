@@ -22,11 +22,43 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        continue-on-error: true
+
+      - name: Fallback to bundled Android SDK
+        run: |
+          # 如果 setup-android 失败或 SDK 未就位，用 runner 自带的 cmdline-tools 继续
+          if [ -d "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" ]; then
+            echo "使用 bundled cmdline-tools: $ANDROID_SDK_ROOT/cmdline-tools/latest/bin"
+            echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          elif [ -d "/usr/local/lib/android/sdk/cmdline-tools/latest/bin" ]; then
+            export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+            echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          elif [ -d "/usr/lib/android-sdk/cmdline-tools/latest/bin" ]; then
+            export ANDROID_SDK_ROOT=/usr/lib/android-sdk
+            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+            echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          else
+            echo "尝试自动下载 cmdline-tools..."
+            curl -fsSL -o /tmp/cmdline-tools.zip \
+              https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q /tmp/cmdline-tools.zip -d /tmp/
+            sudo mkdir -p /usr/local/lib/android/sdk/cmdline-tools/latest
+            sudo mv /tmp/cmdline-tools /usr/local/lib/android/sdk/cmdline-tools/latest
+            export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+            echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+            echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          fi
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          set -x
+          yes | sdkmanager --licenses 2>&1 || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools" 2>&1 \
+            || sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools" 2>&1 \
+            || echo "SDK 包安装失败，使用已有版本..."
 
       - name: Set up Gradle 8.5
         run: |
@@ -46,6 +78,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          ANDROID_HOME: $ANDROID_SDK_ROOT
         run: gradle assembleRelease --no-daemon
 
       - name: Prepare APK for release
