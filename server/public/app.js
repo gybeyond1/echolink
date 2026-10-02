@@ -1661,9 +1661,9 @@
         if (!r.feed || !r.feed.length) { box.innerHTML = `<div class="empty">暂无</div>`; return; }
         box.innerHTML = r.feed.slice(0, 20).map(m => `
           <div style="padding:8px 0;border-bottom:1px solid var(--line)">
-            <strong>${esc(m.topic)}</strong>
-            <span class="hint">${new Date(m.created_at).toLocaleString()}</span>
-            <div>${esc(m.text)}</div>
+            <strong>${esc(m.name || m.device || m.token)}</strong>
+            <span class="hint">${new Date(m.last_push_at || m.created_at).toLocaleString()}</span>
+            <div class="hint">已推送 ${m.push_count || 0} 次</div>
           </div>`).join("");
       } catch {}
     }
@@ -1673,7 +1673,7 @@
       const device = document.getElementById("octop-ch-device").value.trim() || "all";
       if (!name) { status.innerHTML = `<div class="hint">填写通道名</div>`; return; }
       try {
-        const r = await api("/api/admin/octop/channels", { method: "POST", json: { name, device } });
+        const r = await api("/api/admin/octop/channels", { method: "POST", json: { name, device, userId: "default" } });
         document.getElementById("octop-ch-name").value = "";
         document.getElementById("octop-ch-device").value = "";
         status.innerHTML = `<div class="alert alert-ok">已创建！把 token 配置到 Octop：</div>

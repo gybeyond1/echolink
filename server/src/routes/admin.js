@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const { getDB, getSettings, setSettings } = require("../db");
 const { authMiddleware, requireAdmin } = require("../middleware/auth");
 const { getAllChannels, getOrCreateChannel, deleteChannel, toggleChannel, updateChannel } = require("../moviepilot");
+const octopDb = require("../octop");
 const { getAllChannels: getOctopAllChannels, getOrCreateChannel: getOctopOrCreateChannel, deleteChannel: deleteOctopChannel, toggleChannel: toggleOctopChannel, updateChannel: updateOctopChannel } = require("../octop");
 
 const router = express.Router();
@@ -389,3 +390,16 @@ router.put("/octop/channels/:userId", (req, res) => {
 });
 
 module.exports = router;
+
+
+router.post("/octop/channels", (req, res) => {
+    const { name, device, userId } = req.body || {};
+    if (!name) return res.status(400).json({ error: "通道名必填" });
+    const channel = getOctopOrCreateChannel(userId || "default", name, device || "all");
+    res.json({ ok: true, channel });
+});
+
+router.get("/octop/channels/feed", (req, res) => {
+    const feed = octopDb.getOctopRecentFeed ? octopDb.getOctopRecentFeed(50) : [];
+    res.json({ feed });
+});

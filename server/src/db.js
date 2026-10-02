@@ -121,9 +121,23 @@ function initDB() {
       public_base_url TEXT DEFAULT '',
       mp_api_key TEXT DEFAULT '',
       enabled INTEGER DEFAULT 1,
+      name TEXT DEFAULT '',
+      device TEXT DEFAULT 'all',
+      push_count INTEGER DEFAULT 0,
+      last_push_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
+  `);
+  // 兼容旧库：补列
+  for (const col of [
+    ['name', "ADD COLUMN name TEXT DEFAULT ''"],
+    ['device', "ADD COLUMN device TEXT DEFAULT 'all'"],
+    ['push_count', "ADD COLUMN push_count INTEGER DEFAULT 0"],
+    ['last_push_at', 'ADD COLUMN last_push_at DATETIME'],
+  ]) {
+    try { octopDb.exec(`ALTER TABLE octop_channels ${col[1]}`); } catch {}
+  }
   `);
   // 迁移：旧表加字段
   try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN callback_url TEXT DEFAULT ''"); } catch (_) {}
