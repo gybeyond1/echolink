@@ -389,13 +389,23 @@ router.put("/octop/channels/:userId", (req, res) => {
   res.json({ ok: true, channel: { ...channel, username: user ? user.username : null } });
 });
 
-module.exports = router;
+
 
 
 router.post("/octop/channels", (req, res) => {
-    const { name, device, userId } = req.body || {};
+    const { name, device, username } = req.body || {};
     if (!name) return res.status(400).json({ error: "通道名必填" });
-    const channel = getOctopOrCreateChannel(userId || "default", name, device || "all");
+    const db = getDB();
+    // 把用户名转成 userId（整数）
+    let numericUserId;
+    if (username) {
+      const row = db.prepare("SELECT id FROM users WHERE username = ?").get(username);
+      if (!row) return res.status(404).json({ error: "用户不存在: " + username });
+      numericUserId = row.id;
+    } else {
+      numericUserId = req.userId; // 当前登录管理员自己
+    }
+    const channel = getOctopOrCreateChannel(numericUserId, name, device || "all");
     res.json({ ok: true, channel });
 });
 
@@ -403,3 +413,5 @@ router.get("/octop/channels/feed", (req, res) => {
     const feed = octopDb.getOctopRecentFeed ? octopDb.getOctopRecentFeed(50) : [];
     res.json({ feed });
 });
+
+module.exports = router;

@@ -117,12 +117,12 @@ function generateToken() {
 
 // 获取或创建通道
 function getOrCreateChannel(userId, name, device) {
-  const db = require("./db");
+  const db = getDB();
   const token = generateToken();
-  db.octopDb.prepare(
+  db.prepare(
     "INSERT OR REPLACE INTO octop_channels (user_id, token, name, device, push_count, enabled) VALUES (?, ?, ?, ?, 0, 1)"
   ).run(userId, token, name || '', device || 'all');
-  const row = db.octopDb.prepare(
+  const row = db.prepare(
     "SELECT user_id, token, name, device, push_count, last_push_at, created_at FROM octop_channels WHERE user_id = ?"
   ).get(userId);
   return row;
@@ -179,38 +179,18 @@ function getAllChannels() {
 
 // 追加 Octop 消息到话题并广播
 function appendOctopMessage(username, cardData, text) {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId);
   const db = getDB();
   const octopUser = (username && username.trim()) ? username.trim() : DEFAULT_OCTOP_USER;
   const userId = getUserIdByUsername(octopUser);
   if (!userId) {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId);
-    return {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId); delivered: 0, message: null, error: "用户不存在: " + octopUser };
+    return { delivered: 0, message: null, error: "用户不存在: " + octopUser };
   }
 
   const msgText = String(text || cardData?.text || "");
 
   // 10 秒去重
   if (isOctopDuplicate(octopUser, msgText)) {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId);
-    return {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId); delivered: 0, message: null, duplicate: true };
+    return { delivered: 0, message: null, duplicate: true };
   }
 
   const topic = ensureUserOctopTopic(userId, octopUser);
@@ -226,10 +206,6 @@ function appendOctopMessage(username, cardData, text) {
     .run(topicName, cardData?.title || "Octop", msgText, ts, cardJson);
 
   const message = {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId);
     id: result.lastInsertRowid,
     topic: topicName,
     title: cardData?.title || "Octop",
@@ -249,24 +225,13 @@ function appendOctopMessage(username, cardData, text) {
     peer_avatar: null,
   };
 
-  const {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId); broadcastToUser } = require("./websocket");
+  const { broadcastToUser } = require("./websocket");
   try {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId); broadcastToUser(userId, {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId); type: "topic_message", topic: topicName, data: message }); } catch (_) {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId);}
+    broadcastToUser(userId, { type: "topic_message", topic: topicName, data: message });
+  } catch (_) {}
+
+  // 更新通道计数
+  db.prepare("UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?").run(userId);
 
   // 历史裁剪
   const maxHistory = parseInt(process.env.MAX_TOPIC_HISTORY || "200");
@@ -275,11 +240,7 @@ function appendOctopMessage(username, cardData, text) {
        SELECT id FROM topic_messages WHERE topic = ? ORDER BY id DESC LIMIT ?)`
   ).run(topicName, topicName, maxHistory);
 
-  return {
-  const db = require("./db");
-  db.octopDb.prepare(
-    "UPDATE octop_channels SET push_count = push_count + 1, last_push_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-  ).run(userId); delivered: 1, message };
+  return { delivered: 1, message };
 }
 
 // 编辑已发送的 Octop 消息
@@ -486,9 +447,9 @@ function sendUserMessageToOctop(username, text) {
 
 function getOctopRecentFeed(limit) {
   limit = limit || 50;
-  const db = require("./db");
+  const db = getDB();
   try {
-    return db.octopDb.prepare(
+    return db.prepare(
       "SELECT user_id, token, name, device, push_count, last_push_at, created_at FROM octop_channels ORDER BY last_push_at DESC, created_at DESC LIMIT ?"
     ).all(limit);
   } catch (e) {
