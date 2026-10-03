@@ -1083,6 +1083,16 @@ class TopicFragment : Fragment() {
                         com.echolink.util.DebugLogger.e("TopicFragment", "MP转发失败", e)
                     }
                 }
+                // Octop 话题：文字消息额外转发给 Octop
+                if (!skipMpForward && topic.startsWith("octop_") && mediaType == "text" && text.isNotEmpty()) {
+                    com.echolink.util.DebugLogger.d("TopicFragment", "Octop转发消息: topic=$topic, text=$text")
+                    try {
+                        val resp = ApiClient.post("/api/octop/send", mapOf("text" to text))
+                        com.echolink.util.DebugLogger.d("TopicFragment", "Octop转发响应: $resp")
+                    } catch (e: Exception) {
+                        com.echolink.util.DebugLogger.e("TopicFragment", "Octop转发失败", e)
+                    }
+                }
             } catch (e: Exception) {
                 // 发送失败：移除临时消息
                 chatAdapter.removeMessage(tempId)
