@@ -296,7 +296,8 @@ router.post("/stream_start", (req, res) => {
   const token = body.token || req.query.token || req.headers["x-octop-token"];
   const channel = verifyToken(token);
   if (!channel) return res.status(401).json({ error: "无效或缺失的通道 token" });
-  const username = body.username || channel.username;
+  // 只允许推到通道所属用户，忽略客户端传入的 username
+  const username = channel.username;
   const initialText = body.text || "";
   try {
     const r = startStreamMessage(username, initialText);

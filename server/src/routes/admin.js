@@ -4,7 +4,7 @@ const { getDB, getSettings, setSettings } = require("../db");
 const { authMiddleware, requireAdmin } = require("../middleware/auth");
 const { getAllChannels, getOrCreateChannel, deleteChannel, toggleChannel, updateChannel } = require("../moviepilot");
 const octopDb = require("../octop");
-const { getAllChannels: getOctopAllChannels, getOrCreateChannel: getOctopOrCreateChannel, deleteChannel: deleteOctopChannel, toggleChannel: toggleOctopChannel, updateChannel: updateOctopChannel } = require("../octop");
+const { getAllChannels: getOctopAllChannels, getOrCreateChannel: getOctopOrCreateChannel, deleteChannel: deleteOctopChannel, toggleChannel: toggleOctopChannel, updateChannel: updateOctopChannel, generateToken: generateOctopToken } = require("../octop");
 
 const router = express.Router();
 
@@ -346,6 +346,17 @@ router.get("/octop/channels", (req, res) => {
   }
 });
 
+router.post("/octop/channels/:userId/reset", (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: "invalid user id" });
+  const db = getDB();
+  const row = db.prepare("SELECT user_id FROM octop_channels WHERE user_id = ?").get(userId);
+  if (!row) return res.status(404).json({ error: "Channel not found" });
+  const newToken = generateOctopToken();
+  db.prepare("UPDATE octop_channels SET token = ? WHERE user_id = ?").run(newToken, userId);
+  res.json({ ok: true, token: newToken });
+});
+
 // 为用户创建/重置 Octop 通道（生成新 token）
 router.post("/octop/channels/:userId", (req, res) => {
   const userId = parseInt(req.params.userId);
@@ -391,23 +402,6 @@ router.put("/octop/channels/:userId", (req, res) => {
 
 
 
-
-router.post("/octop/channels", (req, res) => {
-    const { name, device, username } = req.body || {};
-    if (!name) return res.status(400).json({ error: "通道名必填" });
-    const db = getDB();
-    // 把用户名转成 userId（整数）
-    let numericUserId;
-    if (username) {
-      const row = db.prepare("SELECT id FROM users WHERE username = ?").get(username);
-      if (!row) return res.status(404).json({ error: "用户不存在: " + username });
-      numericUserId = row.id;
-    } else {
-      numericUserId = req.userId; // 当前登录管理员自己
-    }
-    const channel = getOctopOrCreateChannel(numericUserId, name, device || "all");
-    res.json({ ok: true, channel });
-});
 
 router.get("/octop/channels/feed", (req, res) => {
     const feed = octopDb.getOctopRecentFeed ? octopDb.getOctopRecentFeed(50) : [];

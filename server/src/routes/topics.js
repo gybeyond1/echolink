@@ -134,7 +134,12 @@ router.get("/", authMiddleware, (req, res) => {
        WHERE ${isAdmin ? "1=1" : "m.user_id = ?"}
          AND (t.kind != 'devices' OR u.id IS NOT NULL)
          AND (
+           COALESCE(t.kind, '') NOT IN ('octop', 'moviepilot')
+           ${isAdmin ? "" : "OR (t.kind IN ('octop','moviepilot') AND t.owner_id = m.user_id)"}
+         )
+         AND (
            t.kind = 'devices'
+           ${isAdmin ? "OR 1=1" : "OR t.kind IN ('octop','moviepilot')"}
            OR EXISTS (
              SELECT 1 FROM topic_messages tm
              WHERE tm.topic = t.name
@@ -240,7 +245,9 @@ router.get("/:topic/members", authMiddleware, (req, res) => {
   const db = getDB();
   const topic = getTopic(name);
   if (!topic) return res.status(404).json({ error: "Topic not found" });
-  if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
+  if (["octop", "moviepilot"].includes(topic.kind)) {
+    if (req.userId !== topic.owner_id) return res.status(403).json({ error: "Not a member of this topic" });
+  } else if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
     return res.status(403).json({ error: "Not a member of this topic" });
   }
   const members = db
@@ -400,14 +407,17 @@ router.post("/:topic/publish", authMiddleware, (req, res) => {
     const info = db.prepare("INSERT INTO topics (name, owner_id, title, description, kind) VALUES (?, ?, ?, ?, 'normal')").run(name, req.userId, name, "");
     topic = { id: info.lastInsertRowid, name };
     db.prepare("INSERT INTO topic_members (topic_id, user_id, role) VALUES (?, ?, 'owner')").run(topic.id, req.userId);
-  } else if (topic.kind === "devices" || topic.kind === "dm") {
-    // 设备会话：仅同账号；私聊：仅 dm-<a>-<b> 中的两位好友（名字里就能校验）
+  } else if (["devices", "dm", "octop", "moviepilot"].includes(topic.kind)) {
+    // 设备会话 / 私聊 / 私有通道（octop、moviepilot）：仅本人可发
     let allowed = false;
     if (topic.kind === "devices") {
       allowed = req.userId === topic.owner_id || req.role === "admin";
-    } else {
+    } else if (topic.kind === "dm") {
       const m = /^dm-(\d+)-(\d+)$/.exec(name);
       allowed = !!m && (req.userId === parseInt(m[1]) || req.userId === parseInt(m[2]) || req.role === "admin");
+    } else {
+      // octop_ / moviepilot_ 私有通道：仅 owner 本人可发
+      allowed = req.userId === topic.owner_id;
     }
     if (!allowed) return res.status(403).json({ error: "You are not a member of this topic" });
     // 兜底补齐成员关系（历史数据可能缺）
@@ -503,7 +513,13 @@ router.get("/:topic/messages", authMiddleware, (req, res) => {
   const db = getDB();
   const topic = getTopic(name);
   if (!topic) return res.status(404).json({ error: "Topic not found" });
-  if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
+  const isPrivate = ["octop", "moviepilot"].includes(topic.kind);
+  if (isPrivate) {
+    // 私有通道：仅 owner 本人可读（admin 也不可）
+    if (req.userId !== topic.owner_id) {
+      return res.status(403).json({ error: "Not a member of this topic" });
+    }
+  } else if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
     return res.status(403).json({ error: "Not a member of this topic" });
   }
 
@@ -566,6 +582,9 @@ router.post("/:topic/read", authMiddleware, (req, res) => {
   const db = getDB();
   const topic = getTopic(name);
   if (!topic) return res.status(404).json({ error: "Topic not found" });
+  if (["octop", "moviepilot"].includes(topic.kind) && req.userId !== topic.owner_id) {
+    return res.status(403).json({ error: "Not a member of this topic" });
+  }
   const mem = getMembership(topic.id, req.userId);
   if (!mem && req.role !== "admin") return res.status(403).json({ error: "Not a member of this topic" });
   const maxId = db.prepare("SELECT COALESCE(MAX(id), 0) as max_id FROM topic_messages WHERE topic = ?").get(name);
@@ -621,6 +640,9 @@ router.delete("/:topic/messages/:id", authMiddleware, (req, res) => {
   const db = getDB();
   const topic = getTopic(name);
   if (!topic) return res.status(404).json({ error: "Topic not found" });
+  if (["octop", "moviepilot"].includes(topic.kind) && req.userId !== topic.owner_id) {
+    return res.status(403).json({ error: "Not a member of this topic" });
+  }
   if (!getMembership(topic.id, req.userId) && req.role !== "admin") {
     return res.status(403).json({ error: "Not a member of this topic" });
   }

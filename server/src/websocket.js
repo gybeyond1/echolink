@@ -33,6 +33,7 @@ function setupWebSocket(server) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "default-secret");
       userId = decoded.userId;
+      ws.role = decoded.role || "user";
     } catch (err) {
       ws.close(4003, "Invalid token");
       return;
@@ -144,11 +145,29 @@ function setupWebSocket(server) {
 
 // ===== 话题订阅/发布 =====
 
+function getTopicOwnerId(topicId) {
+  const db = getDB();
+  const t = db.prepare("SELECT owner_id FROM topics WHERE id = ?").get(topicId);
+  return t ? t.owner_id : null;
+}
+
 function subscribeToTopic(ws, topic) {
   const name = normalizeTopic(topic);
   if (!name) {
     ws.send(JSON.stringify({ type: "error", message: "Invalid topic name" }));
     return;
+  }
+  // 私有通道（octop_ / moviepilot_）：只允许 owner 本人订阅，admin 也不能偷听
+  if (/^(octop_|moviepilot_)/.test(name)) {
+    const db = getDB();
+    const tRow = db.prepare("SELECT id, owner_id FROM topics WHERE name = ?").get(name);
+    if (tRow) {
+      if (ws.userId !== tRow.owner_id) {
+        ws.send(JSON.stringify({ type: "error", message: "Not a member of this topic" }));
+        console.log(`[WS] User ${ws.userId} DENIED subscribe to private topic "${name}" (owner=${tRow.owner_id})`);
+        return;
+      }
+    }
   }
   if (!topicSubscriptions.has(name)) topicSubscriptions.set(name, new Set());
   topicSubscriptions.get(name).add(ws);

@@ -1607,84 +1607,87 @@
 
   async function renderAdminOctop(main) {
     main.innerHTML = `<h2 class="page-title">Octop 通知通道</h2>
-      <p class="page-sub">管理 Octop AI 助手的通知通道。Octop 通过这个通道向设备推送通知和流式内容。</p>
-      <div class="card" style="max-width:680px">
-        <h3 style="margin:0 0 14px 0">通道列表</h3>
-        <table style="width:100%">
-          <thead><tr><th>通道名</th><th>设备</th><th>Token</th><th>已推送</th><th>操作</th></tr></thead>
-          <tbody id="octop-ch-tbody"><tr><td colspan="5" class="hint" style="padding:12px">加载中…</td></tr></tbody>
-        </table>
-        <div class="row" style="margin-top:16px;align-items:end">
-          <div><label>通道名</label><input id="octop-ch-name" type="text" placeholder="Octop 通知" style="width:240px" /></div>
-          <div><label>设备</label><input id="octop-ch-device" type="text" placeholder="all" style="width:160px" /></div>
-        </div>
-        <button class="btn" id="octop-ch-add" style="margin-top:14px">添加通道</button>
-        <div id="octop-ch-status" style="margin-top:12px"></div>
-      </div>
-      <div class="card" style="max-width:680px;margin-top:16px">
-        <h3 style="margin:0 0 14px 0">最近推送</h3>
-        <div id="octop-feed" class="empty">暂无</div>
+      <p class="page-sub">为每个用户生成独立的 Octop 通知通道 Token。Octop 通过这个通道向该用户的设备推送通知，不同账号之间完全隔离。</p>
+      <div class="card">
+        <label>用户通道列表</label>
+        <div id="octop-list">加载中…</div>
       </div>`;
-    const status = document.getElementById("octop-ch-status");
 
-    async function load() {
+    const box = document.getElementById("octop-list");
+
+    const load = async () => {
       try {
         const r = await api("/api/admin/octop/channels");
-        const tbody = document.getElementById("octop-ch-tbody");
-        if (!r.channels || !r.channels.length) {
-          tbody.innerHTML = `<tr><td colspan="5" class="hint" style="padding:12px">还没有通道，添加一个吧</td></tr>`;
-          return;
+        const channels = r.channels || [];
+        if (!channels.length) {
+          box.innerHTML = `<div class="empty">暂无通道，点击下方按钮为用户创建。</div>`;
+        } else {
+          box.innerHTML = `<table><thead><tr><th>用户</th><th>Token</th><th>状态</th><th>已推送</th><th></th></tr></thead><tbody>
+            ${channels.map(c => {
+              const disabled = c.enabled === 0;
+              return `<tr>
+                <td><b>${esc(c.display_name || c.username)}</b><div style="color:var(--muted);font-size:12px">@${esc(c.username)} · ID: ${c.user_id}</div></td>
+                <td><code style="font-size:11px;word-break:break-all">${esc(String(c.token||"").substring(0, 12))}...</code> <button class="btn ghost sm" data-copy-token="${c.user_id}" data-token="${esc(c.token)}">复制</button></td>
+                <td><span class="badge ${disabled ? "member" : "admin"}">${disabled ? "禁用" : "启用"}</span></td>
+                <td style="font-size:12px;color:var(--muted)">${c.push_count || 0}${c.last_push_at ? `<div style="font-size:11px">${new Date(c.last_push_at).toLocaleString()}</div>` : ""}</td>
+                <td style="text-align:right;white-space:nowrap">
+                  <button class="btn ghost sm" data-toggle="${c.user_id}" data-enabled="${c.enabled ? 1 : 0}">${disabled ? "启用" : "禁用"}</button>
+                  <button class="btn sm" data-reset="${c.user_id}">重置Token</button>
+                  <button class="btn danger sm" data-del="${c.user_id}">删除</button>
+                </td>
+              </tr>`;
+            }).join("")}
+          </tbody></table>`;
         }
-        tbody.innerHTML = r.channels.map(ch => `
-          <tr>
-            <td>${esc(ch.name)}</td>
-            <td>${esc(ch.device)}</td>
-            <td><span class="chip">${esc(ch.token)}</span></td>
-            <td>${ch.push_count || 0}</td>
-            <td>
-              <button class="btn danger btn-sm" data-id="${ch.id}" data-action="del">删除</button>
-            </td>
-          </tr>`).join("");
-        tbody.querySelectorAll("button[data-action=del]").forEach(btn => btn.onclick = async () => {
-          try { await api(`/api/admin/octop/channels/${btn.dataset.id}`, { method: "DELETE" }); load(); }
-          catch (e) { status.innerHTML = `<div class="alert alert-err">${esc(e.message)}</div>`; }
+
+        const users = await api("/api/admin/users");
+        const channelUserIds = new Set(channels.map(c => c.user_id));
+        const noChannelUsers = (users.users || []).filter(u => !channelUserIds.has(u.id));
+        if (noChannelUsers.length) {
+          box.innerHTML += `<div style="margin-top:12px">
+            <label>为以下用户创建通道：</label>
+            <div class="chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+              ${noChannelUsers.map(u => `<button class="btn sm" data-create="${u.id}">+ ${esc(u.display_name || u.username)} (ID: ${u.id})</button>`).join(" ")}
+            </div>
+          </div>`;
+        }
+
+        box.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => {
+          try {
+            await api("/api/admin/octop/channels/" + b.dataset.toggle + "/toggle", { method: "PUT", json: { enabled: b.dataset.enabled === "0" } });
+            toast("已更新", "ok"); load();
+          } catch (e) { toast(e.message, "err"); }
+        });
+        box.querySelectorAll("[data-reset]").forEach(b => b.onclick = async () => {
+          if (!confirm("重置该用户的 Octop 通道 Token？旧 Token 将失效。")) return;
+          try {
+            await api("/api/admin/octop/channels/" + b.dataset.reset + "/reset", { method: "POST", json: {} });
+            toast("已重置", "ok"); load();
+          } catch (e) { toast(e.message, "err"); }
+        });
+        box.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+          if (!confirm("删除该用户的 Octop 通道？")) return;
+          try {
+            await api("/api/admin/octop/channels/" + b.dataset.del, { method: "DELETE" });
+            toast("已删除", "ok"); load();
+          } catch (e) { toast(e.message, "err"); }
+        });
+        box.querySelectorAll("[data-create]").forEach(b => b.onclick = async () => {
+          try {
+            await api("/api/admin/octop/channels/" + b.dataset.create, { method: "POST", json: {} });
+            toast("已创建", "ok"); load();
+          } catch (e) { toast(e.message, "err"); }
+        });
+        box.querySelectorAll("[data-copy-token]").forEach(b => b.onclick = () => {
+          const token = b.dataset.token;
+          if (navigator.clipboard) navigator.clipboard.writeText(token).then(() => toast("Token 已复制", "ok")).catch(() => {});
         });
       } catch (e) {
-        status.innerHTML = `<div class="alert alert-err">${esc(e.message)}</div>`;
+        box.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
       }
-    }
-
-    async function loadFeed() {
-      try {
-        const r = await api("/api/admin/octop/channels/feed");
-        const box = document.getElementById("octop-feed");
-        if (!r.feed || !r.feed.length) { box.innerHTML = `<div class="empty">暂无</div>`; return; }
-        box.innerHTML = r.feed.slice(0, 20).map(m => `
-          <div style="padding:8px 0;border-bottom:1px solid var(--line)">
-            <strong>${esc(m.name || m.device || m.token)}</strong>
-            <span class="hint">${new Date(m.last_push_at || m.created_at).toLocaleString()}</span>
-            <div class="hint">已推送 ${m.push_count || 0} 次</div>
-          </div>`).join("");
-      } catch {}
-    }
-
-    document.getElementById("octop-ch-add").onclick = async () => {
-      const name = document.getElementById("octop-ch-name").value.trim();
-      const device = document.getElementById("octop-ch-device").value.trim() || "all";
-      if (!name) { status.innerHTML = `<div class="hint">填写通道名</div>`; return; }
-      try {
-        const r = await api("/api/admin/octop/channels", { method: "POST", json: { name, device, userId: "default" } });
-        document.getElementById("octop-ch-name").value = "";
-        document.getElementById("octop-ch-device").value = "";
-        status.innerHTML = `<div class="alert alert-ok">已创建！把 token 配置到 Octop：</div>
-          <div class="hint" style="font-family:monospace;margin-top:8px">export ECHOLINK_TOKEN=${esc(r.token)}</div>
-          <div class="hint" style="font-family:monospace">export ECHOLINK_URL=http://你的服务器:39000</div>`;
-        load();
-      } catch (e) { status.innerHTML = `<div class="alert alert-err">${esc(e.message)}</div>`; }
     };
 
     load();
-    loadFeed();
   }
 
   async function renderAdminSettings(main) {

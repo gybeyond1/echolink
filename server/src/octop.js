@@ -5,7 +5,7 @@ const https = require("https");
 const { URL } = require("url");
 
 // 默认 Octop 用户（兼容不带用户名的旧调用地址）
-const DEFAULT_OCTOP_USER = "gybeyond";
+const DEFAULT_OCTOP_USER = null;
 
 // ========== 长轮询消息队列 ==========
 // 内存消息队列：username -> [{update_id, message}]
@@ -169,6 +169,7 @@ function getAllChannels() {
   const db = getDB();
   const rows = db.prepare(
     `SELECT c.id, c.user_id, c.token, c.enabled, c.created_at,
+            c.name, c.device, c.push_count, c.last_push_at,
             u.username, u.display_name
      FROM octop_channels c
      JOIN users u ON u.id = c.user_id
@@ -181,6 +182,9 @@ function getAllChannels() {
 function appendOctopMessage(username, cardData, text) {
   const db = getDB();
   const octopUser = (username && username.trim()) ? username.trim() : DEFAULT_OCTOP_USER;
+  if (!octopUser) {
+    return { delivered: 0, message: null, error: "未指定目标用户" };
+  }
   const userId = getUserIdByUsername(octopUser);
   if (!userId) {
     return { delivered: 0, message: null, error: "用户不存在: " + octopUser };
