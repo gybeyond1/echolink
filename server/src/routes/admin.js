@@ -317,7 +317,7 @@ router.put("/moviepilot/channels/:userId/toggle", (req, res) => {
   res.json({ ok: true, enabled: enabled ? 1 : 0 });
 });
 
-// 更新通道配置（只保留 enabled）
+// 更新通道配置（enabled + MP 官方 API 模式字段）
 router.put("/moviepilot/channels/:userId", (req, res) => {
   const userId = parseInt(req.params.userId);
   if (!userId) return res.status(400).json({ error: "invalid user id" });
@@ -325,10 +325,27 @@ router.put("/moviepilot/channels/:userId", (req, res) => {
   const updates = {};
 
   if (body.enabled !== undefined) updates.enabled = body.enabled ? 1 : 0;
+  // 方案3：MP 官方 API 模式配置
+  for (const k of ["mp_server_url", "mp_username", "mp_password", "mp_poll_interval"]) {
+    if (body[k] !== undefined) updates[k] = body[k];
+  }
 
   const channel = updateChannel(userId, updates);
   const db = getDB();
   const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId);
+
+  // 配置变更后立即同步该用户的通知轮询状态（启/停）
+  try {
+    const { isMpApiChannel, startPolling, stopPolling } = require("../mpapi");
+    const username = user ? user.username : null;
+    if (username && isMpApiChannel(channel)) {
+      startPolling({ ...channel, username });
+    } else if (username) {
+      stopPolling(username);
+    }
+  } catch (e) {
+    console.error("[admin] mpapi 轮询同步失败:", e.message);
+  }
 
   res.json({ ok: true, channel: { ...channel, username: user ? user.username : null } });
 });

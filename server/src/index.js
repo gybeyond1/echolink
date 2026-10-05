@@ -150,4 +150,21 @@ server.listen(PORT, HOST, () => {
   console.log(`  WS:    ws://${HOST}:${PORT}/ws`);
   console.log(`  WebUI: http://${HOST}:${PORT}/`);
   console.log(`========================================\n`);
+
+  // 方案3：启动 MP 官方 API 模式的通知轮询（为已配置 mp_server_url 的通道）
+  try {
+    const { startAllPolling } = require("./mpapi");
+    startAllPolling();
+    console.log("[mpapi] MP 官方 API 轮询已初始化");
+  } catch (e) {
+    console.error("[mpapi] 初始化失败:", e.message);
+  }
 });
+
+// 优雅退出：清理轮询定时器
+for (const evt of ["SIGINT", "SIGTERM"]) {
+  process.on(evt, () => {
+    try { require("./mpapi").stopAllPolling(); } catch (_) {}
+    process.exit(0);
+  });
+}

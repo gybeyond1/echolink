@@ -1592,6 +1592,37 @@
             toast("已创建", "ok"); load();
           } catch (e) { toast(e.message, "err"); }
         });
+        box.querySelectorAll("[data-mpcfg]").forEach(b => b.onclick = () => {
+          const channel = channels.find(x => x.user_id === parseInt(b.dataset.mpcfg));
+          openModal("MP API 配置（方案3：官方接口直连）", `
+            <p style="color:var(--muted);font-size:12px;margin-bottom:10px">配置 MoviePilot 地址与账号后，该通道走官方 REST + Agent SSE（零侵入），通知由轮询推送；留空则回退旧长轮询模式。</p>
+            <label>MoviePilot 地址（如 http://192.168.31.76:3001）</label>
+            <input class="inp" id="mp-server" placeholder="http://192.168.31.76:3001" value="${esc(channel.mp_server_url || "")}">
+            <label>MP 用户名</label>
+            <input class="inp" id="mp-user" placeholder="gybeyond" value="${esc(channel.mp_username || "")}">
+            <label>MP 密码</label>
+            <input class="inp" id="mp-pass" type="password" placeholder="********" value="">
+            <label>通知轮询间隔（秒，5-60）</label>
+            <input class="inp" id="mp-poll" type="number" min="5" max="60" value="${channel.mp_poll_interval || 30}">
+            <div style="text-align:right;margin-top:14px">
+              <button class="btn" id="mp-save">保存</button>
+            </div>`);
+          document.getElementById("mp-save").onclick = async () => {
+            const body = {
+              mp_server_url: document.getElementById("mp-server").value.trim(),
+              mp_username: document.getElementById("mp-user").value.trim(),
+              mp_poll_interval: parseInt(document.getElementById("mp-poll").value) || 30,
+            };
+            const pass = document.getElementById("mp-pass").value;
+            if (pass) body.mp_password = pass;
+            try {
+              await api("/api/admin/moviepilot/channels/" + b.dataset.mpcfg, { method: "PUT", body });
+              toast("已保存，轮询已" + (body.mp_server_url ? "启动" : "停止"), "ok");
+              document.getElementById("autoModal")?.remove();
+              load();
+            } catch (e) { toast(e.message, "err"); }
+          };
+        });
         box.querySelectorAll("[data-copy-token]").forEach(b => b.onclick = () => {
           const token = b.dataset.token;
           if (navigator.clipboard) navigator.clipboard.writeText(token).then(() => toast("Token 已复制", "ok")).catch(() => {});

@@ -145,6 +145,14 @@ function updateChannel(userId, updates) {
   const values = [];
   if (updates.enabled !== undefined) { fields.push("enabled = ?"); values.push(updates.enabled ? 1 : 0); }
   if (updates.token !== undefined) { fields.push("token = ?"); values.push(updates.token); }
+  // MP 官方 API 模式配置（方案3）
+  if (updates.mp_server_url !== undefined) { fields.push("mp_server_url = ?"); values.push(String(updates.mp_server_url).trim()); }
+  if (updates.mp_username !== undefined) { fields.push("mp_username = ?"); values.push(String(updates.mp_username).trim()); }
+  if (updates.mp_password !== undefined) { fields.push("mp_password = ?"); values.push(String(updates.mp_password).trim()); }
+  if (updates.mp_poll_interval !== undefined) {
+    const v = Math.min(Math.max(parseInt(updates.mp_poll_interval) || 30, 5), 60);
+    fields.push("mp_poll_interval = ?"); values.push(v);
+  }
   if (fields.length === 0) return getOrCreateChannel(userId);
   values.push(userId);
   db.prepare(`UPDATE moviepilot_channels SET ${fields.join(", ")} WHERE user_id = ?`).run(...values);
@@ -167,6 +175,7 @@ function getAllChannels() {
   const db = getDB();
   const rows = db.prepare(`
     SELECT c.id, c.user_id, c.token, c.enabled, c.created_at,
+           c.mp_server_url, c.mp_username, c.mp_poll_interval, c.mp_last_notification_id,
            u.username, u.display_name
     FROM moviepilot_channels c
     JOIN users u ON u.id = c.user_id
@@ -456,6 +465,21 @@ async function callbackButton(username, callbackData, messageId) {
   const userId = getUserIdByUsername(username);
   if (!userId) return { error: "用户不存在: " + username };
 
+  // 方案3：若该用户通道已配置 MP 官方 API（mp_server_url + mp_username），
+  // 按钮回调直接走官方 /api/v1/message/agent/callback，不再入长轮询队列
+  try {
+    const { getChannelByUsername, isMpApiChannel, sendCallback } = require("./mpapi");
+    const channel = getChannelByUsername(username);
+    if (isMpApiChannel(channel)) {
+      sendCallback(username, channel, callbackData, messageId).catch((e) => {
+        console.error("[mpapi] 按钮回调失败:", e.message);
+      });
+      return { ok: true, mode: "mpapi", queued: true };
+    }
+  } catch (e) {
+    console.error("[moviepilot] mpapi 回调分流异常:", e.message);
+  }
+
   // 存入消息队列（格式跟 Telegram callback_query 一致）
   enqueueMPMessage(username, {
     callback_query: {
@@ -472,6 +496,22 @@ async function callbackButton(username, callbackData, messageId) {
 async function sendUserMessageToMP(username, text) {
   const userId = getUserIdByUsername(username);
   if (!userId) return { error: "用户不存在: " + username };
+
+  // 方案3：若该用户通道已配置 MP 官方 API，文字直接走 /api/v1/message/agent/stream
+  // （SSE 流式），回复逐帧写入话题，保留打字机效果
+  try {
+    const { getChannelByUsername, isMpApiChannel, sendAgentMessage } = require("./mpapi");
+    const channel = getChannelByUsername(username);
+    if (isMpApiChannel(channel)) {
+      sendAgentMessage(username, channel, text).catch((e) => {
+        console.error("[mpapi] Agent 消息发送失败:", e.message);
+        appendMoviepilotMessage(username, null, `[EchoLink] 消息发送失败：${e.message}`);
+      });
+      return { ok: true, mode: "mpapi", queued: true };
+    }
+  } catch (e) {
+    console.error("[moviepilot] mpapi 发送分流异常:", e.message);
+  }
 
   // 存入消息队列（格式跟 Telegram message 一致）
   enqueueMPMessage(username, {
@@ -495,6 +535,9 @@ module.exports = {
   deleteChannel,
   toggleChannel,
   appendMoviepilotMessage,
+  startStreamMessage,
+  appendStreamMessage,
+  endStreamMessage,
   editMoviepilotMessage,
   deleteMoviepilotMessage,
   answerCallbackQuery,

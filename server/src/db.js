@@ -149,6 +149,12 @@ function initDB() {
   try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN telegram_proxy_username TEXT DEFAULT ''"); } catch (_) {}
   try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN telegram_proxy_password TEXT DEFAULT ''"); } catch (_) {}
   try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN telegram_last_update_id INTEGER DEFAULT 0"); } catch (_) {}
+  // MP 官方 API 模式（方案3：零侵入，走官方 REST + Agent SSE）
+  try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN mp_server_url TEXT DEFAULT ''"); } catch (_) {}
+  try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN mp_username TEXT DEFAULT ''"); } catch (_) {}
+  try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN mp_password TEXT DEFAULT ''"); } catch (_) {}
+  try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN mp_poll_interval INTEGER DEFAULT 30"); } catch (_) {}
+  try { db.exec("ALTER TABLE moviepilot_channels ADD COLUMN mp_last_notification_id INTEGER DEFAULT 0"); } catch (_) {}
 
   // Octop 通道：每个用户独立的 Octop 通知/交互通道配置
   db.exec(`
