@@ -1538,13 +1538,18 @@
         if (!channels.length) {
           box.innerHTML = `<div class="empty">暂无通道，点击下方按钮为用户创建。</div>`;
         } else {
-          box.innerHTML = `<table><thead><tr><th>用户</th><th>Token</th><th>状态</th><th></th></tr></thead><tbody>
+          box.innerHTML = `<table><thead><tr><th>用户</th><th>Token</th><th>MP API 模式</th><th>状态</th><th></th></tr></thead><tbody>
             ${channels.map(c => {
+              const mpCfg = c.mp_server_url
+                ? `<div style="font-size:11px;word-break:break-all">${esc(c.mp_server_url)}</div><div style="color:var(--muted);font-size:11px">@${esc(c.mp_username || "-")} · 轮询${(c.mp_poll_interval || 30)}s</div>`
+                : `<span class="badge member">未配置</span>`;
               return `<tr>
                 <td><b>${esc(c.display_name || c.username)}</b><div style="color:var(--muted);font-size:12px">@${esc(c.username)} · ID: ${c.user_id}</div></td>
                 <td><code style="font-size:11px;word-break:break-all">${esc(c.token.substring(0, 12))}...</code> <button class="btn ghost sm" data-copy-token="${c.user_id}" data-token="${esc(c.token)}">复制</button></td>
+                <td>${mpCfg}</td>
                 <td><span class="badge ${c.enabled ? "admin" : "member"}">${c.enabled ? "启用" : "禁用"}</span></td>
                 <td style="text-align:right;white-space:nowrap">
+                  <button class="btn sm" data-mpcfg="${c.user_id}">MP API 配置</button>
                   <button class="btn ghost sm" data-toggle="${c.user_id}" data-enabled="${c.enabled ? 1 : 0}">${c.enabled ? "禁用" : "启用"}</button>
                   <button class="btn sm" data-reset="${c.user_id}">重置Token</button>
                   <button class="btn danger sm" data-del="${c.user_id}">删除</button>
