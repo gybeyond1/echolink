@@ -143,12 +143,26 @@ function handleAgentEvent(username, evt, stream) {
   const type = evt.type || "message";
   console.log(`[mpapi] ${username} SSE事件 type=${type}, content长度=${(evt.content||evt.message||'').length}, session_id=${evt.session_id||''}`);
   switch (type) {
+    case "start": {
+      // MP 会话开始帧（可能带 session_id，已在循环外层同步），重置本地流
+      if (stream.messageId != null) {
+        endStreamMessage(stream.messageId);
+        stream.messageId = null;
+      }
+      break;
+    }
+    case "thinking": {
+      // 思考中帧：无正文，忽略（未来可做"正在思考…"占位）
+      break;
+    }
+    case "delta":
     case "message": {
+      // MP 流式正文帧：内容在 delta.content；兼容旧版 message 帧
       const content = evt.content || evt.message || "";
-      if (!content) { console.log(`[mpapi] ${username} SSE message 帧无内容, 忽略`); return; }
+      if (!content) { console.log(`[mpapi] ${username} SSE ${type} 帧无内容, 忽略`); return; }
       if (stream.messageId == null) {
         const r = startStreamMessage(username, content);
-        if (r.error || !r.message_id) return;
+        if (r.error || !r.message_id) { console.log(`[mpapi] ${username} startStreamMessage 失败: ${r.error}`); return; }
         stream.messageId = r.message_id;
       } else {
         appendStreamMessage(stream.messageId, content);
