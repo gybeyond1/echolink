@@ -141,7 +141,27 @@ function handleAgentEvent(username, evt, stream) {
   // 延迟 require，避免 moviepilot <-> mpapi 循环依赖
   const { startStreamMessage, appendStreamMessage, endStreamMessage } = require("./moviepilot");
   const type = evt.type || "message";
-  console.log(`[mpapi] ${username} SSE事件 type=${type}, content长度=${(evt.content||evt.message||'').length}, session_id=${evt.session_id||''}`);
+  const keys = Object.keys(evt || {});
+  const choicesN = Array.isArray(evt.choices) ? evt.choices.length : 0;
+  console.log(`[mpapi] ${username} SSE事件 type=${type}, keys=[${keys.join(',')}], choices=${choicesN}, content长度=${(evt.content||evt.message||'').length}, session_id=${evt.session_id||''}`);
+  // MP 交互按钮：choices（AgentChatChoiceCard[]）→ 写入消息 card_data.buttons
+  if (choicesN > 0 && stream.messageId != null) {
+    try {
+      const { editMoviepilotMessage } = require("./moviepilot");
+      const buttons = [];
+      for (const card of evt.choices) {
+        for (const b of (card.buttons || [])) {
+          if (b && b.label) buttons.push({ text: String(b.label), callback_data: String(b.callback_data || b.label) });
+        }
+      }
+      if (buttons.length) {
+        editMoviepilotMessage(stream.messageId, null, buttons, null);
+        console.log(`[mpapi] ${username} 交互按钮已写入消息 ${stream.messageId}: ${JSON.stringify(buttons.map(b=>b.text))}`);
+      }
+    } catch (e) {
+      console.error(`[mpapi] ${username} choices 按钮写入失败:`, e.message);
+    }
+  }
   switch (type) {
     case "start": {
       // MP 会话开始帧（可能带 session_id，已在循环外层同步），重置本地流
