@@ -41,6 +41,11 @@ function normalizeServerUrl(url) {
   return String(url || "").trim().replace(/\/+$/, "");
 }
 
+// token 缓存 key：服务器 + MP 用户名组合，保证多 MP 实例（不同服务器、相同用户名）不串 token
+function tokenCacheKey(channel) {
+  return `${normalizeServerUrl(channel.mp_server_url)}|${(channel.mp_username || "").trim()}`;
+}
+
 function getUserByUsername(username) {
   const db = getDB();
   return db.prepare("SELECT id, username FROM users WHERE username = ?").get(username);
@@ -99,12 +104,12 @@ async function mpLogin(channel) {
   if (!data || !data.access_token) {
     throw new Error(`MP 登录失败（HTTP ${status}）：${JSON.stringify(data || {}).slice(0, 200)}`);
   }
-  tokenCache.set(channel.mp_username.trim(), { token: data.access_token, fetchedAt: Date.now() });
+  tokenCache.set(tokenCacheKey(channel), { token: data.access_token, fetchedAt: Date.now() });
   return data.access_token;
 }
 
 async function ensureToken(channel) {
-  const key = channel.mp_username.trim();
+  const key = tokenCacheKey(channel);
   const cached = tokenCache.get(key);
   if (cached && cached.token) return cached.token;
   return mpLogin(channel);
@@ -112,7 +117,7 @@ async function ensureToken(channel) {
 
 // 401 时强制重登一次
 async function ensureTokenFresh(channel, token) {
-  const key = channel.mp_username.trim();
+  const key = tokenCacheKey(channel);
   const cached = tokenCache.get(key);
   if (cached && cached.token === token && Date.now() - cached.fetchedAt > 60000) {
     tokenCache.delete(key);

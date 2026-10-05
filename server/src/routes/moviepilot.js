@@ -1,6 +1,6 @@
 const express = require("express");
 const { authMiddleware } = require("../middleware/auth");
-const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic, getOrCreateChannel, verifyToken, appendMoviepilotMessage, editMoviepilotMessage, deleteMoviepilotMessage, answerCallbackQuery, getUpdates, startStreamMessage, appendStreamMessage, endStreamMessage } = require("../moviepilot");
+const { callbackButton, sendUserMessageToMP, ensureUserMoviepilotTopic, getOrCreateChannel, verifyToken, isMpApiMode, appendMoviepilotMessage, editMoviepilotMessage, deleteMoviepilotMessage, answerCallbackQuery, getUpdates, startStreamMessage, appendStreamMessage, endStreamMessage } = require("../moviepilot");
 
 const router = express.Router();
 
@@ -15,6 +15,12 @@ router.post(["/receive", "/send_message"], (req, res) => {
     return res.status(401).json({ error: "无效或缺失的通道 token" });
   }
   const username = channel.username;
+
+  // 方案3模式互斥：该通道已切换到 MP 官方 API（轮询/SSE），忽略旧插件推送，
+  // 防止同一批消息双写（MP API 轮询 + 旧插件 push 各写一份）
+  if (isMpApiMode(channel)) {
+    return res.status(200).json({ ok: true, skipped: true, mode: "mpapi" });
+  }
 
   // 兼容两种格式：MP 插件发送 {card: {...}}，旧格式直接平铺
   const card = (body.card && typeof body.card === "object") ? body.card : body;
@@ -58,6 +64,10 @@ router.post(["/receive", "/send_message"], (req, res) => {
 router.post("/edit_message", (req, res) => {
   const body = req.body || {};
   const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const chk = verifyToken(token);
+  if (chk && isMpApiMode(chk)) {
+    return res.status(200).json({ ok: true, skipped: true, mode: "mpapi" });
+  }
   const channel = verifyToken(token);
   if (!channel) {
     return res.status(401).json({ error: "无效或缺失的通道 token" });
@@ -89,6 +99,10 @@ router.post("/edit_message", (req, res) => {
 router.post("/delete_message", (req, res) => {
   const body = req.body || {};
   const token = body.token || req.query.token || req.headers["x-mp-token"];
+  const chk = verifyToken(token);
+  if (chk && isMpApiMode(chk)) {
+    return res.status(200).json({ ok: true, skipped: true, mode: "mpapi" });
+  }
   const channel = verifyToken(token);
   if (!channel) {
     return res.status(401).json({ error: "无效或缺失的通道 token" });

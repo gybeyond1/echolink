@@ -159,6 +159,15 @@ function updateChannel(userId, updates) {
   return db.prepare("SELECT * FROM moviepilot_channels WHERE user_id = ?").get(userId);
 }
 
+// 通道是否已切换到 MP 官方 API 模式（方案3）
+// 与 mpapi.isMpApiChannel 等价，但这里不 require mpapi 以避免循环依赖
+function isMpApiMode(channel) {
+  if (!channel) return false;
+  const server = (channel.mp_server_url || "").trim();
+  const user = (channel.mp_username || "").trim();
+  return channel.enabled === 1 && server.length > 0 && user.length > 0;
+}
+
 // 根据 token 验证通道，返回通道信息
 function verifyToken(token) {
   if (!token) return null;
@@ -531,6 +540,7 @@ module.exports = {
   getOrCreateChannel,
   updateChannel,
   verifyToken,
+  isMpApiMode,
   getAllChannels,
   deleteChannel,
   toggleChannel,
