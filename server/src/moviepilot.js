@@ -511,6 +511,7 @@ async function sendUserMessageToMP(username, text) {
   try {
     const { getChannelByUsername, isMpApiChannel, sendAgentMessage } = require("./mpapi");
     const channel = getChannelByUsername(username);
+    console.log(`[moviepilot] ${username} 发送分流: isMpApiChannel=${!!(channel && isMpApiChannel(channel))}, mp_server_url=${channel && channel.mp_server_url}`);
     if (isMpApiChannel(channel)) {
       sendAgentMessage(username, channel, text).catch((e) => {
         console.error("[mpapi] Agent 消息发送失败:", e.message);

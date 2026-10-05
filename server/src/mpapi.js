@@ -141,10 +141,11 @@ function handleAgentEvent(username, evt, stream) {
   // 延迟 require，避免 moviepilot <-> mpapi 循环依赖
   const { startStreamMessage, appendStreamMessage, endStreamMessage } = require("./moviepilot");
   const type = evt.type || "message";
+  console.log(`[mpapi] ${username} SSE事件 type=${type}, content长度=${(evt.content||evt.message||'').length}, session_id=${evt.session_id||''}`);
   switch (type) {
     case "message": {
       const content = evt.content || evt.message || "";
-      if (!content) return;
+      if (!content) { console.log(`[mpapi] ${username} SSE message 帧无内容, 忽略`); return; }
       if (stream.messageId == null) {
         const r = startStreamMessage(username, content);
         if (r.error || !r.message_id) return;
@@ -165,6 +166,7 @@ function handleAgentEvent(username, evt, stream) {
       break;
     }
     case "done": {
+      console.log(`[mpapi] ${username} SSE done 帧, messageId=${stream.messageId}`);
       if (stream.messageId != null) {
         endStreamMessage(stream.messageId);
         stream.messageId = null;
@@ -179,6 +181,7 @@ function handleAgentEvent(username, evt, stream) {
 // 发送 Agent 消息（SSE 流式），文字增量实时写入话题
 // sessionId 为空时用 clientSessionId（EchoLink 生成的 UUID），MP 会在流事件里返回真实 session_id
 async function sendAgentMessage(username, channel, text, sessionId) {
+  console.log(`[mpapi] ${username} sendAgentMessage 开始, server=${channel.mp_server_url}, text=${(text||'').slice(0,20)}`);
   const serverUrl = normalizeServerUrl(channel.mp_server_url);
   const token = await ensureToken(channel);
   const state = sessionState.get(username) || { serverSessionId: null, streaming: { messageId: null, active: false } };
@@ -257,6 +260,7 @@ async function sendAgentMessage(username, channel, text, sessionId) {
       stream.messageId = null;
     }
   }
+  console.log(`[mpapi] ${username} sendAgentMessage 完成, 流结束, sessionId=${state.serverSessionId}`);
   return { ok: true, mode: "mpapi", sessionId: state.serverSessionId };
 }
 
@@ -298,6 +302,7 @@ function notificationToCard(n) {
 }
 
 async function pollNotifications(channel) {
+  console.log(`[mpapi] ${channel.username || '?'} 通知轮询触发, last_id=${channel.mp_last_notification_id}`);
   const username = (channel.username || "").trim(); // EchoLink 用户名（入库/广播）
   const serverUrl = normalizeServerUrl(channel.mp_server_url);
   let token;
